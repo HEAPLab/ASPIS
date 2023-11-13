@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "iosfwd": "cpp"
-    },
-    "C_Cpp.default.includePath": [
-        "/usr/lib/llvm-15/include/"
-    ]
-}
