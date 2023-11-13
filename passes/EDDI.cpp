@@ -476,6 +476,7 @@ struct EDDI : public ModulePass {
                                         GV.isExternallyInitialized()
                                         );
           GVCopy->setAlignment(GV.getAlign());
+          GVCopy->setDSOLocal(GV.isDSOLocal());
           // Save the duplicated global so that the duplicate can be used as operand
           // of other duplicated instructions
           DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(&GV, GVCopy));
@@ -788,8 +789,6 @@ struct EDDI : public ModulePass {
       }
 
       persistCompiledFunctions();
-
-      errs() << *(Md.getFunction("uxListRemove_ret_dup")) << "\n";
 
       return true;
     }

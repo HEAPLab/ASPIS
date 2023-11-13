@@ -27,7 +27,7 @@ using namespace llvm;
  * - 0: Disabled
  * - 1: Enabled
 */
-#define INTRA_FUNCTION_CFC 0
+#define INTRA_FUNCTION_CFC 1
 #define INIT_SIGNATURE -0xDEAD // The same value has to be used as initializer for the signatures in the code
 
 /**

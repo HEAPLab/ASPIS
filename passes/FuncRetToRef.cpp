@@ -44,7 +44,7 @@ void getFuncAnnotations(Module &Md, std::map<Function*, StringRef> &FuncAnnotati
             // get the struct, which holds a pointer to the annotated function
             // as first field, and the annotation as second field
             if (ConstantStruct *CS = dyn_cast<ConstantStruct>(CAOp)) {
-            if (CS->getNumOperands() >= 2) {
+            if (CS->getNumOperands() >= 2 && isa<Function>(CS)) {
                 Function* AnnotatedFunction = cast<Function>(CS->getOperand(0)/*->getOperand(0)*/);
                 // the second field is a pointer to a global constant Array that holds the string
                 if (GlobalVariable *GAnn =

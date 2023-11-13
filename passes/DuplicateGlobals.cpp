@@ -199,7 +199,6 @@ struct DuplicateGlobals : public ModulePass {
             (FuncAnnotations.find(cast<Function>(GV)))->second.startswith("to_duplicate");
         if (! (GV->getType()->isFunctionTy() || GV->isConstant() || GV->getValueType()->isStructTy() || GV->getValueType()->isArrayTy() || GV->getValueType()->isOpaquePointerTy())
             || toDuplicate/* && ! GV.getName().endswith("_dup") */) {
-          //errs() << "Duplicating " << GV->getName() << "\n";
           // see if the global variable has already been cloned
           GlobalVariable *GVCopy = Md.getGlobalVariable((GV->getName() + "_dup").str(), true);
           Constant *Initializer = NULL;
@@ -212,7 +211,7 @@ struct DuplicateGlobals : public ModulePass {
               GVCopy->setExternallyInitialized(GV->isExternallyInitialized());
             }
           }
-          if (GVCopy == NULL) {
+          if (GVCopy == NULL && !GV->getName().endswith_insensitive("_dup")) {
             // get a copy of the global variable
             GVCopy = new GlobalVariable(
                                           Md,
