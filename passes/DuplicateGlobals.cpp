@@ -16,6 +16,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "Utils/Utils.h"
 #include <map>
 #include <list>
 #include <unordered_set>
@@ -34,43 +35,6 @@ struct DuplicateGlobals : public ModulePass {
   private:
 
     std::map<GlobalVariable*, GlobalVariable*> DuplicatedGlobals;
-
-    /**
-     * TODO This function supports only one annotation for each function, multiple annotations are discarded, perhaps I can fix this lol
-     * @param Md The module where to look for the annotations
-     * @param FuncAnnotations A map of Function and StringRef where to put the annotations for each Function
-     */
-    void getFuncAnnotations(Module &Md, std::map<Function*, StringRef> &FuncAnnotations) {
-      if(GlobalVariable* GA = Md.getGlobalVariable("llvm.global.annotations")) {
-        // the first operand holds the metadata
-        for (Value *AOp : GA->operands()) {
-          // all metadata are stored in an array of struct of metadata
-          if (ConstantArray *CA = dyn_cast<ConstantArray>(AOp)) {
-            // so iterate over the operands
-            for (Value *CAOp : CA->operands()) {
-              // get the struct, which holds a pointer to the annotated function
-              // as first field, and the annotation as second field
-              if (ConstantStruct *CS = dyn_cast<ConstantStruct>(CAOp)) {
-                if (CS->getNumOperands() >= 2) {
-                  Function* AnnotatedFunction = cast<Function>(CS->getOperand(0)/*->getOperand(0)*/);
-                  // the second field is a pointer to a global constant Array that holds the string
-                  if (GlobalVariable *GAnn =
-                          dyn_cast<GlobalVariable>(CS->getOperand(1)/*->getOperand(0)*/)) {
-                    if (ConstantDataArray *A =
-                            dyn_cast<ConstantDataArray>(GAnn->getOperand(0))) {
-                      // we have the annotation!
-                      StringRef AS = A->getAsString();
-                      //errs() << "Annotation found: " << AS << "\n";
-                      FuncAnnotations.insert(std::pair<Function*, StringRef>(AnnotatedFunction, AS));                      // if the function is new, add it to the annotated functions
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
 
   /**
    * Reads the file `Filename` and populates the set with the entries of the file.
@@ -111,13 +75,11 @@ struct DuplicateGlobals : public ModulePass {
     if (UCall->getCalledFunction() == NULL || !UCall->getCalledFunction()->hasName()) {
       return;
     }
-    //errs() << "Modifying instruction " << *UCall << "\n";
     // if the function is already a _dup function, we just duplicate the operand corresponding to our global
     if (UCall->getCalledFunction()->getName().endswith("_dup")) {
       int i = 0;
       for (auto &Op : UCall->args()) {
         if (Op == Original) {
-          //errs() << *UCall << " --- " << (UCall->getOperand(i)) << " with i=" << i << "\n";
           UCall->setOperand(i+1, Copy);
         }
         i++;
@@ -129,7 +91,6 @@ struct DuplicateGlobals : public ModulePass {
       auto *Fn = Md.getFunction(name.str() + "_dup");
       // if the function exists, we substitute the original with the duplicate
       if (Fn != NULL) {
-        //errs() << "Changing " << name << " to " << name.str() + "_dup\n";
         std::vector<Value*> args;
         for (Value *Old : UCall->args()) {
           args.push_back(Old);
@@ -232,7 +193,6 @@ struct DuplicateGlobals : public ModulePass {
 
         GlobalVariable *GVCopy = getDuplicatedGlobal(Md, *GV);
         if (GVCopy != NULL) {
-          //errs() << GV->getName() << " --- " << GVCopy->getName() << "\n";
           // clone all the stores performed on GV
 
           std::list<User*> Users;
@@ -253,7 +213,6 @@ struct DuplicateGlobals : public ModulePass {
               IClone->setOperand(IClone->getPointerOperandIndex(), GVCopy);
             }
             else if (isa<LoadInst>(U)) {
-              //errs() << "Found the load: " << *U << "\n";
               for (User *URec : U->users()) {
                 // we have a load used by a call
                 if (isa<CallBase>(URec)) {
@@ -290,13 +249,6 @@ struct DuplicateGlobals : public ModulePass {
           }
         }
       }
-      errs() << "----------------------------------------------\n";
-      for (Function *Fn : Excluded) {
-        errs() << Fn->getName() << "\n";
-      }
-      errs() << "----------------------------------------------\n";
-
-      //replaceCallsWithOriginalCalls(Md, FunctionsToNotModify);
       return true;
     }
 };

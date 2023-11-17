@@ -1,3 +1,6 @@
+#ifndef UTILS_H
+#define UTILS_H
+
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
@@ -20,3 +23,11 @@ bool IsNotAPHINode (Use &U);
  */
 void getFuncAnnotations(Module &Md, std::map<Function*, StringRef> &FuncAnnotations);
 
+// Inserts the names of the compiled functions as a csv into the file passed as parameter
+void persistCompiledFunctions(std::set<Function*> &CompiledFuncs, const char* filename);
+
+bool shouldCompile(Function &Fn, 
+    const std::map<Function*, StringRef> &FuncAnnotations,
+    const std::set<Function*> &OriginalFunctions = std::set<Function*>());
+
+#endif

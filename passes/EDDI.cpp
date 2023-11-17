@@ -25,7 +25,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "Utils/Utils.hpp"
+#include "Utils/Utils.h"
 
 using namespace llvm;
 
@@ -47,20 +47,6 @@ struct EDDI : public ModulePass {
   EDDI() : ModulePass(ID) { }
 
   private:
-    /**
-     * This function specifies whether the function Fn should be compiled.
-    */
-    bool shouldCompile(Function &Fn) {
-      return 
-          // the function is neither null nor empty
-          &Fn != nullptr && Fn.getBasicBlockList().size() != 0 
-          // Moreover, it does not have to be marked as excluded or to_duplicate
-          && (FuncAnnotations.find(&Fn) == FuncAnnotations.end() || 
-          (!FuncAnnotations.find(&Fn)->second.startswith("exclude") /* && 
-          !FuncAnnotations.find(&Fn)->second.startswith("to_duplicate") */))
-          // nor it is one of the original functions
-          && OriginalFunctions.find(&Fn) == OriginalFunctions.end();
-    }
 
     /**
      * Determines whether a instruction &I is used by store instructions different than &Use
@@ -97,16 +83,6 @@ struct EDDI : public ModulePass {
     }
 
     std::set<Function*> CompiledFuncs;
-    // Inserts the names of the compiled functions into a csv file
-    void persistCompiledFunctions() {
-      std::ofstream file;
-      file.open("compiled_eddi_functions.csv");
-      file << "fn_name\n";
-      for (Function *Fn : CompiledFuncs) {
-        file << Fn->getName().str() << "\n";
-      }
-      file.close();
-    }
 
     /**
      * Clones instruction `I` and adds the pair <I, IClone> to DuplicatedInstructionMap, 
@@ -373,7 +349,6 @@ struct EDDI : public ModulePass {
       // If Fn ends with "_dup" we have already the duplicated function.
       // If Fn is NULL, it means that we don't have a duplicate
       if (Fn == NULL || !Fn->getName().endswith("_dup")){
-        //if (Fn != NULL) errs() << "No _dup found for function: " << Fn->getName() << "\n";
         return Fn;
       }
 
@@ -646,11 +621,10 @@ struct EDDI : public ModulePass {
       std::set<Function*> DuplicatedFns;
 
       LLVM_DEBUG(dbgs() << "Retrieving functions to compile... ");
-      //LLVM_DEBUG(dbgs() << "Found: ");
       // first store the instructions to compile in the current module
       int cnt=0;
       for (Function &Fn : Md) {
-        if (shouldCompile(Fn)) {
+        if (shouldCompile(Fn, FuncAnnotations, OriginalFunctions)) {
           cnt ++;
           //LLVM_DEBUG(dbgs() << "Found: " << cnt << "\r");
           FnList.push_back(&Fn);
@@ -674,13 +648,13 @@ struct EDDI : public ModulePass {
       int i = -1;
       int tot_funcs = 0;
       for (Function &Fn : Md) {
-        if (shouldCompile(Fn)) {
+        if (shouldCompile(Fn, FuncAnnotations, OriginalFunctions)) {
           tot_funcs++;
         }
       }
       LLVM_DEBUG(dbgs() << "Iterating over the module functions...\n");
       for (Function &Fn : Md) {
-        if (shouldCompile(Fn)) {
+        if (shouldCompile(Fn, FuncAnnotations, OriginalFunctions)) {
           i++;
           LLVM_DEBUG(dbgs() << "Compiling " << i << "/" << tot_funcs << ": " << Fn.getName() << 
           "\n");
@@ -751,7 +725,7 @@ struct EDDI : public ModulePass {
         I2rm->eraseFromParent();
       }
 
-      persistCompiledFunctions();
+      persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
 
       return true;
     }

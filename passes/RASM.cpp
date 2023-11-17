@@ -15,6 +15,7 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
+#include "Utils/Utils.h"
 #include <list>
 #include <map>
 #include <iostream>
@@ -48,67 +49,12 @@ struct RASM : public ModulePass {
 
     #if (LOG_COMPILED_FUNCS == 1)
     std::set<Function*> CompiledFuncs;
-    // Inserts the names of the compiled functions into a csv file
-    void persistCompiledFunctions() {
-      std::ofstream file;
-      file.open("compiled_rasm_functions.csv");
-      file << "fn_name\n";
-      for (Function *Fn : CompiledFuncs) {
-        file << Fn->getName().str() << "\n";
-      }
-      file.close();
-    }
     #endif
-
-    /**
-     * This function specifies whether the function Fn should be compiled.
-    */
-    bool shouldCompile(Function &Fn) {
-      return &Fn != nullptr && Fn.getBasicBlockList().size() != 0 
-            && (FuncAnnotations.find(&Fn) == FuncAnnotations.end() || 
-            !FuncAnnotations.find(&Fn)->second.startswith("exclude"));
-    }
-
-    /**
-     * TODO This function supports only one annotation for each function, multiple annotations are discarded, perhaps I can fix this lol
-     * @param Md The module where to look for the annotations
-     * @param FuncAnnotations A map of Function and StringRef where to put the annotations for each Function
-     */
-    void getFuncAnnotations(Module &Md) {
-      if(GlobalVariable* GA = Md.getGlobalVariable("llvm.global.annotations")) {
-        // the first operand holds the metadata
-        for (Value *AOp : GA->operands()) {
-          // all metadata are stored in an array of struct of metadata
-          if (ConstantArray *CA = dyn_cast<ConstantArray>(AOp)) {
-            // so iterate over the operands
-            for (Value *CAOp : CA->operands()) {
-              // get the struct, which holds a pointer to the annotated function
-              // as first field, and the annotation as second field
-              if (ConstantStruct *CS = dyn_cast<ConstantStruct>(CAOp)) {
-                if (CS->getNumOperands() >= 2) {
-                  Function* AnnotatedFunction = cast<Function>(CS->getOperand(0)/*->getOperand(0)*/);
-                  // the second field is a pointer to a global constant Array that holds the string
-                  if (GlobalVariable *GAnn =
-                          dyn_cast<GlobalVariable>(CS->getOperand(1)/*->getOperand(0)*/)) {
-                    if (ConstantDataArray *A =
-                            dyn_cast<ConstantDataArray>(GAnn->getOperand(0))) {
-                      // we have the annotation!
-                      StringRef AS = A->getAsString();
-                      FuncAnnotations.insert(std::pair<Function*, StringRef>(AnnotatedFunction, AS));                      // if the function is new, add it to the annotated functions
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
 
     void initializeBlocksSignatures(Module &Md, std::map<BasicBlock*, int> &RandomNumberBBs, std::map<BasicBlock*, int> &SubRanPrevVals) {
         int i = 0;
         for (Function &Fn : Md) {
-            if (shouldCompile(Fn)) {
+            if (shouldCompile(Fn, FuncAnnotations)) {
                 for (BasicBlock &BB : Fn) {
                     if (!BB.getName().equals_insensitive("errbb")) {
                         RandomNumberBBs.insert(std::pair<BasicBlock*, int>(&BB, i));
@@ -139,7 +85,7 @@ struct RASM : public ModulePass {
         // we target only functions defined in the module (i.e. not the ones that
         // have to be linked because they are not in the scope of this compilation
         // instance)
-        if (shouldCompile(Fn)) {
+        if (shouldCompile(Fn, FuncAnnotations)) {
           for (User *U : Fn.users()) {
             if (isa<CallBase>(U)) {
               // Split the basic block containing U, insert the user into the set of call instructions
@@ -159,7 +105,7 @@ struct RASM : public ModulePass {
 
       // populate SplitBBs
       for (Function &Fn : Md) {
-        if (shouldCompile(Fn)) {
+        if (shouldCompile(Fn, FuncAnnotations)) {
           for (BasicBlock &BB : Fn) {
             if (isCallBB(BB) != nullptr) {
               SplitBBs.insert(std::pair<BasicBlock*, BasicBlock*>(&BB, BB.getUniqueSuccessor()));
@@ -181,7 +127,7 @@ struct RASM : public ModulePass {
 
     void initializeEntryBlocksMap(Module &Md) {
       for (Function &Fn : Md) {
-        if (shouldCompile(Fn)) 
+        if (shouldCompile(Fn, FuncAnnotations)) 
           FuncEntryBlocks.insert(std::pair<Function*, BasicBlock*>(&Fn, &Fn.front()));
       }
     }
@@ -260,7 +206,7 @@ struct RASM : public ModulePass {
         #if (INTRA_FUNCTION_CFC == 1) 
         // Case A, we need to update the RetSig
         CallBase *CallIn = isCallBB(BB);
-        if (CallIn != nullptr && shouldCompile(*(*CallIn).getCalledFunction())) {
+        if (CallIn != nullptr && (*CallIn).getCalledFunction() != nullptr && shouldCompile(*(*CallIn).getCalledFunction(), FuncAnnotations)) {
           // Get the signature of the called basic block after the call
           BasicBlock *SuccBB = SplitBBs.find(&BB)->second;
           int randomNumberSuccBB = RandomNumberBBs.find(SuccBB)->second;
@@ -381,7 +327,7 @@ struct RASM : public ModulePass {
   public:
 
     bool runOnModule(Module &Md) override {
-        getFuncAnnotations(Md);
+        getFuncAnnotations(Md, FuncAnnotations);
 
         // Collection of <BB, RandomSign
         std::map<BasicBlock*, int> RandomNumberBBs;
@@ -415,7 +361,7 @@ struct RASM : public ModulePass {
         #endif
 
         for (Function &Fn : Md) {
-          if (shouldCompile(Fn)) {
+          if (shouldCompile(Fn, FuncAnnotations)) {
             #if (LOG_COMPILED_FUNCS == 1)
               CompiledFuncs.insert(&Fn);
             #endif
@@ -472,7 +418,7 @@ struct RASM : public ModulePass {
         }
 
         #if (LOG_COMPILED_FUNCS == 1)
-          persistCompiledFunctions();
+          persistCompiledFunctions(CompiledFuncs, "compiled_rasm_functions.csv");
         #endif
 
         return true;
