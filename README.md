@@ -7,7 +7,7 @@ The hardening process is done by the sequence of passes depicted in the followin
 <img src="images/compiler_scheme.jpg" alt="drawing" width="400"/>
 </p>
 
-> [!NOTE] \
+> [!NOTE]
 > **No pre-built pipeline is currently available**: follow the instructions in the next sections in order to setup the pipeline manually.
 
 ## Pre-requisites
@@ -29,7 +29,7 @@ cmake --build build
 Where `your/llvm/dir` is the directory where LLVMConfig.cmake is found (check here [here](https://llvm.org/docs/CMake.html) for further information).
 
 # Usage
-> [!WARNING] \
+> [!WARNING]
 > **Only the old pass manager is currently supported**: the support for the new pass manager and the newest versions of LLVM (>15.0.0) is currently under developement.
 
 The compiled passes can be found as shared object files (`.so`) into the `build/passes` directory, and are described in the following. In order to apply the optimization, you must use LLVM  `opt` loading the respective shared object file.
