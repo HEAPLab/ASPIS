@@ -1,4 +1,4 @@
-project(SCUDO DESCRIPTION "SCUDO - Secure Computing via Upset Detection compiler Optimizations")
+project(ASPIS DESCRIPTION "ASPIS - Automatic Software-based Protection to Improve Safety")
 
 cmake_minimum_required(VERSION 3.22)
 
