@@ -1,6 +1,6 @@
 # ASPIS: Automatic Software-based Protection to Improve Safety
 
-ASPIS (from the ancient greek Ἀσπίς (Aspís),*shield*) is a out-of-tree plugin for LLVM that acts on the Intermediate-Representation (IR) in order to harden the code against Single-Event Upsets (SEUs). 
+ASPIS (from the ancient greek Ἀσπίς (Aspís), *shield*) is a out-of-tree plugin for LLVM that acts on the Intermediate-Representation (IR) in order to harden the code against Single-Event Upsets (SEUs). 
 
 The hardening process is done by the sequence of passes depicted in the following figure:
 <p align=center>
