@@ -214,5 +214,5 @@ fi;
 $CLANG $opts -O0 out.ll $asm_files -o $output_file 
 
 ## Cleanup
-#rm *.ll
-#rm out.ll.bak
+rm *.ll
+rm out.ll.bak
