@@ -28,7 +28,7 @@ for opt in $raw_opts; do
             case $opt in
                 -h | --help)
                     cat <<-EOF 
-ASPIS: Automatic Software-based Protection to Improve Safety
+ASPIS: Automatic Software-based Protection and Integrity Suite
 Usage: aspis.sh [options] file(s)...
 
 The specified files can be any C source code files. 
@@ -147,10 +147,10 @@ fi;
 ###############################################################################
 
 ## FRONTEND
-$CLANG $input_files $opts -S -emit-llvm -O0 -Xclang -disable-O0-optnone 
+$CLANG $input_files $opts -S -emit-llvm -O0 -Xclang -disable-O0-optnone -mllvm -opaque-pointers
 
 ## LINK & PREPROCESS
-$LLVM_LINK *.ll -o out.ll
+$LLVM_LINK *.ll -o out.ll -opaque-pointers
 $OPT -strip-debug out.ll -o out.ll
 $OPT -lowerswitch out.ll -o out.ll
 
@@ -214,5 +214,5 @@ fi;
 $CLANG $opts -O0 out.ll $asm_files -o $output_file 
 
 ## Cleanup
-rm *.ll
-rm out.ll.bak
+#rm *.ll
+#rm out.ll.bak
