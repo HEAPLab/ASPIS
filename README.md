@@ -1,4 +1,4 @@
-# Automatic Software-based Protection and Integrity Suite
+# ASPIS - Automatic Software-based Protection and Integrity Suite
 
 ASPIS (from the ancient Greek Ἀσπίς Aspís, *shield*) is an out-of-tree plugin for LLVM that acts on the Intermediate-Representation (IR) in order to harden the code against Single-Event Upsets (SEUs). 
 
