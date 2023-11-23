@@ -4,11 +4,8 @@ ASPIS (from the ancient Greek Ἀσπίς Aspís, *shield*) is an out-of-tree pl
 
 The hardening process is done by the sequence of passes depicted in the following figure:
 <p align=center>
-<img src="images/compiler_scheme.jpg" alt="drawing" width="400"/>
+<img src="figures/compiler_scheme.jpg" alt="drawing" width="400"/>
 </p>
-
-> [!NOTE]
-> **No pre-built pipeline is currently available**: follow the instructions in the next sections in order to set up the pipeline manually.
 
 ## Pre-requisites
 
@@ -29,8 +26,54 @@ cmake --build build
 Where `your/llvm/dir` is the directory where LLVMConfig.cmake is found (check here [here](https://llvm.org/docs/CMake.html) for further information).
 
 # Usage
+
+In order to apply ASPIS, you can use the built-in compilation pipeline provided by the `aspis.sh` shell script, or you can make your own custom compilation pipeline using LLVM `opt`.
+
 > [!WARNING]
 > **Only the old pass manager is currently supported**: the support for the new pass manager and the newest versions of LLVM (>15.0.0) is currently under developement.
+
+## Built-in compilation pipeline
+`aspis.sh` is an easy-to-use command-line interface that allows users to run the entire compilation pipeline specifying a few command-line arguments. The arguments that are not recognised are passed directly to the front-end, hence all the `clang` arguments are admissible.
+
+### Options
+ - `-h`, `--help`: Display available options.
+ - `-o <file>`: Write the compilation output to `<file>`.
+ - `--llvm-bin <path>`: Set the path to the llvm binaries (clang, opt, llvm-link) to `<path>`.
+ - `--exclude <file>`: Set the files to exclude from the compilation. The content of `<file>` is the list of files to exclude, one for each line (wildcard `*` allowed).
+ - `--asmfiles <file>`: Defines the set of assembly files required for the compilation. The content of `<file>` is the list of assembly files to pass to the linker at compilation termination, one for each line (wildcard `*` allowed).
+
+### Hardening
+ - `--eddi`: **(Default)** Enable EDDI.
+ - `--seddi`: Enable Selective-EDDI.
+ - `--fdsc`: Enable Full Duplication with Selective Checking.
+
+ - `--cfcss`: **(Default)** Enable CFCSS.
+ - `--rasm`: Enable RASM.
+ - `--inter-rasm`: Enable inter-RASM with the default signature `-0xDEAD`.
+
+### Example
+
+Sample `excludefile.txt` content:
+
+```
+dir/of/excluded/files/*.c
+file_to_esclude.c
+```
+
+Sample `asmfiles.txt` content:
+```
+dir/of/asm/files/*.s
+asmfile_to_link.s
+```
+
+Compile the files `file1.c`, `file2.c`, and `file3.c` as:
+
+```bash
+./aspis.sh --llvm-bin your/llvm/bin/ --exclude excludefile.txt --asmfiles asmfiles.txt --seddi --rasm file1.c file2.c file3.c -o <out_filename>.c
+```
+
+## Create a custom compilation pipeline
+Once ASPIS has been built, you can apply the passes using `opt`.
 
 The compiled passes can be found as shared object files (`.so`) into the `build/passes` directory, and are described in the following. In order to apply the optimization, you must use LLVM  `opt` loading the respective shared object file.
 
@@ -49,7 +92,7 @@ These are the alternative passes for control-flow checking:
 - `libRASM.so` with the `-rasm_verify` is the implementation of RASM in LLVM;
 - `libINTER_RASM` with the `-rasm_verify` is the implementation of RASM that achieves inter-function CFC.
 
-## Example of compilation with ASPIS (sEDDI + RASM)
+### Example of compilation with ASPIS (sEDDI + RASM)
 First, compile the codebase with the appropriate front-end (currently, only `clang` 15.0.0 has been tested).
 
 ```bash
