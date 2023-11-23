@@ -43,8 +43,7 @@
 include/divisible/*
 
 
-## Local 
-
+# Local 
 .idea/*.xml
 .vscode/*
 
@@ -54,3 +53,7 @@ include/*
 lib/*
 bin/*
 test/test_runner
+
+# Examples
+examples/sha/*.csv
+examples/sha/sha
