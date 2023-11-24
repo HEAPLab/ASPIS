@@ -44,7 +44,7 @@ struct RASM : public ModulePass {
   RASM() : ModulePass(ID) { }
 
   private:
-    std::map<Function*, StringRef> FuncAnnotations;
+    std::map<Value*, StringRef> FuncAnnotations;
     std::map<BasicBlock*, BasicBlock*> NewBBs;
 
     #if (LOG_COMPILED_FUNCS == 1)

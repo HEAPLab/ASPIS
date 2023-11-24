@@ -140,7 +140,7 @@ struct DuplicateGlobals : public ModulePass {
      */
     bool runOnModule(Module &Md) override {
 
-      std::map<Function*, StringRef> FuncAnnotations;
+      std::map<Value*, StringRef> FuncAnnotations;
       getFuncAnnotations(Md, FuncAnnotations);
 
       // we find the functions not to modify between the ones we already compiled with EDDI
@@ -156,8 +156,8 @@ struct DuplicateGlobals : public ModulePass {
         // we don't care if the global is constant as it should not change at runtime
         // if the global is a struct or an array we cannot just duplicate the stores
         bool toDuplicate = !isa<Function>(GV) && 
-            FuncAnnotations.find(cast<Function>(GV)) != FuncAnnotations.end() && 
-            (FuncAnnotations.find(cast<Function>(GV)))->second.startswith("to_duplicate");
+            FuncAnnotations.find(GV) != FuncAnnotations.end() && 
+            (FuncAnnotations.find(GV))->second.startswith("to_duplicate");
         if (! (GV->getType()->isFunctionTy() || GV->isConstant() || GV->getValueType()->isStructTy() || GV->getValueType()->isArrayTy() || GV->getValueType()->isOpaquePointerTy())
             || toDuplicate/* && ! GV.getName().endswith("_dup") */) {
           // see if the global variable has already been cloned

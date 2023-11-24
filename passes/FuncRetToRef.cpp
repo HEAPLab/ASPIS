@@ -18,6 +18,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "Utils/Utils.h"
+#include <llvm/IR/Value.h>
 using namespace llvm;
 
 
@@ -85,7 +86,7 @@ Function* updateFnSignature(Function &Fn, Module &Md) {
 void updateRetInstructions(Function &Fn) {
     for (BasicBlock &BB : Fn) {
         Instruction *I = BB.getTerminator();
-        if (isa<ReturnInst>(I)) {
+        if ( I != NULL && isa<ReturnInst>(I)) {
             // get the return value from the instruction
             Value *ReturnValue = cast<ReturnInst>(*I).getReturnValue();
 
@@ -173,14 +174,14 @@ void updateFunctionCalls(Function &Fn, Function &NewFn) {
 
 public:
     bool runOnModule(Module &Md) override {
-        std::map<Function*, StringRef> FuncAnnotations;
+        std::map<Value*, StringRef> FuncAnnotations;
         getFuncAnnotations(Md, FuncAnnotations);
 
         // store the functions that are currently in the module
         std::list<Function*> FnList;
 
         for (Function &Fn : Md) {
-            if (Fn.getBasicBlockList().size() != 0 && !(*FuncAnnotations.find(&Fn)).second.startswith("exclude") && !(*FuncAnnotations.find(&Fn)).second.startswith("to_duplicate")) {
+            if (Fn.size() != 0 && !(*FuncAnnotations.find(&Fn)).second.startswith("exclude") && !(*FuncAnnotations.find(&Fn)).second.startswith("to_duplicate")) {
                 FnList.push_back(&Fn);
             }
         }

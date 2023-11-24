@@ -189,6 +189,7 @@ void sha_final(SHA_INFO *sha_info)
 /* compute the SHA digest of a FILE stream */
 
 #define BLOCK_SIZE	8192
+int some_int = 0;
 BYTE data_sha[BLOCK_SIZE] = RANDOM_STRING;
 void sha_stream(SHA_INFO *sha_info)
 {

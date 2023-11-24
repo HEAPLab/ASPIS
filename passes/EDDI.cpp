@@ -364,9 +364,9 @@ struct EDDI : public ModulePass {
       Value *RuntimeSig;
       Value *RetSig;
       for (GlobalVariable &GV : Md.globals()) {
-        if (!isa<Function>(GV) && FuncAnnotations.find(cast<Function>(&GV)) != FuncAnnotations.end()) {
-          if ((FuncAnnotations.find(cast<Function>(&GV)))->second.startswith("runtime_sig") 
-              || (FuncAnnotations.find(cast<Function>(&GV)))->second.startswith("run_adj_sig")) {
+        if (!isa<Function>(GV) && FuncAnnotations.find(&GV) != FuncAnnotations.end()) {
+          if ((FuncAnnotations.find(&GV))->second.startswith("runtime_sig") 
+              || (FuncAnnotations.find(&GV))->second.startswith("run_adj_sig")) {
             continue;
           }
         }
@@ -389,17 +389,18 @@ struct EDDI : public ModulePass {
         bool hasInternalLinkage = GV.hasInternalLinkage();
         bool isMetadataInfo = GV.getSection() == "llvm.metadata";
         bool toExclude = !isa<Function>(GV) && 
-                        FuncAnnotations.find(cast<Function>(&GV)) != FuncAnnotations.end() && 
-                        (FuncAnnotations.find(cast<Function>(&GV)))->second.startswith("exclude");
+                        FuncAnnotations.find(&GV) != FuncAnnotations.end() && 
+                        (FuncAnnotations.find(&GV))->second.startswith("exclude");
 
         if (! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude) // is not function, constant, struct and does not end with _dup
             /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
                 || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
             ) {
-          Constant *Initializer = NULL;
+          Constant *Initializer = nullptr;
           if (GV.hasInitializer()) {
             Initializer = GV.getInitializer();
           }
+          
           // get a copy of the global variable
           GlobalVariable *GVCopy = new GlobalVariable(
                                         Md,
@@ -532,8 +533,8 @@ struct EDDI : public ModulePass {
             for (Value *Original : CInstr->args()) {
               Value *Copy = Original;
               // see if Original has a copy
-              if (DuplicatedInstructionMap.find(cast<Instruction>(Original)) != DuplicatedInstructionMap.end()) {
-                Copy = DuplicatedInstructionMap.find(cast<Instruction>(Original))->second;
+              if (DuplicatedInstructionMap.find(Original) != DuplicatedInstructionMap.end()) {
+                Copy = DuplicatedInstructionMap.find(Original)->second;
               }
               args.push_back(Original);
               args.push_back(Copy);
@@ -595,7 +596,7 @@ struct EDDI : public ModulePass {
     }
 
   public:
-    std::map<Function*, StringRef> FuncAnnotations;
+    std::map<Value*, StringRef> FuncAnnotations;
     std::set<Function*> OriginalFunctions;
     /**
      * I have to duplicate all instructions except function calls and branches

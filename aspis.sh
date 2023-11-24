@@ -151,8 +151,8 @@ $CLANG $input_files $opts -S -emit-llvm -O0 -Xclang -disable-O0-optnone -mllvm -
 
 ## LINK & PREPROCESS
 $LLVM_LINK *.ll -o out.ll -opaque-pointers
-$OPT -strip-debug out.ll -o out.ll
-$OPT -lowerswitch out.ll -o out.ll
+$OPT --enable-new-pm=0 -strip-debug out.ll -o out.ll
+$OPT --enable-new-pm=0 -lowerswitch out.ll -o out.ll
 
 ## FuncRetToRef
 $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -func_ret_to_ref out.ll -o out.ll
@@ -160,7 +160,7 @@ $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -func_ret_to_ref out.l
 ## DATA PROTECTION
 case $dup in
     0) 
-        $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -eddi_verify out.ll -o out.ll
+        $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -eddi_verify out.ll -o out.ll 
         ;;
     1) 
         $OPT --enable-new-pm=0 -load $DIR/build/passes/libSEDDI.so -eddi_verify out.ll -o out.ll
@@ -170,7 +170,7 @@ case $dup in
         ;;
 esac
 
-$OPT -simplifycfg out.ll -o out.ll
+$OPT --enable-new-pm=0 -simplifycfg out.ll -o out.ll
 
 ## CONTROL-FLOW CHECKING
 case $cfc in
@@ -195,8 +195,9 @@ if [[ -n "$exclude_file" ]]; then
     ## Frontend & linking
     mv out.ll out.ll.bak
     rm *.ll
-    $CLANG $opts -O0 -Xclang -disable-O0-optnone -emit-llvm -S $excluded_files out.ll.bak
-    $LLVM_LINK *.ll out.ll.bak -o out.ll
+    mv out.ll.bak out.ll
+    $CLANG $opts -O0 -Xclang -disable-O0-optnone -emit-llvm -S $excluded_files out.ll
+    $LLVM_LINK *.ll -o out.ll
 fi;
 
 ## DuplicateGlobals
@@ -215,4 +216,3 @@ $CLANG $opts -O0 out.ll $asm_files -o $output_file
 
 ## Cleanup
 rm *.ll
-rm out.ll.bak

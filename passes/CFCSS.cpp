@@ -35,7 +35,7 @@ struct CFCSS : public ModulePass {
   CFCSS() : ModulePass(ID) { }
 
   private:
-    std::map<Function*, StringRef> FuncAnnotations;
+    std::map<Value*, StringRef> FuncAnnotations;
     
     #if (LOG_COMPILED_FUNCS == 1)
     std::set<Function*> CompiledFuncs;
@@ -141,7 +141,7 @@ struct CFCSS : public ModulePass {
           CFGVerificationBB->insertInto(BB->getParent(), Pair.first);
 
           IRBuilder<> B(CFGVerificationBB);
-          Value *Cond = &CFGVerificationBB->getInstList().back();
+          Value *Cond = &CFGVerificationBB->back();
           B.CreateCondBr(Cond, BB, FuncErrBBs.find(BB->getParent())->second);
 
           // move all the phi instructions from the next BB into the CFGVerificationBB
