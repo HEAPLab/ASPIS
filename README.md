@@ -11,7 +11,9 @@ The hardening process is done by the sequence of passes depicted in the followin
 
 The toolchain has been tested with the following versions:
 - CMake 3.22.1
-- CLang 15.0.0
+- LLVM 16.0.0
+
+During the development of ASPIS, done mostly on LLVM 15, we discovered a bug in the [`splitBasicBlock()`](https://llvm.org/doxygen/classllvm_1_1BasicBlock.html#a2bc5caaabd6841e4ab97237ebcaeb86d) procedure. The bug has been fixed in LLVM 16, so it is highly recommended to use it rather than applying the patch to the previous versions. 
 
 ## Building
 
@@ -30,7 +32,7 @@ Where `your/llvm/dir` is the directory where LLVMConfig.cmake is found (check he
 In order to apply ASPIS, you can use the built-in compilation pipeline provided by the `aspis.sh` shell script, or you can make your own custom compilation pipeline using LLVM `opt`.
 
 > [!WARNING]
-> **Only the old pass manager is currently supported**: the support for the new pass manager and the newest versions of LLVM (>15.0.0) is currently under developement.
+> **Only the old pass manager is currently supported**: the support for the new pass manager and the newest versions of LLVM (>16.0.0) is currently under developement.
 
 ## Built-in compilation pipeline
 `aspis.sh` is an easy-to-use command-line interface that allows users to run the entire compilation pipeline specifying a few command-line arguments. The arguments that are not recognised are passed directly to the front-end, hence all the `clang` arguments are admissible.
@@ -93,7 +95,7 @@ These are the alternative passes for control-flow checking:
 - `libINTER_RASM` with the `-rasm_verify` is the implementation of RASM that achieves inter-function CFC.
 
 ### Example of compilation with ASPIS (sEDDI + RASM)
-First, compile the codebase with the appropriate front-end (currently, only `clang` 15.0.0 has been tested).
+First, compile the codebase with the appropriate front-end.
 
 ```bash
 clang <files.c> -emit-llvm -S
