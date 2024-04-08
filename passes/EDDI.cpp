@@ -291,11 +291,11 @@ struct EDDI : public ModulePass {
       if(!CmpInstructions.empty()) {
         // all comparisons must be true
         Value *AndInstr = B.CreateAnd(CmpInstructions);
-        B.CreateCondBr(AndInstr, I.getParent(), &ErrBB);
+        B.CreateCondBr(AndInstr, I.getParent(), &ErrBB)->setDebugLoc(I.getDebugLoc());
       }
 
       if(VerificationBB->size() == 0) {
-        B.CreateBr(I.getParent());
+        B.CreateBr(I.getParent())->setDebugLoc(I.getDebugLoc());
       }
     }
 
@@ -700,11 +700,11 @@ struct EDDI : public ModulePass {
             }
           }
 
-          // insert the code for jumping to the error basic block in case of a mismatch
+          // insert the code for calling the error basic block in case of a mismatch
           IRBuilder<> ErrB(ErrBB);
           auto CalleeF = ErrBB->getModule()->getOrInsertFunction(
               "DataCorruption_Handler", FunctionType::getVoidTy(Md.getContext()));
-          ErrB.CreateCall(CalleeF)->setDebugLoc(ErrB.getCurrentDebugLocation());
+          auto *CallI = ErrB.CreateCall(CalleeF);
           ErrB.CreateUnreachable();
 
           std::list<Instruction*> errBranches;
@@ -716,8 +716,13 @@ struct EDDI : public ModulePass {
             ValueToValueMapTy VMap;
             BasicBlock *ErrBBCopy = CloneBasicBlock(ErrBB, VMap);
             ErrBBCopy->insertInto(ErrBB->getParent(), I->getParent());
+            // set the debug location to the instruction the ErrBB is related to
+            for (Instruction &ErrI : *ErrBBCopy) {
+              ErrI.setDebugLoc(I->getDebugLoc());
+            }
             I->replaceSuccessorWith(ErrBB, ErrBBCopy);
           }
+          ErrBB->eraseFromParent();
         }
       }
 
