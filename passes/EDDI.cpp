@@ -196,7 +196,7 @@ struct EDDI : public ModulePass {
       Value *F1 = getPtrFinalValue(V1);
       Value *F2 = getPtrFinalValue(V2);
 
-      if (F1 != NULL && F2 != NULL) {
+      if (F1 != NULL && F2 != NULL && !F1->getType()->isPointerTy()) {
         Instruction *L1 = B.CreateLoad(F1->getType(), F1);
         Instruction *L2 = B.CreateLoad(F2->getType(), F2);
         if (L1->getType()->isFloatingPointTy()) {
