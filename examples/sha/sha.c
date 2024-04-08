@@ -190,11 +190,11 @@ void sha_final(SHA_INFO *sha_info)
 
 #define BLOCK_SIZE	8192
 int some_int = 0;
-BYTE data_sha[BLOCK_SIZE] = RANDOM_STRING;
+BYTE data_sha[BLOCK_SIZE+1] = RANDOM_STRING;
 void sha_stream(SHA_INFO *sha_info)
 {
     sha_init(sha_info);
-    sha_update(sha_info, &data_sha, BLOCK_SIZE);
+    sha_update(sha_info, data_sha, BLOCK_SIZE);
     sha_final(sha_info);
 }
 
@@ -202,7 +202,7 @@ void sha_stream(SHA_INFO *sha_info)
 
 void sha_print(SHA_INFO *sha_info)
 {
-    printf("%08lx %08lx %08lx %08lx %08lx\n",
+    printf("%08dx %08dx %08dx %08dx %08dx\n",
 	sha_info->digest[0], sha_info->digest[1], sha_info->digest[2],
 	sha_info->digest[3], sha_info->digest[4]);
 }
