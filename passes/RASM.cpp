@@ -362,6 +362,13 @@ struct RASM : public ModulePass {
 
         for (Function &Fn : Md) {
           if (shouldCompile(Fn, FuncAnnotations)) {
+            DebugLoc debugLoc;
+            for (auto &I : Fn.front()) {
+              if (I.getDebugLoc()) {
+                debugLoc = I.getDebugLoc();
+                break;
+              } 
+            }
             #if (LOG_COMPILED_FUNCS == 1)
               CompiledFuncs.insert(&Fn);
             #endif
@@ -405,7 +412,7 @@ struct RASM : public ModulePass {
             IRBuilder<> ErrB(ErrBB);
             auto CalleeF = ErrBB->getModule()->getOrInsertFunction(
                 "SigMismatch_Handler", FunctionType::getVoidTy(Md.getContext()));
-            ErrB.CreateCall(CalleeF)->setDebugLoc(ErrB.getCurrentDebugLocation());
+            ErrB.CreateCall(CalleeF)->setDebugLoc(debugLoc);
             ErrB.CreateUnreachable();
 
             for (auto &Elem : RandomNumberBBs) {

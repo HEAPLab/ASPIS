@@ -16,6 +16,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "Utils/Utils.h"
 #include <list>
+#include <llvm/IR/DebugLoc.h>
 #include <map>
 #include <iostream>
 #include <fstream>
@@ -255,6 +256,13 @@ struct CFCSS : public ModulePass {
 
           // create IRBuilder
           IRBuilder<> B(Md.getContext());
+          DebugLoc debugLoc;
+          for (auto &I : Fn.front()) {
+            if (I.getDebugLoc()) {
+              debugLoc = I.getDebugLoc();
+              break;
+            } 
+          }
           B.SetInsertPoint(&*Fn.front().getFirstInsertionPt());
 
           // Create G and D at the function prologue
@@ -284,7 +292,7 @@ struct CFCSS : public ModulePass {
           IRBuilder<> ErrB(ErrBB);
           auto CalleeF = ErrBB->getModule()->getOrInsertFunction(
               "SigMismatch_Handler", FunctionType::getVoidTy(Md.getContext()));
-          ErrB.CreateCall(CalleeF)->setDebugLoc(ErrB.getCurrentDebugLocation());
+          ErrB.CreateCall(CalleeF)->setDebugLoc(debugLoc);
           ErrB.CreateUnreachable();
           ErrBBs.insert(std::pair<Function*, BasicBlock*>(&Fn, ErrBB));
         }
