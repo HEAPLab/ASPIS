@@ -151,7 +151,7 @@ $CLANG $input_files $opts -S -emit-llvm -O0 -Xclang -disable-O0-optnone -mllvm -
 
 ## LINK & PREPROCESS
 $LLVM_LINK *.ll -o out.ll -opaque-pointers
-$OPT --enable-new-pm=0 -strip-debug out.ll -o out.ll
+#$OPT --enable-new-pm=0 -strip-debug out.ll -o out.ll
 $OPT --enable-new-pm=0 -lowerswitch out.ll -o out.ll
 
 ## FuncRetToRef
@@ -196,7 +196,7 @@ if [[ -n "$exclude_file" ]]; then
     mv out.ll out.ll.bak
     rm *.ll
     mv out.ll.bak out.ll
-    $CLANG $opts -O0 -Xclang -disable-O0-optnone -emit-llvm -S $excluded_files out.ll
+    $CLANG $opts -O0 -Xclang -disable-O0-optnone -emit-llvm -S $excluded_files #out.ll
     $LLVM_LINK *.ll -o out.ll
 fi;
 
