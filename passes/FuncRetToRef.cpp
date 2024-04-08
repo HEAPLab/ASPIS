@@ -73,6 +73,11 @@ Function* updateFnSignature(Function &Fn, Module &Md) {
     if(ClonedFunc->hasRetAttribute(Attribute::ZExt)) {
         ClonedFunc->removeRetAttr(Attribute::ZExt);
     }
+    
+    // we may have a noundef ret attribute and we remove it as we have no return
+    if(ClonedFunc->hasRetAttribute(Attribute::NoUndef)){
+        ClonedFunc->removeRetAttr(Attribute::NoUndef);
+    }
 
     updateRetInstructions(*ClonedFunc);
 
