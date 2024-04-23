@@ -47,7 +47,7 @@ Options:
                         assembly files to pass to the linker at compilation 
                         termination, one for each line (wildcard * allowed).
 
-Hardening:
+Hardening mechanism:
     --eddi              (Default) Enable EDDI.
     --seddi             Enable Selective-EDDI.
     --fdsc              Enable Full Duplication with Selective Checking.
@@ -55,6 +55,13 @@ Hardening:
     --cfcss             (Default) Enable CFCSS.
     --rasm              Enable RASM.
     --inter-rasm        Enable inter-RASM with the default signature -0xDEAD.
+
+Hardening options:
+    -alternate-memmap   When set, alternates the definition of original and 
+                        duplicate variables. By default they are allocated in 
+                        groups maximizing the distance between original and
+                        duplicated value.
+
 EOF
                     exit 0
                     ;;
@@ -151,7 +158,7 @@ $CLANG $input_files $opts -S -emit-llvm -O0 -Xclang -disable-O0-optnone -mllvm -
 
 ## LINK & PREPROCESS
 $LLVM_LINK *.ll -o out.ll -opaque-pointers
-#$OPT --enable-new-pm=0 -strip-debug out.ll -o out.ll
+$OPT --enable-new-pm=0 -strip-debug out.ll -o out.ll
 $OPT --enable-new-pm=0 -lowerswitch out.ll -o out.ll
 
 ## FuncRetToRef

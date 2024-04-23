@@ -9,9 +9,13 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
+#include <llvm/Support/CommandLine.h>
 #include <map>
 
 using namespace llvm;
+
+extern bool AlternateMemMapEnabled;
+extern std::string DuplicateSecName;
 
 // Given a Use U, it returns true if the instruction is a PHI instruction
 bool IsNotAPHINode (Use &U);

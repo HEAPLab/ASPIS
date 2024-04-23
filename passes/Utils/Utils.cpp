@@ -13,6 +13,13 @@
 #include <iostream>
 
 using namespace llvm;
+  
+bool AlternateMemMapEnabled;
+std::string DuplicateSecName;
+
+static cl::opt<bool, true> AlternateMemMap("alternate-memmap", cl::desc("Enable the alternate memory layout for alloca and global variables"), cl::location(AlternateMemMapEnabled), cl::init(false));
+
+static cl::opt<std::string, true> DuplicateSecNameOpt("duplicate-sec", cl::desc("Specify the name of the section where the duplicate data should be allocated"), cl::location(DuplicateSecName), cl::init(".dup_data"));
 
 bool IsNotAPHINode (Use &U){
   return !isa<PHINode>(U.getUser());

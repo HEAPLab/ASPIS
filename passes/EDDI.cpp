@@ -17,6 +17,11 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Support/CommandLine.h"
+#include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/Type.h>
+#include <llvm/Support/Errc.h>
+#include <llvm/Support/ModRef.h>
 #include <map>
 #include <list>
 #include <array>
@@ -41,7 +46,8 @@ using namespace llvm;
 //#define CHECK_AT_CALLS
 //#define CHECK_AT_BRANCH
 
-namespace {
+namespace { 
+
 struct EDDI : public ModulePass {
   static char ID; // Pass identification, replacement for typeid
   EDDI() : ModulePass(ID) { }
@@ -90,7 +96,18 @@ struct EDDI : public ModulePass {
     */
     Instruction* cloneInstr(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap) {
       Instruction *IClone = I.clone();
-      IClone->insertAfter(&I);
+      
+      if (!I.getType()->isVoidTy()) {
+        IClone->setName(I.getName() + "_dup");
+      }
+
+      // if the instruction is an alloca and alternate-memmap is disabled, place it at the end of the list of alloca instruction
+      if (AlternateMemMapEnabled == false && isa<AllocaInst>(I)) {
+        IClone->insertBefore(&*I.getParent()->getFirstNonPHIOrDbgOrAlloca());
+      } // else place it right after the instruction we are working on
+      else {
+        IClone->insertAfter(&I);
+      }
       DuplicatedInstructionMap.insert(std::pair<Instruction *, Instruction *>(&I, IClone));
       return IClone;
     }
@@ -363,10 +380,14 @@ struct EDDI : public ModulePass {
     void duplicateGlobals (Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap) {
       Value *RuntimeSig;
       Value *RetSig;
+      std::list<GlobalVariable*> GVars;
       for (GlobalVariable &GV : Md.globals()) {
-        if (!isa<Function>(GV) && FuncAnnotations.find(&GV) != FuncAnnotations.end()) {
-          if ((FuncAnnotations.find(&GV))->second.startswith("runtime_sig") 
-              || (FuncAnnotations.find(&GV))->second.startswith("run_adj_sig")) {
+        GVars.push_back(&GV);
+      }
+      for (auto GV : GVars) {
+        if (!isa<Function>(GV) && FuncAnnotations.find(GV) != FuncAnnotations.end()) {
+          if ((FuncAnnotations.find(GV))->second.startswith("runtime_sig") 
+              || (FuncAnnotations.find(GV))->second.startswith("run_adj_sig")) {
             continue;
           }
         }
@@ -380,45 +401,58 @@ struct EDDI : public ModulePass {
          *        a) It is not an array
          *        b) It is an array but its elements are neither structs nor arrays
         */
-        bool isFunction = GV.getType()->isFunctionTy();
-        bool isConstant = GV.isConstant();
-        bool isStruct = GV.getValueType()->isStructTy();
-        bool isArray = GV.getValueType()->isArrayTy();
-        bool isPointer = GV.getValueType()->isOpaquePointerTy();
-        bool endsWithDup = GV.getName().endswith("_dup");
-        bool hasInternalLinkage = GV.hasInternalLinkage();
-        bool isMetadataInfo = GV.getSection() == "llvm.metadata";
+        bool isFunction = GV->getType()->isFunctionTy();
+        bool isConstant = GV->isConstant();
+        bool isStruct = GV->getValueType()->isStructTy();
+        bool isArray = GV->getValueType()->isArrayTy();
+        bool isPointer = GV->getValueType()->isOpaquePointerTy();
+        bool endsWithDup = GV->getName().endswith("_dup");
+        bool hasInternalLinkage = GV->hasInternalLinkage();
+        bool isMetadataInfo = GV->getSection() == "llvm.metadata";
         bool toExclude = !isa<Function>(GV) && 
-                        FuncAnnotations.find(&GV) != FuncAnnotations.end() && 
-                        (FuncAnnotations.find(&GV))->second.startswith("exclude");
+                        FuncAnnotations.find(GV) != FuncAnnotations.end() && 
+                        (FuncAnnotations.find(GV))->second.startswith("exclude");
 
         if (! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude) // is not function, constant, struct and does not end with _dup
             /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
                 || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
             ) {
           Constant *Initializer = nullptr;
-          if (GV.hasInitializer()) {
-            Initializer = GV.getInitializer();
+          if (GV->hasInitializer()) {
+            Initializer = GV->getInitializer();
           }
           
+          GlobalVariable *InsertBefore;
+          
+          if (AlternateMemMapEnabled == false) {
+            InsertBefore = GVars.front();
+          } else {
+            InsertBefore = GV;
+          }
+
           // get a copy of the global variable
           GlobalVariable *GVCopy = new GlobalVariable(
                                         Md,
-                                        GV.getValueType(), 
+                                        GV->getValueType(), 
                                         false,
-                                        GV.getLinkage(),
+                                        GV->getLinkage(),
                                         Initializer,
-                                        GV.getName()+"_dup",
-                                        &GV,
-                                        GV.getThreadLocalMode(),
-                                        GV.getAddressSpace(),
-                                        GV.isExternallyInitialized()
+                                        GV->getName()+"_dup",
+                                        InsertBefore,
+                                        GV->getThreadLocalMode(),
+                                        GV->getAddressSpace(),
+                                        GV->isExternallyInitialized()
                                         );
-          GVCopy->setAlignment(GV.getAlign());
-          GVCopy->setDSOLocal(GV.isDSOLocal());
+
+          if (AlternateMemMapEnabled == false && !GV->hasSection()) {
+            GVCopy->setSection(DuplicateSecName);
+          }
+
+          GVCopy->setAlignment(GV->getAlign());
+          GVCopy->setDSOLocal(GV->isDSOLocal());
           // Save the duplicated global so that the duplicate can be used as operand
           // of other duplicated instructions
-          DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(&GV, GVCopy));
+          DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(GV, GVCopy));
         }
       }
     }
@@ -463,7 +497,7 @@ struct EDDI : public ModulePass {
 
         #ifdef CHECK_AT_STORES
           #if (SELECTIVE_CHECKING == 1)
-          if (I.getParent()->hasNPredecessorsOrMore(2)) 
+          if (I.getParent()->getTerminator()->getNumSuccessors() > 1) 
           #endif
           addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
         #endif
@@ -482,7 +516,7 @@ struct EDDI : public ModulePass {
         // add consistency checks on I
         #ifdef CHECK_AT_BRANCH
           #if (SELECTIVE_CHECKING == 1)
-          if (I.getParent()->hasNPredecessorsOrMore(2)) 
+          if (I.getParent()->getTerminator()->getNumSuccessors() > 1) 
           #endif
           addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
         #endif
@@ -506,7 +540,7 @@ struct EDDI : public ModulePass {
           // add consistency checks on I
           #ifdef CHECK_AT_CALLS
             #if (SELECTIVE_CHECKING == 1)
-            if (I.getParent()->hasNPredecessorsOrMore(2)) 
+            if (I.getParent()->getTerminator()->getNumSuccessors() > 1) 
             #endif
             addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
           #endif
@@ -519,7 +553,7 @@ struct EDDI : public ModulePass {
           // add consistency checks on I
           #ifdef CHECK_AT_CALLS
             #if (SELECTIVE_CHECKING == 1)
-            if (I.getParent()->hasNPredecessorsOrMore(2)) 
+            if (I.getParent()->getTerminator()->getNumSuccessors() > 1) 
             #endif
             addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
           #endif
@@ -530,14 +564,23 @@ struct EDDI : public ModulePass {
           // if the _dup function exists, we substitute the call instruction with a call to the function with duplicated arguments
           if (Fn != NULL) {
             std::vector<Value*> args;
+            int i=0;
             for (Value *Original : CInstr->args()) {
               Value *Copy = Original;
               // see if Original has a copy
               if (DuplicatedInstructionMap.find(Original) != DuplicatedInstructionMap.end()) {
                 Copy = DuplicatedInstructionMap.find(Original)->second;
               }
-              args.push_back(Original);
-              args.push_back(Copy);
+
+              if (AlternateMemMapEnabled == false) {
+                args.insert(args.begin()+i, Original);
+                args.push_back(Copy);
+              }
+              else {
+                args.push_back(Original);
+                args.push_back(Copy);
+              }
+              i++;
             }
             
             if (Fn != CInstr->getCalledFunction()){
@@ -566,28 +609,37 @@ struct EDDI : public ModulePass {
       return false;
     }
 
-    // TODO (optimization) duplicate the arguments in a different way: (arg1, arg1_dup, arg2, arg2_dup) -> (arg1, arg2, arg1_dup, arg2_dup)
     Function *duplicateFnArgs(Function &Fn, Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap) {
       Type *RetType = Fn.getReturnType();
       FunctionType *FnType = Fn.getFunctionType();
 
-      // create the param type list
-      std::vector<Type*> paramTypeList;
-      for (Type *ParamType : FnType->params()) {
-          paramTypeList.push_back(ParamType);
-          paramTypeList.push_back(ParamType); // two times
+      // create the param type lists
+      std::vector<Type*> paramTypeVec;
+      for (int i=0; i < Fn.arg_size(); i++) {
+        Type *ParamType = FnType->params()[i];
+        if (AlternateMemMapEnabled == false) { // sequential
+          paramTypeVec.insert(paramTypeVec.begin()+i, ParamType);
+          paramTypeVec.push_back(ParamType);
+        } else {
+          paramTypeVec.push_back(ParamType);
+          paramTypeVec.push_back(ParamType); // two times
+        }
       }
 
       // update the function type adding the duplicated args
       FunctionType *NewFnType = FnType->get(RetType,              // returntype
-                                          paramTypeList,          // params
+                                          paramTypeVec,          // params
                                           FnType->isVarArg());    // vararg
       
       // create the function and clone the old one
       Function *ClonedFunc = Fn.Create(NewFnType, Fn.getLinkage(), Fn.getName() + "_dup", Fn.getParent());
       ValueToValueMapTy Params;
       for (int i=0; i < Fn.arg_size(); i++) {
+        if (AlternateMemMapEnabled == false) {
+          Params[Fn.getArg(i)] = ClonedFunc->getArg(Fn.arg_size() + i);
+        } else {
           Params[Fn.getArg(i)] = ClonedFunc->getArg(i*2);
+        }
       }
       SmallVector<ReturnInst*, 8> returns;
       CloneFunctionInto(ClonedFunc, &Fn, Params, CloneFunctionChangeType::GlobalChanges, returns);
@@ -632,7 +684,7 @@ struct EDDI : public ModulePass {
           ValueToValueMapTy Params;
           Function *OriginalFn = CloneFunction(&Fn, Params);
           OriginalFunctions.insert(OriginalFn);
-          OriginalFn->setName(Fn.getName() + "_original");
+          OriginalFn->setName(Fn.getName().str() + "_original");
         }
       }
 

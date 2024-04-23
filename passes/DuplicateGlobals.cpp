@@ -17,6 +17,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "Utils/Utils.h"
+#include <llvm/Support/CommandLine.h>
 #include <map>
 #include <list>
 #include <unordered_set>
@@ -27,7 +28,8 @@ using namespace llvm;
 
 #define DEBUG_TYPE "eddi_verification"
 
-namespace {
+namespace {  
+  
 struct DuplicateGlobals : public ModulePass {
   static char ID; // Pass identification, replacement for typeid
   DuplicateGlobals() : ModulePass(ID) { }
@@ -80,7 +82,11 @@ struct DuplicateGlobals : public ModulePass {
       int i = 0;
       for (auto &Op : UCall->args()) {
         if (Op == Original) {
-          UCall->setOperand(i+1, Copy);
+          if (AlternateMemMapEnabled == false) {
+            UCall->setOperand(i + UCall->arg_size()/2, Copy);
+          } else {
+            UCall->setOperand(i+1, Copy);
+          }
         }
         i++;
       }
@@ -92,14 +98,26 @@ struct DuplicateGlobals : public ModulePass {
       // if the function exists, we substitute the original with the duplicate
       if (Fn != NULL) {
         std::vector<Value*> args;
+        int i=0;
         for (Value *Old : UCall->args()) {
           args.push_back(Old);
-          if (Old == Original) {
-            args.push_back(Copy);
+          if (AlternateMemMapEnabled == false) {
+            if (Old == Original) {
+              args.insert(args.begin() + i, Copy);
+            }
+            else {
+              args.insert(args.begin() + i, Old);
+            }
           }
           else {
-            args.push_back(Old);
+            if (Old == Original) {
+              args.push_back(Copy);
+            }
+            else {
+              args.push_back(Old);
+            }
           }
+          i++;
         }
         // replace the original with the dup function
         IRBuilder<> B(UCall);
