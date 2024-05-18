@@ -1,3 +1,9 @@
+#ifndef __i386__
+
+#error This code requires compilation with the -m32 flag.
+
+#endif
+
 /* NIST Secure Hash Algorithm */
 /* heavily modified by Uwe Hollerbach uh@alumni.caltech edu */
 /* from Peter C. Gutmann's implementation as found in */
@@ -202,7 +208,7 @@ void sha_stream(SHA_INFO *sha_info)
 
 void sha_print(SHA_INFO *sha_info)
 {
-    printf("%08dx %08dx %08dx %08dx %08dx\n",
+    printf("%08lx %08lx %08lx %08lx %08lx\n",
 	sha_info->digest[0], sha_info->digest[1], sha_info->digest[2],
 	sha_info->digest[3], sha_info->digest[4]);
 }
