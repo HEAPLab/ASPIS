@@ -16,10 +16,16 @@ excluded_files=""
 asm_file=""
 asm_files=""
 input_files=""
-opts=
+clang_options=
+eddi_options=
+cfc_options=
 llvm_bin=$(dirname $(which clang))
 dup=0 # 0 = eddi,   1 = seddi,  2 = fdsc
 cfc=0 # 0 = cfcss,  1 = rasm,   2 = inter-rasm
+debug_enabled=false
+verbose=false
+cleanup=true
+
 raw_opts="$@"
 
 for opt in $raw_opts; do
@@ -28,7 +34,18 @@ for opt in $raw_opts; do
             case $opt in
                 -h | --help)
                     cat <<-EOF 
-ASPIS: Automatic Software-based Protection and Integrity Suite
+.-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=''=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-.
+|                          _____ _____ _____  _____                |
+!                   /\    / ____|  __ \_   _|/ ____|               !
+:                  /  \  | (___ | |__) || | | (___                 :
+:                 / /\ \  \___ \|  ___/ | |  \___ \                :
+.                / ____ \ ____) | |    _| |_ ____) |               .
+:               /_/    \_\_____/|_|   |_____|_____/                :
+:                                                                  :
+!  ASPIS: Automatic Software-based Protection and Integrity Suite  !
+|                                                                  |
+'-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=..=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'
+
 Usage: aspis.sh [options] file(s)...
 
 The specified files can be any C source code files. 
@@ -36,6 +53,7 @@ By default, the compiler performs EDDI+CFCSS hardening.
 
 Options:
     -h, --help          Display available options.
+    -v, --verbose       Turn on verbose mode
     -o <file>           Write the compilation output to <file>.
     --llvm-bin <path>   Set the path to the llvm binaries (clang, opt, 
                         llvm-link) to <path>.
@@ -46,6 +64,8 @@ Options:
                         compilation. The content of <file> is the list of 
                         assembly files to pass to the linker at compilation 
                         termination, one for each line (wildcard * allowed).
+    --no-cleanup        Does not remove the intermediate .ll files generated,
+                        which mkght be useful for debug purposes.
 
 Hardening mechanism:
     --eddi              (Default) Enable EDDI.
@@ -55,9 +75,10 @@ Hardening mechanism:
     --cfcss             (Default) Enable CFCSS.
     --rasm              Enable RASM.
     --inter-rasm        Enable inter-RASM with the default signature -0xDEAD.
+    --no-cfc            Completely disable control-flow checking
 
 Hardening options:
-    -alternate-memmap   When set, alternates the definition of original and 
+    --alternate-memmap  When set, alternates the definition of original and 
                         duplicate variables. By default they are allocated in 
                         groups maximizing the distance between original and
                         duplicated value.
@@ -65,7 +86,9 @@ Hardening options:
 EOF
                     exit 0
                     ;;
-
+                -v | --verbose)
+                    verbose=true;
+                    ;;
                 -o*)
                     if [[ ${#opt} -eq 2 ]]; then
                         parse_state=1;
@@ -112,11 +135,24 @@ EOF
                 --inter-rasm)
                     cfc=2
                     ;;
+                --no-cfc)
+                    cfc=-1
+                    ;;
+                --alternate-memmap)
+                    eddi_options="$eddi_options $opt=true";
+                    ;;
+                -g)
+                    debug_enabled=true;
+                    clang_options="$clang_options $opt";
+                    ;;
+                --no-cleanup)
+                    cleanup=false;
+                    ;;
                 *.c)
                     input_files="$input_files $opt";
                     ;;
                 *)
-                    opts="$opts $opt";
+                    clang_options="$clang_options $opt";
                     ;;
             esac;
             ;;
@@ -143,6 +179,14 @@ EOF
     esac
 done
 
+if [[ $verbose == true ]]; then
+    echo "Verbose mode ON"
+    # Function to display commands
+    exe() { echo -e "\t\$ $@" ; "$@" ; }
+else
+    exe() { "$@" ; }
+fi
+
 CLANG="${llvm_bin}/clang" 
 OPT="${llvm_bin}/opt"
 LLVM_LINK="${llvm_bin}/llvm-link"
@@ -153,44 +197,58 @@ fi;
 
 ###############################################################################
 
+echo -e "=== Front-end and pre-processing ==="
+
 ## FRONTEND
-$CLANG $input_files $opts -S -emit-llvm -O0 -Xclang -disable-O0-optnone -mllvm -opaque-pointers
+exe $CLANG $input_files $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -mllvm -opaque-pointers
 
 ## LINK & PREPROCESS
-$LLVM_LINK *.ll -o out.ll -opaque-pointers
-$OPT --enable-new-pm=0 -strip-debug out.ll -o out.ll
-$OPT --enable-new-pm=0 -lowerswitch out.ll -o out.ll
+exe $LLVM_LINK *.ll -o out.ll -opaque-pointers
+
+echo -e "\xE2\x9C\x94 Emitted and linked IR."
+
+if [[ $debug_enabled == false ]]; then
+    exe $OPT --enable-new-pm=0 -strip-debug out.ll -o out.ll
+    echo -e "\xE2\x9C\x94 Debug mode disabled, stripped debug symbols."
+fi
+
+exe $OPT --enable-new-pm=0 -lowerswitch out.ll -o out.ll
 
 ## FuncRetToRef
-$OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -func_ret_to_ref out.ll -o out.ll
+exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -func_ret_to_ref out.ll -o out.ll
 
+echo -e "\n=== ASPIS transformations =========="
 ## DATA PROTECTION
 case $dup in
     0) 
-        $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -eddi_verify out.ll -o out.ll 
+        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -eddi_verify out.ll -o out.ll $eddi_options
         ;;
     1) 
-        $OPT --enable-new-pm=0 -load $DIR/build/passes/libSEDDI.so -eddi_verify out.ll -o out.ll
+        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libSEDDI.so -eddi_verify out.ll -o out.ll $eddi_options
         ;;
     2) 
-        $OPT --enable-new-pm=0 -load $DIR/build/passes/libFDSC.so -eddi_verify out.ll -o out.ll
+        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libFDSC.so -eddi_verify out.ll -o out.ll $eddi_options
         ;;
 esac
+echo -e "\xE2\x9C\x94 Applied data protection passes."
 
 $OPT --enable-new-pm=0 -simplifycfg out.ll -o out.ll
 
 ## CONTROL-FLOW CHECKING
 case $cfc in
     0) 
-        $OPT --enable-new-pm=0 -load $DIR/build/passes/libCFCSS.so -cfcss_verify out.ll -o out.ll
+        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libCFCSS.so -cfcss_verify out.ll -o out.ll $cfc_options
         ;;
     1) 
-        $OPT --enable-new-pm=0 -load $DIR/build/passes/libRASM.so -rasm_verify out.ll -o out.ll
+        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libRASM.so -rasm_verify out.ll -o out.ll $cfc_options
         ;;
     2) 
-        $OPT --enable-new-pm=0 -load $DIR/build/passes/libINTER_RASM.so -rasm_verify out.ll -o out.ll
+        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libINTER_RASM.so -rasm_verify out.ll -o out.ll $cfc_options
         ;;
+    *)
+        echo -e "\t--no-cfc specified!"
 esac
+echo -e "\xE2\x9C\x94 Applied CFC passes."
 
 if [[ -n "$exclude_file" ]]; then
     # scan the directories of excluded files
@@ -200,16 +258,19 @@ if [[ -n "$exclude_file" ]]; then
     done < "$exclude_file";
 
     ## Frontend & linking
-    mv out.ll out.ll.bak
-    rm *.ll
-    mv out.ll.bak out.ll
-    $CLANG $opts -O0 -Xclang -disable-O0-optnone -emit-llvm -S $excluded_files #out.ll
-    $LLVM_LINK *.ll -o out.ll
+    exe mv out.ll out.ll.bak
+    exe rm *.ll
+    exe mv out.ll.bak out.ll
+    exe $CLANG $clang_options -O0 -Xclang -disable-O0-optnone -emit-llvm -S $excluded_files #out.ll
+    exe $LLVM_LINK *.ll -o out.ll
 fi;
+echo -e "\xE2\x9C\x94 Linked excluded files to the compilation."
 
 ## DuplicateGlobals
-$OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -duplicate_globals out.ll -o out.ll
+exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -duplicate_globals out.ll -o out.ll -S $eddi_options
+echo -e "\xE2\x9C\x94 Duplicated globals."
 
+echo -e "\n=== Back-end ======================="
 if [[ -n "$asm_file" ]]; then
     # scan the directories of excluded files
     while IFS= read -r line 
@@ -219,7 +280,13 @@ if [[ -n "$asm_file" ]]; then
 fi;
 
 ## Backend
-$CLANG $opts -O0 out.ll $asm_files -o $output_file 
+exe $CLANG $clang_options -O0 out.ll $asm_files -o $output_file 
+echo -e "\xE2\x9C\x94 Binary emitted."
 
-## Cleanup
-rm *.ll
+#Cleanup
+if [[ $cleanup == true ]]; then
+    rm *.ll
+    echo -e "\xE2\x9C\x94 Cleaned cached files."
+fi
+
+echo -e "\nDone!"
