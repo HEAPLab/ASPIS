@@ -218,35 +218,36 @@ struct DuplicateGlobals : public ModulePass {
             Users.push_back(U);
           }
           for (User *U : Users) {
-            // the user has to be a store of a excluded function writing the global 
-            if (isa<StoreInst>(U) && 
-                cast<StoreInst>(U)->getPointerOperand() == GV && 
-                FunctionsToNotModify.find(cast<Instruction>(U)->getParent()->getParent()->getName().str()) == FunctionsToNotModify.end()) {
-              // duplicate the store!
-              StoreInst *I = cast<StoreInst>(U);
-              StoreInst *IClone = cast<StoreInst>(I->clone());
-              IClone->insertAfter(I);
+            if (FunctionsToNotModify.find(cast<Instruction>(U)->getParent()->getParent()->getName().str()) == FunctionsToNotModify.end()) {
+              // the user has to be a store of a excluded function writing the global 
+              if (isa<StoreInst>(U) && 
+                  cast<StoreInst>(U)->getPointerOperand() == GV) {
+                // duplicate the store!
+                StoreInst *I = cast<StoreInst>(U);
+                StoreInst *IClone = cast<StoreInst>(I->clone());
+                IClone->insertAfter(I);
 
-              // change the operand
-              IClone->setOperand(IClone->getPointerOperandIndex(), GVCopy);
-            }
-            else if (isa<LoadInst>(U)) {
-              for (User *URec : U->users()) {
-                // we have a load used by a call
-                if (isa<CallBase>(URec)) {
-                  LoadInst *ULoad = cast<LoadInst>(U);
-                  Instruction *ULoadClone = ULoad->clone();
-                  ULoadClone->insertAfter(ULoad);
-                  int id = ULoad->getPointerOperandIndex();
-                  ULoadClone->setOperand(id, GVCopy);
-                  
-                  duplicateCall(Md, cast<CallBase>(URec), ULoad, ULoadClone);
-                  break;
+                // change the operand
+                IClone->setOperand(IClone->getPointerOperandIndex(), GVCopy);
+              }
+              else if (isa<LoadInst>(U)) {
+                for (User *URec : U->users()) {
+                  // we have a load used by a call
+                  if (isa<CallBase>(URec)) {
+                    LoadInst *ULoad = cast<LoadInst>(U);
+                    Instruction *ULoadClone = ULoad->clone();
+                    ULoadClone->insertAfter(ULoad);
+                    int id = ULoad->getPointerOperandIndex();
+                    ULoadClone->setOperand(id, GVCopy);
+                    
+                    duplicateCall(Md, cast<CallBase>(URec), ULoad, ULoadClone);
+                    break;
+                  }
                 }
               }
-            }
             else if (isa<CallBase>(U)) {
-              duplicateCall(Md, cast<CallBase>(U), GV, GVCopy);
+                duplicateCall(Md, cast<CallBase>(U), GV, GVCopy);
+              }
             }
           }
         }

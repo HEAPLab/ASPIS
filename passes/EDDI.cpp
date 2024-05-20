@@ -97,7 +97,7 @@ struct EDDI : public ModulePass {
     Instruction* cloneInstr(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap) {
       Instruction *IClone = I.clone();
       
-      if (!I.getType()->isVoidTy()) {
+      if (!I.getType()->isVoidTy() && I.hasName()) {
         IClone->setName(I.getName() + "_dup");
       }
 
@@ -720,16 +720,22 @@ struct EDDI : public ModulePass {
           // them in order to access them during the instruction 
           // duplication phase
           if (DuplicatedFns.find(&Fn) != DuplicatedFns.end()) {
-
             // save the function arguments and their duplicates
-            for (int i=0; i < Fn.arg_size(); i=i+2) {
-              Value *Arg = Fn.getArg(i);
-              Value *ArgClone = Fn.getArg(i+1);
+            for (int i=0; i<Fn.arg_size(); i++) {
+              Value *Arg, *ArgClone;
+              if (AlternateMemMapEnabled == false) {
+                if (i >= Fn.arg_size()/2) {
+                  break;
+                }
+                Arg = Fn.getArg(i);
+                ArgClone = Fn.getArg(i*2);
+              }
+              else {
+                if (i%2 == 1) continue;
+                Arg = Fn.getArg(i);
+                ArgClone = Fn.getArg(i+1);
+              }
               DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(Arg, ArgClone));
-            }
-
-            for (int i=0; i < Fn.arg_size(); i=i+2) {
-              Value *Arg = Fn.getArg(i);
               for (User *U : Arg->users()) {
                 if (isa<Instruction>(U)) {
                   // duplicate the uses of each argument
