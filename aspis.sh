@@ -17,8 +17,8 @@ asm_file=""
 asm_files=""
 input_files=""
 clang_options=
-eddi_options=
-cfc_options=
+eddi_options="-S"
+cfc_options="-S"
 llvm_bin=$(dirname $(which clang))
 dup=0 # 0 = eddi,   1 = seddi,  2 = fdsc
 cfc=0 # 0 = cfcss,  1 = rasm,   2 = inter-rasm
