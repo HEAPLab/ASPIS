@@ -218,7 +218,7 @@ struct DuplicateGlobals : public ModulePass {
             Users.push_back(U);
           }
           for (User *U : Users) {
-            if (FunctionsToNotModify.find(cast<Instruction>(U)->getParent()->getParent()->getName().str()) == FunctionsToNotModify.end()) {
+            if (isa<Instruction>(U) && FunctionsToNotModify.find(cast<Instruction>(U)->getParent()->getParent()->getName().str()) == FunctionsToNotModify.end()) {
               // the user has to be a store of a excluded function writing the global 
               if (isa<StoreInst>(U) && 
                   cast<StoreInst>(U)->getPointerOperand() == GV) {
