@@ -34,4 +34,6 @@ bool shouldCompile(Function &Fn,
     const std::map<Value*, StringRef> &FuncAnnotations,
     const std::set<Function*> &OriginalFunctions = std::set<Function*>());
 
+DebugLoc findNearestDebugLoc(Instruction &I);
+
 #endif

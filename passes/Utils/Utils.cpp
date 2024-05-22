@@ -9,6 +9,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include <map>
+#include <list>
 #include <fstream>
 #include <iostream>
 
@@ -82,4 +83,37 @@ bool shouldCompile(Function &Fn,
       !FuncAnnotations.find(&Fn)->second.startswith("to_duplicate") */))
       // nor it is one of the original functions
       && OriginalFunctions.find(&Fn) == OriginalFunctions.end();
+}
+
+DebugLoc findNearestDebugLoc(Instruction &I) {
+  std::list<BasicBlock*> candidates;
+
+  auto *PrevI = I.getPrevNonDebugInstruction();
+
+  while (PrevI = PrevI->getPrevNonDebugInstruction()) {
+    if (auto DL = PrevI->getDebugLoc()) {
+      return DL;
+    }
+  }
+
+  for (auto *U : I.getParent()->users()) {
+    candidates.push_back(cast<Instruction>(U)->getParent());
+  }
+
+  for (auto *BB : candidates) {
+    PrevI = BB->getTerminator();
+    while (PrevI = PrevI->getPrevNonDebugInstruction()) {
+      if (auto DL = PrevI->getDebugLoc()) {
+        return DL;
+      }
+    }
+    for (auto *U : BB->users()) {
+      if(std::find(candidates.begin(), candidates.end(), cast<Instruction>(U)->getParent()) == candidates.end()) {
+        candidates.push_back(cast<Instruction>(U)->getParent());
+      }
+    }
+  }
+  errs() << "Could not find nearest debug location! Aborting compilation.\n";
+  abort();
+  return nullptr;
 }
