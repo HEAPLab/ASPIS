@@ -109,6 +109,7 @@ struct EDDI : public ModulePass {
         IClone->insertAfter(&I);
       }
       DuplicatedInstructionMap.insert(std::pair<Instruction *, Instruction *>(&I, IClone));
+      DuplicatedInstructionMap.insert(std::pair<Instruction *, Instruction *>(IClone, &I));
       return IClone;
     }
 
@@ -273,7 +274,8 @@ struct EDDI : public ModulePass {
                   Value *OriginalElem = B.CreateExtractValue(Original, i);
                   Value *CopyElem = B.CreateExtractValue(Copy, i);
                   DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(OriginalElem, CopyElem));
-                  
+                  DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(CopyElem, OriginalElem));
+                                    
                   if (OriginalElem->getType()->isPointerTy()) {
                     Value *CmpInstr = comparePtrs(*OriginalElem, *CopyElem, B);
                     if (CmpInstr != NULL) {
@@ -444,7 +446,7 @@ struct EDDI : public ModulePass {
                                         GV->isExternallyInitialized()
                                         );
 
-          if (AlternateMemMapEnabled == false && !GV->hasSection()) {
+          if (AlternateMemMapEnabled == false && !GV->hasSection() && !GV->hasInitializer()) {
             GVCopy->setSection(DuplicateSecName);
           }
 
@@ -453,6 +455,7 @@ struct EDDI : public ModulePass {
           // Save the duplicated global so that the duplicate can be used as operand
           // of other duplicated instructions
           DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(GV, GVCopy));
+          DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(GVCopy, GV));
         }
       }
     }
@@ -492,7 +495,7 @@ struct EDDI : public ModulePass {
 
         // duplicate the operands
         duplicateOperands(I, DuplicatedInstructionMap, ErrBB);
-
+        
         // add consistency checks on I
 
         #ifdef CHECK_AT_STORES
@@ -515,10 +518,8 @@ struct EDDI : public ModulePass {
 
         // add consistency checks on I
         #ifdef CHECK_AT_BRANCH
-          #if (SELECTIVE_CHECKING == 1)
           if (I.getParent()->getTerminator()->getNumSuccessors() > 1) 
-          #endif
-          addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
+            addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
         #endif
       }
 
@@ -585,6 +586,7 @@ struct EDDI : public ModulePass {
             
             if (Fn != CInstr->getCalledFunction()){
               Instruction *NewCInstr = B.CreateCall(Fn->getFunctionType(), Fn, args);
+              NewCInstr->setDebugLoc(CInstr->getDebugLoc());
               res = 1;
               CInstr->replaceNonMetadataUsesWith(NewCInstr);
             }
@@ -728,7 +730,7 @@ struct EDDI : public ModulePass {
                   break;
                 }
                 Arg = Fn.getArg(i);
-                ArgClone = Fn.getArg(i*2);
+                ArgClone = Fn.getArg(i+Fn.arg_size()/2);
               }
               else {
                 if (i%2 == 1) continue;
@@ -736,6 +738,7 @@ struct EDDI : public ModulePass {
                 ArgClone = Fn.getArg(i+1);
               }
               DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(Arg, ArgClone));
+              DuplicatedInstructionMap.insert(std::pair<Value*, Value*>(ArgClone, Arg));
               for (User *U : Arg->users()) {
                 if (isa<Instruction>(U)) {
                   // duplicate the uses of each argument
@@ -776,7 +779,12 @@ struct EDDI : public ModulePass {
             ErrBBCopy->insertInto(ErrBB->getParent(), I->getParent());
             // set the debug location to the instruction the ErrBB is related to
             for (Instruction &ErrI : *ErrBBCopy) {
-              ErrI.setDebugLoc(I->getDebugLoc());
+              if (!I->getDebugLoc()) {
+                ErrI.setDebugLoc(findNearestDebugLoc(*Fn.back().getTerminator()));
+              }
+              else { 
+                ErrI.setDebugLoc(I->getDebugLoc());
+              }
             }
             I->replaceSuccessorWith(ErrBB, ErrBBCopy);
           }
