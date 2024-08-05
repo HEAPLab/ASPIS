@@ -34,7 +34,7 @@ for opt in $raw_opts; do
             case $opt in
                 -h | --help)
                     cat <<-EOF 
-.-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=''=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-.
+.-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-====-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-.
 |                          _____ _____ _____  _____                |
 !                   /\    / ____|  __ \_   _|/ ____|               !
 :                  /  \  | (___ | |__) || | | (___                 :
@@ -44,7 +44,7 @@ for opt in $raw_opts; do
 :                                                                  :
 !  ASPIS: Automatic Software-based Protection and Integrity Suite  !
 |                                                                  |
-'-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=..=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'
+'--.. .- -. . .-.. .-.. .- -.-. ..- .-.. ---=-=-=-=-=-=-=-=-=-=-=-='
 
 Usage: aspis.sh [options] file(s)...
 
@@ -65,7 +65,7 @@ Options:
                         assembly files to pass to the linker at compilation 
                         termination, one for each line (wildcard * allowed).
     --no-cleanup        Does not remove the intermediate .ll files generated,
-                        which mkght be useful for debug purposes.
+                        which might be useful for debug purposes.
 
 Hardening mechanism:
     --eddi              (Default) Enable EDDI.
@@ -208,42 +208,42 @@ exe $LLVM_LINK *.ll -o out.ll -opaque-pointers
 echo -e "\xE2\x9C\x94 Emitted and linked IR."
 
 if [[ $debug_enabled == false ]]; then
-    exe $OPT --enable-new-pm=0 -strip-debug out.ll -o out.ll
+    exe $OPT --enable-new-pm=1 --passes="strip-debug" out.ll -o out.ll
     echo -e "\xE2\x9C\x94 Debug mode disabled, stripped debug symbols."
 fi
 
-exe $OPT --enable-new-pm=0 -lowerswitch out.ll -o out.ll
+exe $OPT --enable-new-pm=1 --passes="lowerswitch" out.ll -o out.ll
 
 ## FuncRetToRef
-exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -func_ret_to_ref out.ll -o out.ll
+exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="func-ret-to-ref" out.ll -o out.ll
 
 echo -e "\n=== ASPIS transformations =========="
 ## DATA PROTECTION
 case $dup in
     0) 
-        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -eddi_verify out.ll -o out.ll $eddi_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="eddi-verify" out.ll -o out.ll $eddi_options
         ;;
     1) 
-        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libSEDDI.so -eddi_verify out.ll -o out.ll $eddi_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libSEDDI.so --passes="eddi-verify" out.ll -o out.ll $eddi_options
         ;;
     2) 
-        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libFDSC.so -eddi_verify out.ll -o out.ll $eddi_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libFDSC.so --passes="eddi-verify" out.ll -o out.ll $eddi_options
         ;;
 esac
 echo -e "\xE2\x9C\x94 Applied data protection passes."
 
-$OPT --enable-new-pm=0 -simplifycfg out.ll -o out.ll
+$OPT --enable-new-pm=1 --passes="simplifycfg" out.ll -o out.ll
 
 ## CONTROL-FLOW CHECKING
 case $cfc in
     0) 
-        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libCFCSS.so -cfcss_verify out.ll -o out.ll $cfc_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libCFCSS.so --passes="cfcss-verify" out.ll -o out.ll $cfc_options
         ;;
     1) 
-        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libRASM.so -rasm_verify out.ll -o out.ll $cfc_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libRASM.so --passes="rasm-verify" out.ll -o out.ll $cfc_options
         ;;
     2) 
-        exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libINTER_RASM.so -rasm_verify out.ll -o out.ll $cfc_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libINTER_RASM.so --passes="rasm-verify" out.ll -o out.ll $cfc_options
         ;;
     *)
         echo -e "\t--no-cfc specified!"
@@ -267,7 +267,7 @@ fi;
 echo -e "\xE2\x9C\x94 Linked excluded files to the compilation."
 
 ## DuplicateGlobals
-exe $OPT --enable-new-pm=0 -load $DIR/build/passes/libEDDI.so -duplicate_globals out.ll -o out.ll -S $eddi_options
+exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="duplicate-globals" out.ll -o out.ll -S $eddi_options
 echo -e "\xE2\x9C\x94 Duplicated globals."
 
 echo -e "\n=== Back-end ======================="

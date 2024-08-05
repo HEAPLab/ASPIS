@@ -3,10 +3,10 @@
  * @brief  LLVM ModulePass that transforms the functions with a return value to void functions
  *         where a pointer is passed as parameter to store the return value.
  * 
- * @author Davide Baroffio, Politecnico di Milano, Italy (dav.baroffio@mail.polimi.it)
+ * @author Davide Baroffio, Politecnico di Milano, Italy (davide.baroffio@polimi.it)
  * ************************************************************************************************
 */
-
+#include "ASPIS.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -18,17 +18,14 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "Utils/Utils.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
 #include <llvm/IR/Value.h>
+
 using namespace llvm;
 
+#define DEBUG_TYPE "func-ret-to-ref"
 
-#define DEBUG_TYPE "func_ret_to_ref"
-
-
-namespace {
-struct FuncRetToRef : public ModulePass {
-    static char ID; // Pass identification, replacement for typeid
-    FuncRetToRef() : ModulePass(ID) { }
 
 /**
  * @param Fn the function for which we want to add the return value as a parameter
@@ -40,7 +37,7 @@ struct FuncRetToRef : public ModulePass {
  *  - void return type 
  *  - a ptr to the old return type as a function argument
 */
-Function* updateFnSignature(Function &Fn, Module &Md) {
+Function* FuncRetToRef::updateFnSignature(Function &Fn, Module &Md) {
     Type *RetType = Fn.getReturnType();
     if (RetType->isVoidTy()) {
         return NULL;
@@ -88,7 +85,7 @@ Function* updateFnSignature(Function &Fn, Module &Md) {
  * Substitutes all the return instructions of a function with void return instructions and
  * add store instructions of the return param
 */
-void updateRetInstructions(Function &Fn) {
+void FuncRetToRef::updateRetInstructions(Function &Fn) {
     for (BasicBlock &BB : Fn) {
         Instruction *I = BB.getTerminator();
         if ( I != NULL && isa<ReturnInst>(I)) {
@@ -115,7 +112,7 @@ void updateRetInstructions(Function &Fn) {
 /** 
  * Gets all the uses of the function and replaces them with the clone function
 */
-void updateFunctionCalls(Function &Fn, Function &NewFn) {
+void FuncRetToRef::updateFunctionCalls(Function &Fn, Function &NewFn) {
     std::list<Instruction*> ListInstrToRemove;
     
     // for each place in which the function has been called, we replace it with the _ret version
@@ -177,30 +174,25 @@ void updateFunctionCalls(Function &Fn, Function &NewFn) {
     }
 }
 
-public:
-    bool runOnModule(Module &Md) override {
-        std::map<Value*, StringRef> FuncAnnotations;
-        getFuncAnnotations(Md, FuncAnnotations);
+PreservedAnalyses FuncRetToRef::run(Module &Md, ModuleAnalysisManager &AM) {
+    std::map<Value*, StringRef> FuncAnnotations;
+    getFuncAnnotations(Md, FuncAnnotations);
 
-        // store the functions that are currently in the module
-        std::list<Function*> FnList;
+    // store the functions that are currently in the module
+    std::list<Function*> FnList;
 
-        for (Function &Fn : Md) {
-            if (Fn.size() != 0 && !(*FuncAnnotations.find(&Fn)).second.startswith("exclude") && !(*FuncAnnotations.find(&Fn)).second.startswith("to_duplicate")) {
-                FnList.push_back(&Fn);
-            }
+    for (Function &Fn : Md) {
+        if (Fn.size() != 0 && !(*FuncAnnotations.find(&Fn)).second.startswith("exclude") && !(*FuncAnnotations.find(&Fn)).second.startswith("to_duplicate")) {
+            FnList.push_back(&Fn);
         }
-
-        for (Function *Fn : FnList) {
-            Function *newFn = updateFnSignature(*Fn, Md);
-            if (newFn != NULL) {
-                updateFunctionCalls(*Fn, *newFn); 
-            }
-        }
-        return 1;
     }
-};
-} // namespace
 
-char FuncRetToRef::ID = 0;
-static RegisterPass<FuncRetToRef> X("func_ret_to_ref", "Transform return values of a function into references in the function signature");
+    for (Function *Fn : FnList) {
+        Function *newFn = updateFnSignature(*Fn, Md);
+        if (newFn != NULL) {
+            updateFunctionCalls(*Fn, *newFn); 
+        }
+    }
+    return PreservedAnalyses::none();
+}
+

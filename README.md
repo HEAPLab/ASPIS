@@ -80,19 +80,19 @@ Once ASPIS has been built, you can apply the passes using `opt`.
 The compiled passes can be found as shared object files (`.so`) into the `build/passes` directory, and are described in the following. In order to apply the optimization, you must use LLVM  `opt` loading the respective shared object file.
 
 ### Data protection
-Developers can select one of the following passes for data protection using the `-eddi_verify` flag:
+Developers can select one of the following passes for data protection using the `-eddi-verify` flag:
 
-- `libEDDI.so` with the `-eddi_verify` flag is the implementation of EDDI in LLVM;
-- `libFDSC.so` with the `-eddi_verify` flag is the implementation of Full Duplication with Selective Checking, an extension of EDDI in which consistency checks are only inserted at basic blocks having multiple predecessors.
-- `libSEDDI.so` with the `-eddi_verify` flag is the implementeation of selective-EDDI (sEDDI), an extension of EDDI in which consistency checks are inserted only at `branch` and `call` instructions (no `store`).
+- `libEDDI.so` with the `-eddi-verify` flag is the implementation of EDDI in LLVM;
+- `libFDSC.so` with the `-eddi-verify` flag is the implementation of Full Duplication with Selective Checking, an extension of EDDI in which consistency checks are only inserted at basic blocks having multiple predecessors.
+- `libSEDDI.so` with the `-eddi-verify` flag is the implementeation of selective-EDDI (sEDDI), an extension of EDDI in which consistency checks are inserted only at `branch` and `call` instructions (no `store`).
 
-Before and after the application of the `-eddi_verify` passes, developers must apply the `-func_ret_to_ref` and the `-duplicate_globals` passes, respectively.
+Before and after the application of the `-eddi-verify` passes, developers must apply the `-func-ret-to-ref` and the `-duplicate-globals` passes, respectively.
 
 ### Control-Flow Checking
 These are the alternative passes for control-flow checking:
-- `libCFCSS.so` with the `-cfcss_verify` is the implementation of CFCSS in LLVM;
-- `libRASM.so` with the `-rasm_verify` is the implementation of RASM in LLVM;
-- `libINTER_RASM` with the `-rasm_verify` is the implementation of RASM that achieves inter-function CFC.
+- `libCFCSS.so` with the `-cfcss-verify` is the implementation of CFCSS in LLVM;
+- `libRASM.so` with the `-rasm-verify` is the implementation of RASM in LLVM;
+- `libINTER_RASM` with the `-rasm-verify` is the implementation of RASM that achieves inter-function CFC.
 
 ### Example of compilation with ASPIS (sEDDI + RASM)
 First, compile the codebase with the appropriate front-end.
@@ -120,10 +120,10 @@ Run the following:
 
 ```bash
 opt -lowerswitch out.ll -o out.ll
-opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libEDDI.so -func_ret_to_ref out.ll -o out.ll
-opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libSEDDI.so -eddi_verify out.ll -o out.ll
+opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libEDDI.so -func-ret-to-ref out.ll -o out.ll
+opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libSEDDI.so -eddi-verify out.ll -o out.ll
 opt -passes=simplifycfg out.ll -o out.ll
-opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libRASM.so -rasm_verify out.ll -o out.ll
+opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libRASM.so -rasm-verify out.ll -o out.ll
 ```
 You may also want to include other files in the compilation, that are previously excluded because of some architecture-dependent features. This is done with the following commands, which first remove the previously emitted single `.ll` files, then compiles the excluded code and links it with the hardened code:
 
@@ -137,6 +137,6 @@ llvm-link -S *.ll out.ll.bak -o out.ll
 Then, apply the last pass and emit the executable: 
 
 ```bash
-opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libEDDI.so -duplicate_globals out.ll -o out.ll
+opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libEDDI.so -duplicate-globals out.ll -o out.ll
 clang out.ll -o out.elf
 ```
