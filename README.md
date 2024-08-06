@@ -13,7 +13,7 @@ The toolchain has been tested with the following versions:
 - CMake 3.22.1
 - LLVM 16.0.0
 
-During the development of ASPIS, done mostly on LLVM 15, we discovered a bug in the [`splitBasicBlock()`](https://llvm.org/doxygen/classllvm_1_1BasicBlock.html#a2bc5caaabd6841e4ab97237ebcaeb86d) procedure. The bug has been fixed in LLVM 16, so it is highly recommended to use it rather than applying the patch to the previous versions. 
+During the development of ASPIS, done mostly on LLVM 15, we discovered a bug in the [`splitBasicBlock()`](https://llvm.org/doxygen/classllvm_1_1BasicBlock.html#a2bc5caaabd6841e4ab97237ebcaeb86d) procedure. The bug has been fixed in LLVM 16, so we recommend using it rather than applying the patch to the previous versions. 
 
 ## Building
 
@@ -30,9 +30,6 @@ Where `your/llvm/dir` is the directory where LLVMConfig.cmake is found (check he
 # Usage
 
 In order to apply ASPIS, you can use the built-in compilation pipeline provided by the `aspis.sh` shell script, or you can make your own custom compilation pipeline using LLVM `opt`.
-
-> [!WARNING]
-> **Only the old pass manager is currently supported**: the support for the new pass manager and the newest versions of LLVM (>16.0.0) is currently under developement.
 
 ## Built-in compilation pipeline
 `aspis.sh` is an easy-to-use command-line interface that allows users to run the entire compilation pipeline specifying a few command-line arguments. The arguments that are not recognised are passed directly to the front-end, hence all the `clang` arguments are admissible.
@@ -77,14 +74,14 @@ Compile the files `file1.c`, `file2.c`, and `file3.c` as:
 ## Create a custom compilation pipeline
 Once ASPIS has been built, you can apply the passes using `opt`.
 
-The compiled passes can be found as shared object files (`.so`) into the `build/passes` directory, and are described in the following. In order to apply the optimization, you must use LLVM  `opt` loading the respective shared object file.
+The compiled passes can be found as shared object files (`.so`) into the `build/passes` directory, and are described in the following. In order to apply the optimization, you must use LLVM  `opt` to load the respective shared object file.
 
 ### Data protection
 Developers can select one of the following passes for data protection using the `-eddi-verify` flag:
 
 - `libEDDI.so` with the `-eddi-verify` flag is the implementation of EDDI in LLVM;
 - `libFDSC.so` with the `-eddi-verify` flag is the implementation of Full Duplication with Selective Checking, an extension of EDDI in which consistency checks are only inserted at basic blocks having multiple predecessors.
-- `libSEDDI.so` with the `-eddi-verify` flag is the implementeation of selective-EDDI (sEDDI), an extension of EDDI in which consistency checks are inserted only at `branch` and `call` instructions (no `store`).
+- `libSEDDI.so` with the `-eddi-verify` flag is the implementation of selective-EDDI (sEDDI), an extension of EDDI in which consistency checks are inserted only at `branch` and `call` instructions (no `store`).
 
 Before and after the application of the `-eddi-verify` passes, developers must apply the `-func-ret-to-ref` and the `-duplicate-globals` passes, respectively.
 
@@ -125,7 +122,7 @@ opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libSEDDI.so -eddi-v
 opt -passes=simplifycfg out.ll -o out.ll
 opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libRASM.so -rasm-verify out.ll -o out.ll
 ```
-You may also want to include other files in the compilation, that are previously excluded because of some architecture-dependent features. This is done with the following commands, which first remove the previously emitted single `.ll` files, then compiles the excluded code and links it with the hardened code:
+You may also want to include other files in the compilation, that are previously excluded because of some architecture-dependent features. This is done with the following commands, which first remove the previously emitted single `.ll` files, then compile the excluded code and link it with the hardened code:
 
 ```bash
 mv out.ll out.ll.bak
