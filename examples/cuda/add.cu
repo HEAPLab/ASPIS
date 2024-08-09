@@ -58,12 +58,18 @@ int perform_add(CUSPIS::cuspisRedundancyPolicy policy) {
     return 0;
 }
 
-#define NUM_ITER 1024*128
 
-int main() {
+int main(int argc, char* argv[]) {
+    int NUM_ITER = 1024;
+
+    if (argc > 1) {
+        NUM_ITER = atoi(argv[1]);
+    }
+
     float avg = 0.0;
     FILE *fp_blocks = fopen("add_b.txt", "w");
     FILE *fp_thread = fopen("add_t.txt", "w");
+    FILE *fp_kernel = fopen("add_k.txt", "w");
 
     // warm-up
     perform_add(CUSPIS::cuspisRedundantBlocks);
@@ -85,6 +91,7 @@ int main() {
         fprintf(fp_blocks, "%3.5f\n", time);
         avg = avg + (time - avg)/(i+1);
     }
+    fclose(fp_blocks);
     printf("avg (redundant blocks):\t\t%3.5f\n", avg);
 
     avg = 0.0;
@@ -110,6 +117,7 @@ int main() {
         fprintf(fp_thread, "%3.5f\n", time);
         avg = avg + (time - avg)/(i+1);
     }
+    fclose(fp_thread);
     printf("avg (redundant threads):\t%3.5f\n", avg);
 
     avg = 0.0;
@@ -132,9 +140,10 @@ int main() {
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&time, start, stop);
 
-        fprintf(fp_thread, "%3.5f\n", time);
+        fprintf(fp_kernel, "%3.5f\n", time);
         avg = avg + (time - avg)/(i+1);
     }
+    fclose(fp_kernel);
     printf("avg (redundant kernels):\t%3.5f\n", avg);
 
 

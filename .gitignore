@@ -58,3 +58,6 @@ test/test_runner
 # Examples
 examples/sha/*.csv
 examples/sha/sha
+
+examples/cuda/*.txt
+examples/cuda/add
