@@ -27,6 +27,7 @@ using namespace llvm;
 #define DEBUG_TYPE "func-ret-to-ref"
 
 
+
 /**
  * @param Fn the function for which we want to add the return value as a parameter
  * @param Md the module
@@ -175,6 +176,8 @@ void FuncRetToRef::updateFunctionCalls(Function &Fn, Function &NewFn) {
 }
 
 PreservedAnalyses FuncRetToRef::run(Module &Md, ModuleAnalysisManager &AM) {
+    LinkageMap linkageMap=mapFunctionLinkageNames(Md);
+    return PreservedAnalyses::none();
     std::map<Value*, StringRef> FuncAnnotations;
     getFuncAnnotations(Md, FuncAnnotations);
 

@@ -25,6 +25,8 @@ cfc=0 # 0 = cfcss,  1 = rasm,   2 = inter-rasm
 debug_enabled=false
 verbose=false
 cleanup=true
+libstdcpp_added=false
+
 
 raw_opts="$@"
 
@@ -148,8 +150,17 @@ EOF
                 --no-cleanup)
                     cleanup=false;
                     ;;
-                *.c)
+                -lstdc++)
+                    libstdcpp_added=true
+                    ;;
+                *.c | *.cpp)
                     input_files="$input_files $opt";
+                    # Check if it's a .cpp file and if -lstdc++ hasn't been added yet
+                     if [[ "$opt" == *.cpp ]] && [[ "$libstdcpp_added" == false ]]; then
+                        clang_options="$clang_options -lstdc++"
+                        libstdcpp_added=true 
+                    fi
+                    
                     ;;
                 *)
                     clang_options="$clang_options $opt";
@@ -200,19 +211,21 @@ fi;
 echo -e "=== Front-end and pre-processing ==="
 
 ## FRONTEND
-exe $CLANG $input_files $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -mllvm -opaque-pointers
+exe $CLANG $input_files $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone
 
 ## LINK & PREPROCESS
 exe $LLVM_LINK *.ll -o out.ll -opaque-pointers
 
 echo -e "\xE2\x9C\x94 Emitted and linked IR."
 
+
+
 if [[ $debug_enabled == false ]]; then
-    exe $OPT --enable-new-pm=1 --passes="strip-debug" out.ll -o out.ll
+    exe $OPT --enable-new-pm=1 --passes="strip" out.ll -o out.ll
     echo -e "\xE2\x9C\x94 Debug mode disabled, stripped debug symbols."
 fi
 
-exe $OPT --enable-new-pm=1 --passes="lowerswitch" out.ll -o out.ll
+    exe $OPT --enable-new-pm=1 --passes="lowerswitch" out.ll -o out.ll
 
 ## FuncRetToRef
 exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="func-ret-to-ref" out.ll -o out.ll
@@ -232,7 +245,8 @@ case $dup in
 esac
 echo -e "\xE2\x9C\x94 Applied data protection passes."
 
-$OPT --enable-new-pm=1 --passes="simplifycfg" out.ll -o out.ll
+$OPT --enable-new-pm=1 --passes="dce,simplifycfg" out.ll -o out.ll
+
 
 ## CONTROL-FLOW CHECKING
 case $cfc in

@@ -1,0 +1,76 @@
+= ASPISpp
+Sartorato Giovanni Alberto <giovannialberto.sartorato@mail.polimi.it>
+:source-highlighter: highlightjs
+:homepage: https://github.com/giovannialbertos/ASPISpp
+:cpp: C++   
+
+[.normal-size]
+Sartorato Giovanni Alberto +
+giovannialberto.sartorato@mail.polimi.it +
+Person code: 10678032
+
+For this project ASPIS was forked to support C++ compilation and tested on multiple benchmarks.
+The fork can be found in my {homepage}[repository]. 
+The following are the changes that were implemented:
+
+== Function mangling
+=== Problem
+This issue occurred when attempting to insert calls to external error handler functions `dataCorruptionHandler` and `SigMismatch_Handler`, during the EDDI,RASM and CFCSS passes. 
+
+LLVM generates mangled names for functions, especially in {Cpp} code to support features such as function overloading and namespaces. However, when trying to insert calls to `dataCorruptionHandler` or `SigMismatch_Handler`, the pass used the unmangled version of the function name. The linkage lookup mechanism was unable to resolve the mangled function names, causing the pass to fail when inserting the call.
+
+=== Solution
+The functions `mapFunctionLinkageNames` and `getLinkageName` were added to utils.
+
+`mapFunctionLinkageNames` is called at the beginning of every pass and creates a map between the original function name and its mangled names (since there may be more than one).
+Then, when `dataCorruptionHandler` and `SigMismatch_Handler` need to be inserted, the correct mangled name is retrieved using `getLinkageName`.
+
+== Clang flags
+The flag `-lstdc++` was added to Clang options in `aspis.sh` to enable {cpp} compilation if at least one of the input files is a {Cpp} file.
+
+== Duplicate certain intrinsic instructions
+=== Problem
+Certain intrinsic instructions weren't being duplicated in EDDI.
+
+=== Solution
+The helper function `isIntrinsicToDuplicate` was added to `utils` to check if the `intrinsicID` of an instruction corresponds to one that should be duplicated. Currently, only `memcpy` is duplicated, but other intrinsics can be added as needed.
+
+== Avoid duplicating alloca for exception handling
+=== Problem
+`alloca` instructions for exception handling were being duplicated in EDDI, causing multiple allocations for exceptions and leading to control flow errors.
+
+=== Solution
+`isAllocaForExceptionHandling` was added, which checks if any of the users of a given `alloca` instruction is a `catch`, to avoid duplicating it.
+
+== Branches with Exceptional Terminators
+=== Problem
+In RASM, when checking the number of successors a block has to compute and update a runtime signature used for control flow integrity, basic blocks with an `invoke` as the terminator were treated as having multiple successors, which complicated control flow.
+
+=== Solution
+A check was added to force the number of successors to 1 by overriding `numSuccessors` if the terminator is an exceptional terminator (such as `invoke`, which branches based on whether an exception is thrown). This ensures that exception handling is treated uniformly and simplifies the process of updating the runtime signature.
+
+== Generating verification basic blocks for landing pads
+=== Problem
+In RASM and CFCSS, landing pads were treated like regular blocks, and verification instructions were inserted before the first instruction. This caused compilation failures because the first instruction in a landing pad must be the landing pad instruction itself.
+
+=== Solution
+A special case for landing pads was created in `createCFGVerificationBB` in RASM and CFCSS. Instead of inserting verification instructions before the first instruction, a store instruction is created at the first insertion point, writing `randomNumberBB` into the memory pointed to by `RuntimeSig`.
+
+
+== Branch unconditionally in case of an invoke
+=== Problem
+In `CFCSS::sortBasicBlocks`, blocks with an `invoke` terminator were treated like other blocks, and a conditional branch was created. However, when a basic block ends with an `InvokeInst`, exception handling is already managed by the `InvokeInst`, so no additional conditional branching is necessary.
+
+=== Solution
+A check was added to see if a block has an `invoke` as its terminator. In such cases, an unconditional branch is added instead of a conditional one.
+
+== New benchmarks
+All changes were tested on multiple benchmarks. In particular, in `examples/cpp-benchmarks`, `full_test.cpp` was added to test various {Cpp} programming features, including:
+
+* Basic Functions (with overloading);
+* Classes and inheritance (member functions, constructors, virtual functions, inheritance and polymorphism with DerivedClass);
+* Templates;
+* Recursion;
+* Exception handling.
+
+

@@ -13,6 +13,8 @@
 #include <map>
 
 using namespace llvm;
+using LinkageMap = std::unordered_map<std::string, std::vector<StringRef>>;
+
 
 extern bool AlternateMemMapEnabled;
 extern std::string DuplicateSecName;
@@ -35,5 +37,13 @@ bool shouldCompile(Function &Fn,
     const std::set<Function*> &OriginalFunctions = std::set<Function*>());
 
 DebugLoc findNearestDebugLoc(Instruction &I);
+
+LinkageMap mapFunctionLinkageNames(const Module &M);
+void printLinkageMap(const LinkageMap &linkageMap);
+StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functionName);
+bool isIntrinsicToDuplicate(CallBase *CInstr);
+
+
+
 
 #endif

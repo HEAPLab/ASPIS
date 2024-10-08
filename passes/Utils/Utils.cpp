@@ -12,8 +12,12 @@
 #include <list>
 #include <fstream>
 #include <iostream>
+#include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
+using LinkageMap = std::unordered_map<std::string, std::vector<StringRef>>;
+
   
 bool AlternateMemMapEnabled;
 std::string DuplicateSecName;
@@ -116,4 +120,56 @@ DebugLoc findNearestDebugLoc(Instruction &I) {
   errs() << "Could not find nearest debug location! Aborting compilation.\n";
   abort();
   return nullptr;
+}
+
+LinkageMap mapFunctionLinkageNames(const Module &M) {
+    LinkageMap linkageMap;
+    for (const Function &F : M) {
+        if (DISubprogram *SP = F.getSubprogram()) {
+            StringRef linkageName = F.getName();
+            
+            if (!linkageName.empty()) {
+                linkageMap[std::string(SP->getName())].push_back(linkageName);
+            }
+        }
+    }
+    return linkageMap;
+}
+
+#include "llvm/Support/raw_ostream.h"
+
+void printLinkageMap(const LinkageMap &linkageMap) {
+    for (const auto &entry : linkageMap) {
+        errs() << "Function Name: " << entry.first << "\n";
+        for (const StringRef &linkageName : entry.second) {
+            errs() << "  Linkage Name: " << linkageName << "\n";
+        }
+    }
+}
+
+
+// This function retrieves the first linkage name for the given function name
+StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functionName) {
+    // Find the function name in the linkageMap
+    auto it = linkageMap.find(functionName);
+
+    // Check if the function name exists in the map
+    if (it != linkageMap.end() && !it->second.empty()) {
+        // Return the first linkage name from the vector
+        DEBUG_WITH_TYPE("linkage_verification",dbgs() << "Linkage name given to "<<functionName <<": " << it->second.front() << "\n");
+        return it->second.front();
+    } else {
+        // Return an empty StringRef if the function name or linkage name is not found
+        DEBUG_WITH_TYPE("linkage_verification",dbgs()<< "No linkage name found for "<< functionName << "\n");
+        return StringRef();
+    }
+}
+
+bool isIntrinsicToDuplicate(CallBase *CInstr) {
+        Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
+        if (intrinsicID == Intrinsic::memcpy) {
+            return true; 
+        }    
+
+    return false; 
 }
