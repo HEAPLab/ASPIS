@@ -31,8 +31,36 @@ Where `your/llvm/dir` is the directory where LLVMConfig.cmake is found (check he
 
 In order to apply ASPIS, you can use the built-in compilation pipeline provided by the `aspis.sh` shell script, or you can make your own custom compilation pipeline using LLVM `opt`.
 
+## Annotations
+
+When compiling `C`/`C++`, it is possible to use clang annotations in the source to manually tell the compiler what to do with specific variables and/or functions. The syntax for the annotation is the following:
+
+```C
+__attribute__((annotate(<annotation>)))
+```
+
+The following describes the possibilities for `<annotation>`.
+
+### The `to_duplicate` annotation
+
+```C
+__attribute__((annotate("to_duplicate")))
+```
+
+When a function is declared this way, ASPIS does not duplicate the function body, but duplicates the call to the function.
+
+When a global variable outside the compilation unit is declared this way, ASPIS duplicates it.
+
+
+### The `exclude` annotation
+
+```C
+__attribute__((annotate("exclude")))
+```
+ASPIS does not compile the annotated function or does not duplicate the annotated global variable.
+
 ## Built-in compilation pipeline
-`aspis.sh` is an easy-to-use command-line interface that allows users to run the entire compilation pipeline specifying a few command-line arguments. The arguments that are not recognised are passed directly to the front-end, hence all the `clang` arguments are admissible.
+`aspis.sh` is a simple command-line interface that allows users to run the entire compilation pipeline specifying a few command-line arguments. The arguments that are not recognised are passed directly to the front-end, hence all the `clang` arguments are admissible.
 
 ### Options
  - `-h`, `--help`: Display available options.
