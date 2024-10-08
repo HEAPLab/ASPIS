@@ -5,6 +5,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Pass.h"
 #include <map>
+#include <set>
 
 using namespace llvm;
 
