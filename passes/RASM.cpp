@@ -316,6 +316,7 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
 }
 
 PreservedAnalyses RASM::run(Module &Md, ModuleAnalysisManager &AM) {
+    createFtFuncs(Md);
     getFuncAnnotations(Md, FuncAnnotations);
     LinkageMap linkageMap=mapFunctionLinkageNames(Md);
     // Collection of <BB, RandomSign

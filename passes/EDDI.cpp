@@ -755,6 +755,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   getFuncAnnotations(Md, FuncAnnotations);
   LLVM_DEBUG(dbgs() << "[done]\n");
 
+  createFtFuncs(Md);
   LinkageMap linkageMap = mapFunctionLinkageNames(Md);
 
   std::map<Value *, Value *>

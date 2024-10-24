@@ -94,7 +94,7 @@ DebugLoc findNearestDebugLoc(Instruction &I) {
 
   auto *PrevI = I.getPrevNonDebugInstruction();
 
-  while (PrevI = PrevI->getPrevNonDebugInstruction()) {
+  while ((PrevI = PrevI->getPrevNonDebugInstruction())) {
     if (auto DL = PrevI->getDebugLoc()) {
       return DL;
     }
@@ -106,7 +106,7 @@ DebugLoc findNearestDebugLoc(Instruction &I) {
 
   for (auto *BB : candidates) {
     PrevI = BB->getTerminator();
-    while (PrevI = PrevI->getPrevNonDebugInstruction()) {
+    while ((PrevI = PrevI->getPrevNonDebugInstruction())) {
       if (auto DL = PrevI->getDebugLoc()) {
         return DL;
       }
@@ -161,7 +161,7 @@ StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functi
     } else {
         // Return an empty StringRef if the function name or linkage name is not found
         DEBUG_WITH_TYPE("linkage_verification",dbgs()<< "No linkage name found for "<< functionName << "\n");
-        return StringRef();
+        return StringRef(functionName);
     }
 }
 
@@ -172,4 +172,28 @@ bool isIntrinsicToDuplicate(CallBase *CInstr) {
         }    
 
     return false; 
+}
+
+void createFtFunc(Module &Md, StringRef name) {
+  auto FnValue = Md.getOrInsertFunction(name, FunctionType::getVoidTy(Md.getContext())).getCallee();
+
+  assert(isa<Function>(FnValue) && "The function name must correspond to a function.");
+
+  auto Fn = cast<Function>(FnValue);
+
+  if (Fn->isDeclaration()) {
+    BasicBlock *StartBB = BasicBlock::Create(Md.getContext(), "start", Fn);
+    BasicBlock *LoopBB = BasicBlock::Create(Md.getContext(), "loop", Fn);
+
+    IRBuilder<> B(StartBB);
+    B.CreateBr(LoopBB);
+
+    B.SetInsertPoint(LoopBB);
+    B.CreateBr(LoopBB);
+  }
+}
+
+void createFtFuncs(Module &Md) {
+  createFtFunc(Md, "DataCorruption_Handler");
+  createFtFunc(Md, "SigMismatch_Handler");
 }

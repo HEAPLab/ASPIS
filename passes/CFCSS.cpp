@@ -235,6 +235,7 @@ void CFCSS::createCFGVerificationBB (BasicBlock &BB,
 }
 
 PreservedAnalyses CFCSS::run(Module &Md, ModuleAnalysisManager &AM) {
+  createFtFuncs(Md);
   getFuncAnnotations(Md, FuncAnnotations);
   LinkageMap linkageMap=mapFunctionLinkageNames(Md);
 
