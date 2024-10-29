@@ -754,6 +754,8 @@ EDDI::duplicateFnArgs(Function &Fn, Module &Md,
 PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   LLVM_DEBUG(dbgs() << "Initializing EDDI...\n");
 
+  auto T = ERDITS::Transformer(ERDITS::BasicBlockCheckpointing, Md);
+
   LLVM_DEBUG(dbgs() << "Getting annotations... ");
   getFuncAnnotations(Md, FuncAnnotations);
   LLVM_DEBUG(dbgs() << "[done]\n");
@@ -904,6 +906,9 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   for (Instruction *I2rm : InstructionsToRemove) {
     I2rm->eraseFromParent();
   }
+
+  // apply the ERDITS transformation
+  T.transform();
 
   persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
 
