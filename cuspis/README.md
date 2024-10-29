@@ -19,21 +19,21 @@ How the duplication or triplication allocates the computation on the GPU depends
 The redundancy affects the number of threads allocated by the kernel.
 
 <p align=center>
-<img src="figures/cuspis_redundant_threads.jpg" alt="redundant threads" width="400"/>
+<img src="figures/redundantthreads.jpg" alt="redundant threads" width="400"/>
 </p>
 
 ### Redundant blocks
 The redundancy affects the number of blocks allocated by the kernel.
 
 <p align=center>
-<img src="figures/cuspis_redundant_threads.jpg" alt="redundant threads" width="400"/>
+<img src="figures/redundantblocks.jpg" alt="redundant blocks" width="400"/>
 </p>
 
 ### Redundant kernel
 The redundancy affects the number of times in which the kernel is executed.
 
 <p align=center>
-<img src="figures/cuspis_redundant_threads.jpg" alt="redundant threads" width="400"/>
+<img src="figures/redundantkernel.jpg" alt="redundant kernel" width="400"/>
 </p>
 
 ## Usage
