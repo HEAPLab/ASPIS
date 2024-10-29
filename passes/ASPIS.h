@@ -35,7 +35,12 @@ class EDDI : public PassInfoMixin<EDDI> {
         std::set<Function*> OriginalFunctions;
 
         int isUsedByStore(Instruction &I, Instruction &Use);
-        Instruction* cloneInstr(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap);
+        void
+        substituteOperand(Instruction &I, Instruction &IClone, int pos,
+                          std::map<Value *, Value *> &DuplicatedInstructionMap);
+        Instruction *
+        cloneInstr(Instruction &I,
+                   std::map<Value *, Value *> &DuplicatedInstructionMap);
         void duplicateOperands (Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
         Value* getPtrFinalValue(Value &V);
         Value* comparePtrs(Value &V1, Value &V2, IRBuilder<> &B);

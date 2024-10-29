@@ -37,6 +37,7 @@
 #include <unordered_set>
 
 #include "Utils/Utils.h"
+#include "Utils/ERDITS.h"
 
 using namespace llvm;
 
@@ -90,6 +91,19 @@ int EDDI::isUsedByStore(Instruction &I, Instruction &Use) {
 }
 
 /**
+ * Substitutes the pos-th operand of IClone with its duplicate.
+ */
+void EDDI::substituteOperand(Instruction &I, Instruction &IClone, int pos, std::map<Value *, Value *> &DuplicatedInstructionMap) {
+  auto Op = I.getOperand(pos);
+  // use the duplicated instruction as operand of IClone
+  auto Duplicate = DuplicatedInstructionMap.find(Op);
+  if (Duplicate != DuplicatedInstructionMap.end())
+    IClone.setOperand(
+        pos,
+        Duplicate->second); // set the pos-th operand with the duplicate value
+}
+
+/**
  * Clones instruction `I` and adds the pair <I, IClone> to
  * DuplicatedInstructionMap, inserting the clone right after the original.
  */
@@ -99,7 +113,7 @@ EDDI::cloneInstr(Instruction &I,
   Instruction *IClone = I.clone();
 
   if (!I.getType()->isVoidTy() && I.hasName()) {
-    IClone->setName(I.getName() + "_dup");
+      IClone->setName(I.getName() + "_dup");
   }
 
   // if the instruction is an alloca and alternate-memmap is disabled, place it
@@ -174,15 +188,8 @@ void EDDI::duplicateOperands(
         }
       }
     }
-
-    if (IClone != NULL) {
-      // use the duplicated instruction as operand of IClone
-      auto Duplicate = DuplicatedInstructionMap.find(V);
-      if (Duplicate != DuplicatedInstructionMap.end())
-        IClone->setOperand(
-            J,
-            Duplicate->second); // set the J-th operand with the duplicate value
-    }
+    if (IClone != NULL)
+      substituteOperand(I, *IClone, J, DuplicatedInstructionMap);
     J++;
   }
 }
@@ -526,14 +533,10 @@ int EDDI::duplicateInstruction(
 
   // if the instruction is an alloca instruction we need to duplicate it
   if (isa<AllocaInst>(I)) {
-    
     if (!isAllocaForExceptionHandling(cast<AllocaInst>(I))){
-      
       cloneInstr(I, DuplicatedInstructionMap);
 
     };
-
-    
   }
 
   // if the instruction is a binary/unary instruction we need to duplicate it
@@ -904,12 +907,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
 
-/*   if (Function *mainFunc = Md.getFunction("main")) {
-    errs() << *mainFunc;
-  } else {
-    errs() << "Function 'main' not found!\n";
-  }
- */
   return PreservedAnalyses::none();
 }
 

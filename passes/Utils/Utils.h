@@ -18,6 +18,7 @@ using LinkageMap = std::unordered_map<std::string, std::vector<StringRef>>;
 
 extern bool AlternateMemMapEnabled;
 extern std::string DuplicateSecName;
+extern std::string ShadowSecName;
 
 // Given a Use U, it returns true if the instruction is a PHI instruction
 bool IsNotAPHINode (Use &U);
