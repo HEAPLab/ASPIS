@@ -1,12 +1,8 @@
-#if defined(__CUDACC__) || defined(__CUDA_ARCH__) || defined(__CUDA_LIBDEVICE__)
-#define __noinline__  __attribute__((noinline))
-#endif /* __CUDACC__  || __CUDA_ARCH__ || __CUDA_LIBDEVICE__ */
-
 #include "CUSPIS.cuh"
 #include <iostream>
 
 __global__ void axpy(float a, float* x, float* y) {
-  y[threadIdx.x] = a * x[threadIdx.x];
+  y[threadIdx.x + blockIdx.x * blockDim.x] = a * x[threadIdx.x + blockIdx.x * blockDim.x];
 }
 
 int run_axpy(CUSPIS::cuspisRedundancyPolicy policy, float *host_x, int N) {
@@ -23,7 +19,7 @@ int run_axpy(CUSPIS::cuspisRedundancyPolicy policy, float *host_x, int N) {
   CUSPIS::cuspisMemcpyToDevice(device_x, host_x, N * sizeof(float));
 
   // Launch the kernel.
-  CUSPIS::Kernel<float, float*, float*> k(1, N, axpy, policy);
+  CUSPIS::Kernel<float, float*, float*> k(blocks, N, axpy, policy);
   k.launch(a, device_x, device_y);
 
   // Copy output data to host.
@@ -40,7 +36,7 @@ int main(int argc, char* argv[]) {
     int SIZES = 1024;
 
     if (argc > 1) {
-        SIZES = atoi(argv[2]);
+        SIZES = atoi(argv[1]);
     }
 
     float avg = 0.0;

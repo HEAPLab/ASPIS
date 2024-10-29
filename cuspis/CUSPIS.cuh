@@ -2,6 +2,7 @@
 #define CUSPIS_H
 
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <driver_types.h>
 #include <cuda_runtime_api.h>
@@ -46,8 +47,8 @@ namespace CUSPIS {
     template <typename ... Types>
     class Kernel {
         private:
-            int numBlocks; 
-            int numThreads;
+            int Dg, Db, Ns=0;
+            cudaStream_t S=0; 
             void (*kernelFunc)(Types ...args);
             cuspisRedundancyPolicy policy;
 
@@ -84,34 +85,48 @@ namespace CUSPIS {
             }
 
         public:
-            Kernel(int numBlocks, int numThreads, void (*kernel)(Types ...args), cuspisRedundancyPolicy policy) :
-                numBlocks(numBlocks), numThreads(numThreads), kernelFunc(kernel), policy(policy) {}
+            Kernel(int Dg, int Db, void (*kernel)(Types ...args), cuspisRedundancyPolicy policy) :
+                Dg(Dg), Db(Db), kernelFunc(kernel), policy(policy) {}
+
+            Kernel(int Dg, int Db, int Ns, void (*kernel)(Types ...args), cuspisRedundancyPolicy policy) :
+                Dg(Dg), Db(Db), Ns(Ns), kernelFunc(kernel), policy(policy) {}
+
+            Kernel(int Dg, int Db, int Ns, cudaStream_t S, void (*kernel)(Types ...args), cuspisRedundancyPolicy policy) :
+                Dg(Dg), Db(Db), Ns(Ns), S(S), kernelFunc(kernel), policy(policy) {}
 
             void launch(Types ...args) {
                 if constexpr (NUM_REPLICAS == 1) {
-                    kernelFunc<<<numBlocks, numThreads>>>(args...);
+                    kernelFunc<<<Dg, Db, Ns, S>>>(args...);
                     return;
                 }
 
                 else if (policy == cuspisRedundantThreads) {
-                    kernelFunc<<<numBlocks, numThreads*NUM_REPLICAS>>>(args...);
+                    if (Db*NUM_REPLICAS <= 1024) {
+                        kernelFunc<<<Dg, Db*NUM_REPLICAS, Ns, S>>>(args...);
+                    }
+                    else { // fallback to redundant blocks
+                        fprintf(stderr, "[CUSPIS] Warning: falling back to redundant block policy! Consider using a different amount of threads...\n");
+                        policy = cuspisRedundantBlocks;
+                        launch(args...); 
+                    }
                 }
                 else if (policy == cuspisRedundantBlocks) {
-                    kernelFunc<<<numBlocks*NUM_REPLICAS, numThreads>>>(args...);
+                    kernelFunc<<<Dg*NUM_REPLICAS, Db, Ns, S>>>(args...);
                 }
                 else if (policy == cuspisRedundantKernel) {
-                    kernelFunc<<<numBlocks, numThreads>>>(args...);
+                    kernelFunc<<<Dg, Db, Ns, S>>>(args...);
                     modify(&args...);
-                    kernelFunc<<<numBlocks, numThreads>>>(args...);
+                    kernelFunc<<<Dg, Db, Ns, S>>>(args...);
                     if constexpr (NUM_REPLICAS == 3) {
                         modify(&args...);
-                        kernelFunc<<<numBlocks, numThreads>>>(args...);
+                        kernelFunc<<<Dg, Db, Ns, S>>>(args...);
                     }
                 }
             }
     };
 
     cudaError_t DataCorruption_Handler(void* dst, int index) {
+        std::cout << index << "\n";
         fprintf(stderr, "Data corruption detected, aborting.\n");
         exit(-1);
     }
@@ -177,12 +192,15 @@ namespace CUSPIS {
             return ret;
         }
 
-        for (int i=0; i<count; i++) { // TODO can we use a memcmp
-            if (((char*)(dst))[i] != (dst_cpy)[i]) {
-                if constexpr (NUM_REPLICAS == 2)
-                    return DataCorruption_Handler(dst, i);
-                else if constexpr (NUM_REPLICAS == 3) // fai il check anche sulla seconda (opzionale)
-                    return cudaMemcpy(dst, ((char*)(src)) + 2*count, count, cudaMemcpyDeviceToHost);
+        if (memcmp(dst, dst_cpy.data(), count) != 0) {
+            // find the first mismatch
+            for (int i=0; i<count; i++) { 
+                if (((char*)(dst))[i] != (dst_cpy)[i]) {
+                    if constexpr (NUM_REPLICAS == 2)
+                        return DataCorruption_Handler(dst, i);
+                    else if constexpr (NUM_REPLICAS == 3) // fai il check anche sulla seconda (opzionale)
+                        return cudaMemcpy(dst, ((char*)(src)) + 2*count, count, cudaMemcpyDeviceToHost);
+                }
             }
         }
 
