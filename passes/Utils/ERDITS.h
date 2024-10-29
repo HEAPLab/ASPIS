@@ -24,9 +24,19 @@ namespace ERDITS {
                                   // and their duplicates
 
     public:
+      Transformer() {};
+
       Transformer(CheckpointingPolicy policy, Module &Md) {
         this->policy = policy;
         this->Md = &Md;
+      }
+
+      void addRecoveryHandle(BranchInst &BI) {
+        this->recoveryHandles.insert(&BI);
+      }
+
+      void addSafeStore(Instruction &I) {
+        this->safeStores.insert(&I);
       }
 
       void transform() {

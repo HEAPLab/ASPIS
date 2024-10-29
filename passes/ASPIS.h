@@ -5,6 +5,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Pass.h"
 #include <llvm/IR/Instructions.h>
+#include "Utils/ERDITS.h"
 #include <map>
 #include <set>
 
@@ -30,6 +31,7 @@ class FuncRetToRef : public PassInfoMixin<FuncRetToRef> {
 
 class EDDI : public PassInfoMixin<EDDI> {
     private:
+        ERDITS::Transformer ERDITSTransformer;
         std::set<Function*> CompiledFuncs;
         std::map<Value*, StringRef> FuncAnnotations;
         std::set<Function*> OriginalFunctions;

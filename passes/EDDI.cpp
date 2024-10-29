@@ -343,8 +343,9 @@ void EDDI::addConsistencyChecks(
   if (!CmpInstructions.empty()) {
     // all comparisons must be true
     Value *AndInstr = B.CreateAnd(CmpInstructions);
-    B.CreateCondBr(AndInstr, I.getParent(), &ErrBB)
-        ->setDebugLoc(I.getDebugLoc());
+    auto BI = B.CreateCondBr(AndInstr, I.getParent(), &ErrBB);
+    BI->setDebugLoc(I.getDebugLoc());
+    ERDITSTransformer.addRecoveryHandle(*BI);
   }
 
   if (VerificationBB->size() == 0) {
@@ -572,6 +573,9 @@ int EDDI::duplicateInstruction(
       IClone->eraseFromParent();
       DuplicatedInstructionMap.erase(DuplicatedInstructionMap.find(&I));
     }
+    else {
+      ERDITSTransformer.addSafeStore(I);
+    }
   }
 
   // if the instruction is a branch/switch/return instruction, we need to
@@ -754,7 +758,7 @@ EDDI::duplicateFnArgs(Function &Fn, Module &Md,
 PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   LLVM_DEBUG(dbgs() << "Initializing EDDI...\n");
 
-  auto T = ERDITS::Transformer(ERDITS::BasicBlockCheckpointing, Md);
+  ERDITSTransformer = ERDITS::Transformer(ERDITS::BasicBlockCheckpointing, Md);
 
   LLVM_DEBUG(dbgs() << "Getting annotations... ");
   getFuncAnnotations(Md, FuncAnnotations);
@@ -908,7 +912,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   }
 
   // apply the ERDITS transformation
-  T.transform();
+  ERDITSTransformer.transform();
 
   persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
 
