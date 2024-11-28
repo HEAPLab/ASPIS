@@ -21,6 +21,10 @@ using LinkageMap = std::unordered_map<std::string, std::vector<StringRef>>;
   
 bool AlternateMemMapEnabled;
 std::string DuplicateSecName;
+bool DebugEnabled;
+
+static cl::opt<bool, true> DebugEnabledOpt("debug-enabled", cl::desc("Enable support for debug metadata"), cl::location(DebugEnabled), cl::init(false));
+
 
 static cl::opt<bool, true> AlternateMemMap("alternate-memmap", cl::desc("Enable the alternate memory layout for alloca and global variables"), cl::location(AlternateMemMapEnabled), cl::init(false));
 
@@ -117,7 +121,9 @@ DebugLoc findNearestDebugLoc(Instruction &I) {
       }
     }
   }
+
   errs() << "Could not find nearest debug location! Aborting compilation.\n";
+  errs() << I << "\n";
   abort();
   return nullptr;
 }

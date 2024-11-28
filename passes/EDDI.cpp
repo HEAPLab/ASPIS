@@ -336,12 +336,17 @@ void EDDI::addConsistencyChecks(
   if (!CmpInstructions.empty()) {
     // all comparisons must be true
     Value *AndInstr = B.CreateAnd(CmpInstructions);
-    B.CreateCondBr(AndInstr, I.getParent(), &ErrBB)
-        ->setDebugLoc(I.getDebugLoc());
+    auto CondBrInst = B.CreateCondBr(AndInstr, I.getParent(), &ErrBB);
+    if (DebugEnabled) {
+      CondBrInst->setDebugLoc(I.getDebugLoc());
+    }
   }
 
   if (VerificationBB->size() == 0) {
-    B.CreateBr(I.getParent())->setDebugLoc(I.getDebugLoc());
+    auto BrInst = B.CreateBr(I.getParent());
+    if (DebugEnabled) {
+      BrInst->setDebugLoc(I.getDebugLoc());
+    }
   }
 }
 
@@ -666,7 +671,9 @@ int EDDI::duplicateInstruction(
             NewCInstr =  CallBuilder.CreateCall(Fn->getFunctionType(), Fn, args);
           }
 
+          if (DebugEnabled) {
           NewCInstr->setDebugLoc(CInstr->getDebugLoc());
+          }
           res = 1;
           CInstr->replaceNonMetadataUsesWith(NewCInstr);
         }
@@ -757,6 +764,25 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   createFtFuncs(Md);
   LinkageMap linkageMap = mapFunctionLinkageNames(Md);
+
+  // fix debug information in the first BB of each function
+  if(DebugEnabled) {
+    for (auto &Fn : Md) {
+      // if the first instruction after the allocas does not have a debug location
+      if (shouldCompile(Fn, FuncAnnotations, OriginalFunctions) && !(*Fn.begin()).getFirstNonPHIOrDbgOrAlloca()->getDebugLoc()) {
+        auto I = &*(*Fn.begin()).getFirstNonPHIOrDbgOrAlloca();
+        auto NextI = I;
+        
+        // iterate over the next instructions finding the first debug loc
+        while (NextI = NextI->getNextNode()) {
+          if (NextI->getDebugLoc()) {
+            I->setDebugLoc(NextI->getDebugLoc());
+            break;
+          }
+        }
+      }
+    }
+  }
 
   std::map<Value *, Value *>
       DuplicatedInstructionMap; // is a map containing the instructions
@@ -884,11 +910,13 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         BasicBlock *ErrBBCopy = CloneBasicBlock(ErrBB, VMap);
         ErrBBCopy->insertInto(ErrBB->getParent(), I->getParent());
         // set the debug location to the instruction the ErrBB is related to
+        if (DebugEnabled) {
         for (Instruction &ErrI : *ErrBBCopy) {
           if (!I->getDebugLoc()) {
             ErrI.setDebugLoc(findNearestDebugLoc(*Fn.back().getTerminator()));
           } else {
             ErrI.setDebugLoc(I->getDebugLoc());
+            }
           }
         }
         I->replaceSuccessorWith(ErrBB, ErrBBCopy);

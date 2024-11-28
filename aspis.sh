@@ -146,6 +146,7 @@ EOF
                 -g)
                     debug_enabled=true;
                     clang_options="$clang_options $opt";
+                    eddi_options="$eddi_options --debug-enabled=true";
                     ;;
                 --no-cleanup)
                     cleanup=false;
