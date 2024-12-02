@@ -253,11 +253,13 @@ void EDDI::addConsistencyChecks(
   std::vector<Value *> CmpInstructions;
 
   // split and add the verification BB
-  I.getParent()->splitBasicBlockBefore(&I);
+  auto BBpred = I.getParent()->splitBasicBlockBefore(&I);
   BasicBlock *VerificationBB =
       BasicBlock::Create(I.getContext(), "VerificationBB",
                          I.getParent()->getParent(), I.getParent());
-  I.getParent()->replaceUsesWithIf(VerificationBB, IsNotAPHINode);
+  I.getParent()->replaceUsesWithIf(BBpred, IsNotAPHINode);
+  auto BI = cast<BranchInst>(BBpred->getTerminator());
+  BI->setSuccessor(0, VerificationBB);
   IRBuilder<> B(VerificationBB);
 
   // add a comparison for each operand
