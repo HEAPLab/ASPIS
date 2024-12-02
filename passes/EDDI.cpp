@@ -455,11 +455,12 @@ void EDDI::duplicateGlobals(
     bool endsWithDup = GV->getName().endswith("_dup");
     bool hasInternalLinkage = GV->hasInternalLinkage();
     bool isMetadataInfo = GV->getSection() == "llvm.metadata";
+    bool isReservedName = GV->getName().starts_with("llvm.");
     bool toExclude = !isa<Function>(GV) &&
                      FuncAnnotations.find(GV) != FuncAnnotations.end() &&
                      (FuncAnnotations.find(GV))->second.startswith("exclude");
 
-    if (! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude) // is not function, constant, struct and does not end with _dup
+    if (! (isFunction || isConstant || endsWithDup || isMetadataInfo || isReservedName || toExclude) // is not function, constant, struct and does not end with _dup
         /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
             || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
         ) {
