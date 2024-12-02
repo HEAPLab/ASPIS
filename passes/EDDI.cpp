@@ -739,6 +739,10 @@ EDDI::duplicateFnArgs(Function &Fn, Module &Md,
                                    Fn.getName() + "_dup", Fn.getParent());
   ValueToValueMapTy Params;
   for (int i = 0; i < Fn.arg_size(); i++) {
+    if (Fn.getArg(i)->hasStructRetAttr()) {
+      Fn.getArg(i)->removeAttr(Attribute::AttrKind::StructRet);
+    }
+
     if (AlternateMemMapEnabled == false) {
       Params[Fn.getArg(i)] = ClonedFunc->getArg(Fn.arg_size() + i);
     } else {
