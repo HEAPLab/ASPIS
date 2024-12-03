@@ -937,6 +937,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     I2rm->eraseFromParent();
   }
 
+  fixGlobalCtors(Md);
   persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
 
 /*   if (Function *mainFunc = Md.getFunction("main")) {
@@ -946,6 +947,75 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   }
  */
   return PreservedAnalyses::none();
+}
+
+void EDDI::fixGlobalCtors(Module &M) {
+  LLVM_DEBUG(dbgs() << "[EDDI] Fixing global constructors\n");
+  LLVMContext &Context = M.getContext();
+
+  // Retrieve the existing @llvm.global_ctors.
+  GlobalVariable *GlobalCtors = M.getGlobalVariable("llvm.global_ctors");
+  if (!GlobalCtors) {
+      llvm::errs() << "Error: @llvm.global_ctors not found in the module.\n";
+      return;
+  }
+
+  // Get the constantness and the section name of the existing global variable.
+  bool isConstant = GlobalCtors->isConstant();
+  StringRef Section = GlobalCtors->getSection();
+
+  // Get the type of the annotations array and struct.
+  ArrayType *CtorsArrayType = cast<ArrayType>(GlobalCtors->getValueType());
+  StructType *CtorStructType = cast<StructType>(CtorsArrayType->getElementType());
+
+  // Create the new Ctor struct fields.
+  PointerType *Int8PtrType = Type::getInt8Ty(Context)->getPointerTo();
+  Constant *IntegerConstant = ConstantInt::get(Type::getInt32Ty(Context), 65535);
+  Constant *NullPtr = ConstantPointerNull::get(Int8PtrType); // Null pointer for other fields.
+
+  // Retrieve existing annotations and append the new one.
+  std::vector<Constant *> Ctors;
+  if (ConstantArray *ExistingArray = dyn_cast<ConstantArray>(GlobalCtors->getInitializer())) {
+    for (unsigned i = 0; i < ExistingArray->getNumOperands(); ++i) {
+      auto *ctorStr = ExistingArray->getOperand(i);
+
+      auto *ctor = ctorStr->getOperand(1);
+      if(isa<Function>(ctor)){
+        Function *dupCtor = getFunctionDuplicate(cast<Function>(ctor));
+        // If there isn't the duplicated constructor, use the original one
+        if(dupCtor == NULL) {
+          dupCtor = cast<Function>(ctor);
+        }
+
+        Constant *CtorAsConstant = ConstantExpr::getBitCast(dupCtor, Int8PtrType);;
+        // Create the new Ctor struct.
+        Constant *NewCtor = ConstantStruct::get(
+            CtorStructType,
+            {IntegerConstant, CtorAsConstant, NullPtr});
+        Ctors.push_back(NewCtor);
+      }
+    }
+  }
+
+  // Create a new array with the correct type and size.
+  ArrayType *NewCtorArrayType = ArrayType::get(CtorStructType, Ctors.size());
+  Constant *NewCtorArray = ConstantArray::get(NewCtorArrayType, Ctors);
+
+  // Remove the old global variable from the module's symbol table.
+  GlobalCtors->removeFromParent();
+  delete GlobalCtors;
+
+  // Create a new global variable with the exact name "llvm.global_ctors".
+  GlobalVariable *NewGlobalCtors = new GlobalVariable(
+      M,
+      NewCtorArray->getType(),
+      isConstant,
+      GlobalValue::AppendingLinkage, // Must use appending linkage for @llvm.global_ctors.
+      NewCtorArray,
+      "llvm.global_ctors");
+
+  // Set the section to match the original.
+  NewGlobalCtors->setSection(Section);
 }
 
 //-----------------------------------------------------------------------------

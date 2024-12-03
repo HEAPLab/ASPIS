@@ -49,6 +49,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         bool isValueDuplicated(std::map<Value *, Value *> &DuplicatedInstructionMap, Instruction &V);
         Function *duplicateFnArgs(Function &Fn, Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
 
+        void fixGlobalCtors(Module &M);
     public:
         PreservedAnalyses run(Module &M,
                               ModuleAnalysisManager &);
