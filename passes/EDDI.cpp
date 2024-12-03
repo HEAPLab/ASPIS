@@ -765,6 +765,15 @@ EDDI::duplicateFnArgs(Function &Fn, Module &Md,
 PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   LLVM_DEBUG(dbgs() << "Initializing EDDI...\n");
 
+  // Replace all uses of alias to aliasee
+  for (auto &alias : Md.aliases()) {
+    auto aliasee = alias.getAliaseeObject();
+    if(isa<Function>(aliasee)){
+      LLVM_DEBUG(dbgs() << "[EDDI] Replacing uses of " << alias.getName() <<  " to " << aliasee->getName() << "\n");
+      alias.replaceAllUsesWith(aliasee);
+    }
+  }
+
   LLVM_DEBUG(dbgs() << "Getting annotations... ");
   getFuncAnnotations(Md, FuncAnnotations);
   LLVM_DEBUG(dbgs() << "[done]\n");
