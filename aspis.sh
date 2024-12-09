@@ -20,6 +20,7 @@ clang_options=
 eddi_options="-S"
 cfc_options="-S"
 llvm_bin=$(dirname $(which clang))
+build_dir="."
 dup=0 # 0 = eddi,   1 = seddi,  2 = fdsc
 cfc=0 # 0 = cfcss,  1 = rasm,   2 = inter-rasm
 debug_enabled=false
@@ -57,6 +58,8 @@ Options:
     -h, --help          Display available options.
     -v, --verbose       Turn on verbose mode
     -o <file>           Write the compilation output to <file>.
+    --build-dir <path>  Specify the directory where to place all the build
+                        files.
     --llvm-bin <path>   Set the path to the llvm binaries (clang, opt, 
                         llvm-link) to <path>.
     --exclude <file>    Set the files to exclude from the compilation. The 
@@ -117,6 +120,13 @@ EOF
                         parse_state=5;
                     else
                         asm_file=`echo "$opt" | cut -b 10`;
+                    fi;
+                    ;;
+                --build-dir*)
+                    if [[ ${#opt} -eq 11 ]]; then
+                        parse_state=6;
+                    else
+                        llvm_bin=`echo "$opt" | cut -b 10`;
                     fi;
                     ;;
                 --eddi)
@@ -188,15 +198,32 @@ EOF
             asm_file="$opt";
             parse_state=0;
             ;;
+        6) 
+            build_dir="$opt";
+            parse_state=0;
+            ;;
     esac
 done
 
 if [[ $verbose == true ]]; then
     echo "Verbose mode ON"
     # Function to display commands
-    exe() { echo -e "\t\$ $@" ; "$@" ; }
+    exe() { 
+        echo -e "\t\$ $@"
+        "$@"
+        local status=$?
+        if [[ $status -ne 0 ]]; then
+            exit 1
+        fi
+    }
 else
-    exe() { "$@" ; }
+    exe() { 
+        "$@"
+        local status=$?
+        if [[ $status -ne 0 ]]; then
+            exit 1
+        fi 
+    }
 fi
 
 CLANG="${llvm_bin}/clang" 
@@ -209,56 +236,63 @@ fi;
 
 ###############################################################################
 
+exe mkdir -p $build_dir
+exe rm -f $build_dir/*.ll
+
 echo -e "=== Front-end and pre-processing ==="
 
 ## FRONTEND
-exe $CLANG $input_files $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone
+for input_file in $input_files; do
+    # Extract the filename without extension
+    filename=$(basename "$input_file" | sed 's/\.[^.]*$//')
+    # Compile the file to LLVM IR (.ll) and save it in the build directory
+    exe $CLANG "$input_file" $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
+done
+#exe $CLANG $input_files $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone
 
 ## LINK & PREPROCESS
-exe $LLVM_LINK *.ll -o out.ll -opaque-pointers
+exe $LLVM_LINK $build_dir/*.ll -o $build_dir/out.ll -opaque-pointers
 
 echo -e "\xE2\x9C\x94 Emitted and linked IR."
 
-
-
 if [[ $debug_enabled == false ]]; then
-    exe $OPT --enable-new-pm=1 --passes="strip" out.ll -o out.ll
+    exe $OPT --enable-new-pm=1 --passes="strip" $build_dir/out.ll -o $build_dir/out.ll
     echo -e "\xE2\x9C\x94 Debug mode disabled, stripped debug symbols."
 fi
 
-    exe $OPT --enable-new-pm=1 --passes="lowerswitch" out.ll -o out.ll
+    exe $OPT --enable-new-pm=1 --passes="lowerswitch" $build_dir/out.ll -o $build_dir/out.ll
 
 ## FuncRetToRef
-exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="func-ret-to-ref" out.ll -o out.ll
+exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="func-ret-to-ref" $build_dir/out.ll -o $build_dir/out.ll
 
 echo -e "\n=== ASPIS transformations =========="
 ## DATA PROTECTION
 case $dup in
     0) 
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="eddi-verify" out.ll -o out.ll $eddi_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
         ;;
     1) 
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libSEDDI.so --passes="eddi-verify" out.ll -o out.ll $eddi_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libSEDDI.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
         ;;
     2) 
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libFDSC.so --passes="eddi-verify" out.ll -o out.ll $eddi_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libFDSC.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
         ;;
 esac
 echo -e "\xE2\x9C\x94 Applied data protection passes."
 
-$OPT --enable-new-pm=1 --passes="dce,simplifycfg" out.ll -o out.ll
+exe $OPT --enable-new-pm=1 --passes="dce,simplifycfg" $build_dir/out.ll -o $build_dir/out.ll
 
 
 ## CONTROL-FLOW CHECKING
 case $cfc in
     0) 
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libCFCSS.so --passes="cfcss-verify" out.ll -o out.ll $cfc_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libCFCSS.so --passes="cfcss-verify" $build_dir/out.ll -o $build_dir/out.ll $cfc_options
         ;;
     1) 
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libRASM.so --passes="rasm-verify" out.ll -o out.ll $cfc_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libRASM.so --passes="rasm-verify" $build_dir/out.ll -o $build_dir/out.ll $cfc_options
         ;;
     2) 
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libINTER_RASM.so --passes="rasm-verify" out.ll -o out.ll $cfc_options
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libINTER_RASM.so --passes="rasm-verify" $build_dir/out.ll -o $build_dir/out.ll $cfc_options
         ;;
     *)
         echo -e "\t--no-cfc specified!"
@@ -273,16 +307,21 @@ if [[ -n "$exclude_file" ]]; then
     done < "$exclude_file";
 
     ## Frontend & linking
-    exe mv out.ll out.ll.bak
-    exe rm *.ll
-    exe mv out.ll.bak out.ll
-    exe $CLANG $clang_options -O0 -Xclang -disable-O0-optnone -emit-llvm -S $excluded_files #out.ll
-    exe $LLVM_LINK *.ll -o out.ll
+    exe mv $build_dir/out.ll $build_dir/out.ll.bak
+    exe rm $build_dir/*.ll
+    exe mv $build_dir/out.ll.bak $build_dir/out.ll
+    for input_file in $excluded_files; do
+        # Extract the filename without extension
+        filename=$(basename "$input_file" | sed 's/\.[^.]*$//')
+        # Compile the file to LLVM IR (.ll) and save it in the build directory
+        exe $CLANG "$input_file" $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
+    done
+    exe $LLVM_LINK $build_dir/*.ll -o $build_dir/out.ll
 fi;
 echo -e "\xE2\x9C\x94 Linked excluded files to the compilation."
 
 ## DuplicateGlobals
-exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="duplicate-globals" out.ll -o out.ll -S $eddi_options
+exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="duplicate-globals" $build_dir/out.ll -o $build_dir/out.ll -S $eddi_options
 echo -e "\xE2\x9C\x94 Duplicated globals."
 
 echo -e "\n=== Back-end ======================="
@@ -295,12 +334,12 @@ if [[ -n "$asm_file" ]]; then
 fi;
 
 ## Backend
-exe $CLANG $clang_options -O0 out.ll $asm_files -o $output_file 
+exe $CLANG $clang_options -O0 $build_dir/out.ll $asm_files -o $build_dir/$output_file 
 echo -e "\xE2\x9C\x94 Binary emitted."
 
 #Cleanup
 if [[ $cleanup == true ]]; then
-    rm *.ll
+    rm -f $build_dir/*.ll
     echo -e "\xE2\x9C\x94 Cleaned cached files."
 fi
 
