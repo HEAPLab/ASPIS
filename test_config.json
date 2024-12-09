@@ -1,0 +1,29 @@
+{
+  "llvm_bin": "<path/to/your/llvm/bin",
+  "tests": [
+    {
+      "test_name": "add1",
+      "source_file": "cpp/simple/add.cpp",
+      "expected_output": "7",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "add2",
+      "source_file": "cpp/simple/add.cpp",
+      "expected_output": "7",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "add3",
+      "source_file": "cpp/simple/add.cpp",
+      "expected_output": "7",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "add4",
+      "source_file": "cpp/simple/add.cpp",
+      "expected_output": "7",
+      "aspis_options": "--eddi --no-cfc"
+    }
+  ]
+}
