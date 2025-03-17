@@ -168,15 +168,23 @@ clang out.ll -o out.elf
 
 ## Using ASPIS with Docker
 
-Build the Docker image from the same directory as the Dockerfile
+You can run ASPIS inside a container to ensure a consistent environment. The container is configured with the necessary dependencies, and a volume is mounted to allow interaction with files on your local machine.
+
+### 1. Build the Docker Image
+
+From the directory containing the Dockerfile, run:
 
 ``` bash
 docker-compose build -t aspis
 ```
 
+### 2. Compile with ASPIS
+
+Run ASPIS inside the container:
+
 ```bash
-docker-compose run --rm aspis /workspace/path/to/your/file
+docker-compose run --rm aspis /workspace/<path-to-your-file>
 ```
 
 > [!WARNING]
-> At the moment aspis.sh run automatically with the `llvm-bin` option set by default. This is because `which clang`, that is normally used by the script, doesn't work inside the container because of the slightly different installation process.
+> The aspis.sh script runs automatically inside the container with the `--llvm-bin` option set by default. This is necessary because `which clang` does not work correctly inside the container.
