@@ -252,7 +252,7 @@ for input_file in $input_files; do
     # Extract the filename without extension
     filename=$(basename "$input_file" | sed 's/\.[^.]*$//')
     # Compile the file to LLVM IR (.ll) and save it in the build directory
-    exe $CLANG "$input_file" -I$clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
+    exe $CLANG "$input_file" $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
 done
 #exe $CLANG $input_files $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone
 
