@@ -98,7 +98,46 @@ void riskyFunction(bool throwException) {
     std::cout << "RiskyFunction executed successfully." << std::endl;
 }
 
+// Sret
+struct State
+{
+    double x0;
+    float x1;
+    float x2;
+    float x3;
+};
+
+class Class
+{
+public:
+    Class() {
+        std::cout << "Class constructor" << std::endl;
+        state = {1.0, 2.f, 3.f, 4.f};
+    }
+
+    State testSretDuplication(){
+        return state;
+    }
+
+private:
+    State state;
+};
+
+
+// noexcept
+void TestNoExcept() noexcept
+{
+    volatile MyClass m_data(1,2);
+}
+
+// testing unexpected special variable
+static Class staticClass;
+
 int main() {
+    std::cout << "Starting main" << std::endl;
+
+    std::cout << "staticClass: " << staticClass.testSretDuplication().x3 << std::endl;
+
     // Call simple function
     simpleFunction();
     
@@ -143,6 +182,12 @@ int main() {
     } catch (const std::runtime_error& e) {
         std::cerr << "Caught exception: " << e.what() << std::endl;
     }
+
+    TestNoExcept();
+
+    // Test sret
+    Class sretTest;
+    std::cout << "test sret: " << sretTest.testSretDuplication().x0 << std::endl;
 
     return 0;
 }
