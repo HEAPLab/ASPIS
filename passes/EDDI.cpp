@@ -503,7 +503,7 @@ void EDDI::duplicateGlobals(
         auto *valueOperand =storeInst->getValueOperand();
         if(isa<CallBase>(valueOperand)){
           CallBase *callInst = cast<CallBase>(valueOperand);
-          if (callInst->getCalledFunction()->getName().equals("__cxa_begin_catch"))
+          if (callInst->getCalledFunction() && callInst->getCalledFunction()->getName().equals("__cxa_begin_catch"))
           {return true;}
         }
         
