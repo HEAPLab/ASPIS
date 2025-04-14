@@ -173,7 +173,7 @@ StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functi
 
 bool isIntrinsicToDuplicate(CallBase *CInstr) {
         Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
-        if (intrinsicID == Intrinsic::memcpy) {
+        if (intrinsicID == Intrinsic::memcpy || intrinsicID == Intrinsic::memset) {
             return true; 
         }    
 
