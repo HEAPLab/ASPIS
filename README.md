@@ -175,7 +175,7 @@ You can run ASPIS inside a container to ensure a consistent environment. The con
 From the directory containing the Dockerfile, run:
 
 ``` bash
-docker-compose build -t aspis
+docker build -t aspis
 ```
 
 ### 2. Compile with ASPIS
@@ -183,7 +183,7 @@ docker-compose build -t aspis
 Run ASPIS inside the container:
 
 ```bash
-docker-compose run --rm aspis /workspace/<path-to-your-file>
+docker compose run --rm aspis /workspace/<path-to-your-file>
 ```
 
 > [!WARNING]
