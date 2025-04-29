@@ -253,11 +253,13 @@ void EDDI::addConsistencyChecks(
   std::vector<Value *> CmpInstructions;
 
   // split and add the verification BB
-  I.getParent()->splitBasicBlockBefore(&I);
+  auto BBpred = I.getParent()->splitBasicBlockBefore(&I);
   BasicBlock *VerificationBB =
       BasicBlock::Create(I.getContext(), "VerificationBB",
                          I.getParent()->getParent(), I.getParent());
-  I.getParent()->replaceUsesWithIf(VerificationBB, IsNotAPHINode);
+  I.getParent()->replaceUsesWithIf(BBpred, IsNotAPHINode);
+  auto BI = cast<BranchInst>(BBpred->getTerminator());
+  BI->setSuccessor(0, VerificationBB);
   IRBuilder<> B(VerificationBB);
 
   // add a comparison for each operand
@@ -674,8 +676,8 @@ int EDDI::duplicateInstruction(
           if (DebugEnabled) {
           NewCInstr->setDebugLoc(CInstr->getDebugLoc());
           }
-          res = 1;
           CInstr->replaceNonMetadataUsesWith(NewCInstr);
+          CInstr->eraseFromParent();
         }
       } else {
         fixFuncValsPassedByReference(*CInstr, DuplicatedInstructionMap, B);
@@ -873,18 +875,23 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         }
       }
 
+      std::list<Instruction*> instructionsToDuplicate;
       for (BasicBlock &BB : Fn) {
         for (Instruction &I : BB) {
           if (!isValueDuplicated(DuplicatedInstructionMap, I)) {
-            // perform the duplication
-            int shouldDelete =
-                duplicateInstruction(I, DuplicatedInstructionMap, *ErrBB);
-            // the instruction duplicated may be equal to the original, so we
-            // return shouldDelete in order to drop the duplicates
-            if (shouldDelete) {
-              InstructionsToRemove.push_back(&I);
-            }
+            instructionsToDuplicate.push_back(&I);
           }
+        }
+      }
+
+      for (auto &I : instructionsToDuplicate) {
+        // perform the duplication
+        int shouldDelete =
+            duplicateInstruction(*I, DuplicatedInstructionMap, *ErrBB);
+        // the instruction duplicated may be equal to the original, so we
+        // return shouldDelete in order to drop the duplicates
+        if (shouldDelete) {
+          InstructionsToRemove.push_back(&*I);
         }
       }
 
