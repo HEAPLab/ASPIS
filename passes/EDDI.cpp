@@ -685,14 +685,6 @@ int EDDI::duplicateInstruction(
     }
   }
 
- /*  else {
-    errs() << I <<"\n";
-  } */
-
-/*   if (!isa<InvokeInst>(I)) {
-    errs() << "it's an invoke";
-    errs() << *I.getParent();
-  } */
   return res;
 }
 
@@ -708,6 +700,15 @@ bool EDDI::isValueDuplicated(
     }
   }
   return false;
+}
+
+Instruction *getSingleReturnInst(Function &F) {
+  for (BasicBlock &BB : F) {
+    if (auto *retInst = llvm::dyn_cast<llvm::ReturnInst>(BB.getTerminator())) {
+      return retInst;
+    }
+  }
+  return nullptr;
 }
 
 Function *
@@ -907,6 +908,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       auto *CallI = ErrB.CreateCall(CalleeF);
       ErrB.CreateUnreachable();
 
+      #ifdef DC_HANDLER_INLINE
       std::list<Instruction *> errBranches;
       for (User *U : ErrBB->users()) {
         Instruction *I = cast<Instruction>(U);
@@ -929,6 +931,20 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         I->replaceSuccessorWith(ErrBB, ErrBBCopy);
       }
       ErrBB->eraseFromParent();
+      #else 
+      if (DebugEnabled) {
+        for (Instruction &ErrI : *ErrBB) {
+          auto DL = findNearestDebugLoc(*getSingleReturnInst(Fn));
+          if (!DL) {
+            DL = findNearestDebugLoc(*Fn.back().getTerminator());
+          }
+          if (!DL) {
+            DL = findNearestDebugLoc(*Fn.back().getTerminator());
+          }
+          ErrI.setDebugLoc(DL);
+        }
+      }
+      #endif
     }
   }
 
@@ -939,12 +955,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
 
-/*   if (Function *mainFunc = Md.getFunction("main")) {
-    errs() << *mainFunc;
-  } else {
-    errs() << "Function 'main' not found!\n";
-  }
- */
   return PreservedAnalyses::none();
 }
 
