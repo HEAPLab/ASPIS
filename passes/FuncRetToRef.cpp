@@ -72,9 +72,19 @@ Function* FuncRetToRef::updateFnSignature(Function &Fn, Module &Md) {
         ClonedFunc->removeRetAttr(Attribute::ZExt);
     }
     
+    if(ClonedFunc->hasRetAttribute(Attribute::SExt)) {
+        ClonedFunc->removeRetAttr(Attribute::SExt);
+    }
+
     // we may have a noundef ret attribute and we remove it as we have no return
     if(ClonedFunc->hasRetAttribute(Attribute::NoUndef)){
         ClonedFunc->removeRetAttr(Attribute::NoUndef);
+    }
+
+    for (int i=0; i < ClonedFunc->arg_size(); i++) {
+        if(ClonedFunc->hasParamAttribute(i, Attribute::Returned)){
+            ClonedFunc->removeParamAttr(i, Attribute::Returned);
+        }
     }
 
     updateRetInstructions(*ClonedFunc);
@@ -99,7 +109,7 @@ void FuncRetToRef::updateRetInstructions(Function &Fn) {
             Value *ReturnPtr = Fn.getArg(Fn.arg_size()-1); // the last argument is the return ptr
 
             // Store the returnvalue in the returnptr
-            B.CreateStore(ReturnValue, ReturnPtr);
+            B.CreateStore(ReturnValue, ReturnPtr, true);
 
             // create a ret instruction
             B.CreateRetVoid();
@@ -116,57 +126,64 @@ void FuncRetToRef::updateRetInstructions(Function &Fn) {
 void FuncRetToRef::updateFunctionCalls(Function &Fn, Function &NewFn) {
     std::list<Instruction*> ListInstrToRemove;
     
+    std::list<CallBase*> FnUsers;
+
     // for each place in which the function has been called, we replace it with the _ret version
     for (User *U : Fn.users()) {
         if (isa<CallBase>(U)) {
             CallBase *CInstr = cast<CallBase>(U); // this is the instruction that called the function
-            
-            // duplicate all the args of the original instruction and add a new arg for the ret value
-            std::vector<Value*> args;
-            for (Value *V : CInstr->args()) {
-                args.push_back(V);
-            }
+            if (CInstr->getCalledFunction() == &Fn)
+                FnUsers.push_back(CInstr);
+        }
+    }
+    for (CallBase *CInstr : FnUsers) {
+        // duplicate all the args of the original instruction and add a new arg for the ret value
+        std::vector<Value*> args;
+        for (Value *V : CInstr->args()) {
+            args.push_back(V);
+        }
 
-            IRBuilder<> B(CInstr);
-            
-            // The function return value can be used immediately by a store instruction, 
-            // so we try to get the pointer operand of the store instruction and use it as a return value
-            int found = 0;
-            for (User *UC : CInstr->users()) {
-                // if the user is a store instruction and the stored value is the output of the call instr
-                if (isa<StoreInst>(UC) && cast<StoreInst>(UC)->getValueOperand() == CInstr) {
-                    StoreInst *SI = cast<StoreInst>(UC);
+        IRBuilder<> B(CInstr);
+        
+        // The function return value can be used immediately by a store instruction, 
+        // so we try to get the pointer operand of the store instruction and use it as a return value
+        int found = 0;
+        for (User *UC : CInstr->users()) {
+            // if the user is a store instruction and the stored value is the output of the call instr
+            if (isa<StoreInst>(UC) && cast<StoreInst>(UC)->getValueOperand() == CInstr) {
+                StoreInst *SI = cast<StoreInst>(UC);
 
-                    // get the pointer
-                    Value *CandidateAlloca = SI->getPointerOperand();
-                    if (isa<AllocaInst>(CandidateAlloca)) {
-                        found = 1;
-                        args.push_back(SI->getPointerOperand());
-                         // remove the store from the basic block as the operation is performed in the called fun
-                        SI->eraseFromParent();
-                        
-                        // do the call
-                        B.CreateCall(NewFn.getFunctionType(), &NewFn, args);
-            
-                        break;
-                    }
+                // get the pointer
+                Value *CandidateAlloca = SI->getPointerOperand();
+                if (isa<AllocaInst>(CandidateAlloca)) {
+                    found = 1;
+                    args.push_back(SI->getPointerOperand());
+                        // remove the store from the basic block as the operation is performed in the called fun
+                    SI->eraseFromParent();
+                    
+                    // do the call
+                    B.CreateCall(NewFn.getFunctionType(), &NewFn, args);
+        
+                    Instruction *TmpLoad = B.CreateLoad(CInstr->getType(), CandidateAlloca);
+                    CInstr->replaceNonMetadataUsesWith(TmpLoad);
+                    break;
                 }
             }
-
-            // if the return is not used by a store but is used by other instructions,
-            // we allocate the memory for return value in the caller function
-            if (!found) {
-                IRBuilder<> BInit(&(CInstr->getParent()->getParent()->front().front()));
-                Instruction *TmpAlloca = BInit.CreateAlloca(CInstr->getType());
-                args.push_back(TmpAlloca);
-                // do the call
-                B.CreateCall(NewFn.getFunctionType(), &NewFn, args);
-                // use the load on the return value instead of the previous function output
-                Instruction *TmpLoad = B.CreateLoad(CInstr->getType(), TmpAlloca);
-                CInstr->replaceNonMetadataUsesWith(TmpLoad);
-            }
-            ListInstrToRemove.push_back(CInstr);
         }
+
+        // if the return is not used by a store but is used by other instructions,
+        // we allocate the memory for return value in the caller function
+        if (!found) {
+            IRBuilder<> BInit(&(CInstr->getParent()->getParent()->front().front()));
+            Instruction *TmpAlloca = BInit.CreateAlloca(CInstr->getType());
+            args.push_back(TmpAlloca);
+            // do the call
+            B.CreateCall(NewFn.getFunctionType(), &NewFn, args);
+            // use the load on the return value instead of the previous function output
+            Instruction *TmpLoad = B.CreateLoad(CInstr->getType(), TmpAlloca, true);
+            CInstr->replaceNonMetadataUsesWith(TmpLoad);
+        }
+        ListInstrToRemove.push_back(CInstr);
     }
 
     // remove all the older call instructions
@@ -177,7 +194,6 @@ void FuncRetToRef::updateFunctionCalls(Function &Fn, Function &NewFn) {
 
 PreservedAnalyses FuncRetToRef::run(Module &Md, ModuleAnalysisManager &AM) {
     LinkageMap linkageMap=mapFunctionLinkageNames(Md);
-    return PreservedAnalyses::none();
     std::map<Value*, StringRef> FuncAnnotations;
     getFuncAnnotations(Md, FuncAnnotations);
 
