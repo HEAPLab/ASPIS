@@ -146,41 +146,41 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
     int subRanPrevVal = SubRanPrevVals.find(&BB)->second;
     // in this case BB is not the first Basic Block of the function, so it has to update RuntimeSig and check it
     if (!BB.isEntryBlock()) {
-        if (isa<LandingPadInst>(BB.getFirstNonPHI())) {
+        if (isa<LandingPadInst>(BB.getFirstNonPHI()) || BB.getName().contains_insensitive("verification")) {
           IRBuilder<> BChecker(&*BB.getFirstInsertionPt());
-          BChecker.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB),&RuntimeSig);
+          BChecker.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB),&RuntimeSig, true);
         }
-        else {
+        else if (!BB.getName().contains_insensitive("errbb")){
         BasicBlock *NewBB = BasicBlock::Create(BB.getContext(), "RASM_Verification_BB", BB.getParent(), &BB);
         IRBuilder<> BChecker(NewBB);
 
-        // add instructions for the first runtime signature update
-        Value *InstrRuntimeSig = BChecker.CreateLoad(IntType, &RuntimeSig);
+          // add instructions for the first runtime signature update
+          Value *InstrRuntimeSig = BChecker.CreateLoad(IntType, &RuntimeSig, true);
 
-        Value *RuntimeSignatureVal = BChecker.CreateSub(InstrRuntimeSig, llvm::ConstantInt::get(IntType, subRanPrevVal));
-        BChecker.CreateStore(RuntimeSignatureVal, &RuntimeSig);
+          Value *RuntimeSignatureVal = BChecker.CreateSub(InstrRuntimeSig, llvm::ConstantInt::get(IntType, subRanPrevVal));
+          BChecker.CreateStore(RuntimeSignatureVal, &RuntimeSig, true);
 
-        // update phi placing them in the new block
-        while (isa<PHINode>(&BB.front())) {
-          Instruction *PhiInst = &BB.front();
-          PhiInst->removeFromParent();
-          PhiInst->insertBefore(&NewBB->front());
-        }
-
-        // replace the uses of BB with NewBB
-        for (BasicBlock &BB_ : *BB.getParent()) {
-          if (&BB_ != NewBB) {
-            BB_.getTerminator()->replaceSuccessorWith(&BB, NewBB);
+          // update phi placing them in the new block
+          while (isa<PHINode>(&BB.front())) {
+            Instruction *PhiInst = &BB.front();
+            PhiInst->removeFromParent();
+            PhiInst->insertBefore(&NewBB->front());
           }
-        }
 
-        // add instructions for checking the runtime signature
-        Value *CmpVal = BChecker.CreateCmp(llvm::CmpInst::ICMP_EQ, RuntimeSignatureVal, llvm::ConstantInt::get(IntType, randomNumberBB));
-        BChecker.CreateCondBr(CmpVal, &BB, &ErrBB);
+          // replace the uses of BB with NewBB
+          for (BasicBlock &BB_ : *BB.getParent()) {
+            if (&BB_ != NewBB) {
+              BB_.getTerminator()->replaceSuccessorWith(&BB, NewBB);
+            }
+          }
 
-        // add NewBB and BB into the NewBBs map
-        NewBBs.insert(std::pair<BasicBlock*, BasicBlock*>(NewBB, &BB));
-    }
+          // add instructions for checking the runtime signature
+          Value *CmpVal = BChecker.CreateCmp(llvm::CmpInst::ICMP_EQ, RuntimeSignatureVal, llvm::ConstantInt::get(IntType, randomNumberBB));
+          BChecker.CreateCondBr(CmpVal, &BB, &ErrBB);
+
+          // add NewBB and BB into the NewBBs map
+          NewBBs.insert(std::pair<BasicBlock*, BasicBlock*>(NewBB, &BB));
+      }
     }
 
     // Add instructions for the second runtime signature update.
@@ -209,17 +209,17 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
       IRBuilder<> B(CallIn);
       
       // Backup the ret signature so that we don't overwrite it
-      Value* RetSigBackup = B.CreateLoad(IntType, &RetSig);
+      Value* RetSigBackup = B.CreateLoad(IntType, &RetSig, true);
 
       // Set the runtime signature as the input signature of the first basic block of the called function
-      B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberCalledBB+subRanPrevValCalledBB), &RuntimeSig);
+      B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberCalledBB+subRanPrevValCalledBB), &RuntimeSig, true);
       
       // Set the ret signature as the signature of the basic block after the call
-      B.CreateStore(llvm::ConstantInt::get(IntType, retSig), &RetSig);
+      B.CreateStore(llvm::ConstantInt::get(IntType, retSig), &RetSig, true);
 
       // Restore the ret signature after the call
       B.SetInsertPoint(CallIn->getNextNonDebugInstruction());
-      B.CreateStore(RetSigBackup, &RetSig);
+      B.CreateStore(RetSigBackup, &RetSig, true);
     }
     else
     #endif
@@ -238,13 +238,13 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
 
       // compute the adjustment value as AdjVal = primeNum+SubRanPrevVal-RetSig = randomNumberBB-subRanPrevVal+SubRanPrevVal-RetSig = randomNumberBB-RetSig
       IRBuilder<> B(NewBB);
-      Value *InstrRetSig = B.CreateLoad(IntType, &RetSig);
+      Value *InstrRetSig = B.CreateLoad(IntType, &RetSig, true);
       Value* AdjVal = B.CreateSub(llvm::ConstantInt::get(IntType, randomNumberBB), InstrRetSig);
 
       // update the signature
-      Value *InstrRuntimeSig = B.CreateLoad(IntType, &RuntimeSig);
+      Value *InstrRuntimeSig = B.CreateLoad(IntType, &RuntimeSig, true);
       Value* NewSig = B.CreateSub(InstrRuntimeSig, AdjVal);
-      B.CreateStore(NewSig, &RuntimeSig);
+      B.CreateStore(NewSig, &RuntimeSig, true);
 
       // compare the new signature with RetSig
       Value *CmpValRet = B.CreateCmp(llvm::CmpInst::ICMP_EQ, NewSig, InstrRetSig);
@@ -276,9 +276,9 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
           int succSubRanPrevVal = SubRanPrevVals.find(Successor)->second;
           int adjVal = randomNumberBB - (succRandomNumberBB + succSubRanPrevVal);
 
-          Value *InstrRuntimeSig = B.CreateLoad(IntType, &RuntimeSig);
+          Value *InstrRuntimeSig = B.CreateLoad(IntType, &RuntimeSig, true);
           Value *NewSig = B.CreateSub(InstrRuntimeSig, llvm::ConstantInt::get(IntType, adjVal));
-          B.CreateStore(NewSig, &RuntimeSig);
+          B.CreateStore(NewSig, &RuntimeSig, true);
           break;
         }
         case 2: {
@@ -300,11 +300,20 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
 
           Value *BrCondition = getCondition(*Terminator);
 
-          Value *AdjustValue = B.CreateSelect(BrCondition, llvm::ConstantInt::get(IntType, adjVal_1)
+          Value *AdjustValue;
+          if (Successor_1->getName().contains_insensitive("errbb")) {
+            B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB-adjVal_2), &RuntimeSig, true);
+          }
+          if (Successor_2->getName().contains_insensitive("errbb")) {
+            B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB-adjVal_1), &RuntimeSig, true);
+          }
+          else {
+            AdjustValue = B.CreateSelect(BrCondition, llvm::ConstantInt::get(IntType, adjVal_1)
                                     , llvm::ConstantInt::get(IntType, adjVal_2));
-          Value *InstrRuntimeSig = B.CreateLoad(IntType, &RuntimeSig);
-          Value *NewSig = B.CreateSub(InstrRuntimeSig, AdjustValue);
-          B.CreateStore(NewSig, &RuntimeSig);
+            Value *InstrRuntimeSig = B.CreateLoad(IntType, &RuntimeSig, true);
+            Value *NewSig = B.CreateSub(InstrRuntimeSig, AdjustValue);
+            B.CreateStore(NewSig, &RuntimeSig, true);
+          }
           break;
         }
         
@@ -368,8 +377,8 @@ PreservedAnalyses RASM::run(Module &Md, ModuleAnalysisManager &AM) {
           // initialize the runtime signature for the first basic block of the function
           Value *RuntimeSig = B.CreateAlloca(IntType);
           Value *RetSig = B.CreateAlloca(IntType);
-          B.CreateStore(llvm::ConstantInt::get(IntType, currSig), RuntimeSig);
-          B.CreateStore(llvm::ConstantInt::get(IntType, RandomNumberBBs.size() + currSig), RetSig);
+          B.CreateStore(llvm::ConstantInt::get(IntType, currSig), RuntimeSig, true);
+          B.CreateStore(llvm::ConstantInt::get(IntType, RandomNumberBBs.size() + currSig), RetSig, true);
         #elif (INTRA_FUNCTION_CFC == 1)
           int subCurrSig = SubRanPrevVals.find(&Fn.front())->second;
           // add instructions for initializing the runtime signatures in case they have not been initialized
@@ -380,8 +389,8 @@ PreservedAnalyses RASM::run(Module &Md, ModuleAnalysisManager &AM) {
           IRBuilder<> B(NewBB);
           
           // load the runtime signatures
-          Value* RuntimeSigInstr = B.CreateLoad(IntType, RuntimeSig);
-          Value* RetSigInstr = B.CreateLoad(IntType, RetSig);
+          Value* RuntimeSigInstr = B.CreateLoad(IntType, RuntimeSig, true);
+          Value* RetSigInstr = B.CreateLoad(IntType, RetSig, true);
 
           // compare them with their initialization value INIT_SIGNATURE
           Value* Cond1 = B.CreateCmp(llvm::CmpInst::ICMP_EQ, RuntimeSigInstr, RetSigInstr);
@@ -391,8 +400,8 @@ PreservedAnalyses RASM::run(Module &Md, ModuleAnalysisManager &AM) {
           // if they contain the initialization values, update them using sig and num_bbs+sig
           Value* NewRuntimeSig = B.CreateSelect(CondAnd, llvm::ConstantInt::get(IntType, currSig + subCurrSig), RuntimeSigInstr);
           Value* NewRetSig = B.CreateSelect(CondAnd, llvm::ConstantInt::get(IntType, RandomNumberBBs.size() + currSig), RetSigInstr);
-          B.CreateStore(NewRuntimeSig, RuntimeSig);
-          B.CreateStore(NewRetSig, RetSig);
+          B.CreateStore(NewRuntimeSig, RuntimeSig, true);
+          B.CreateStore(NewRetSig, RetSig, true);
 
           // add the branch to the previous frontBB
           B.CreateBr(FrontBB);
