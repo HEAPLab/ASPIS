@@ -85,6 +85,10 @@ bool shouldCompile(Function &Fn,
       // the function is neither null nor empty
       
       Fn.size() != 0 
+      &&
+      !Fn.getName().contains("DataCorruption_Handler")
+      &&
+      !Fn.getName().contains("SigMismatch_Handler")
       // Moreover, it does not have to be marked as excluded or to_duplicate
       && (FuncAnnotations.find(&Fn) == FuncAnnotations.end() || 
       (!FuncAnnotations.find(&Fn)->second.startswith("exclude") /* && 
@@ -95,10 +99,13 @@ bool shouldCompile(Function &Fn,
 
 DebugLoc findNearestDebugLoc(Instruction &I) {
   std::list<BasicBlock*> candidates;
+  if (&I == nullptr) {
+    return nullptr;
+  }
 
   auto *PrevI = I.getPrevNonDebugInstruction();
 
-  while ((PrevI = PrevI->getPrevNonDebugInstruction())) {
+  while (PrevI && (PrevI = PrevI->getPrevNonDebugInstruction())) {
     if (auto DL = PrevI->getDebugLoc()) {
       return DL;
     }
@@ -122,9 +129,8 @@ DebugLoc findNearestDebugLoc(Instruction &I) {
     }
   }
 
-  errs() << "Could not find nearest debug location! Aborting compilation.\n";
+  errs() << "Could not find nearest debug location!\n";
   errs() << I << "\n";
-  abort();
   return nullptr;
 }
 
@@ -173,7 +179,7 @@ StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functi
 
 bool isIntrinsicToDuplicate(CallBase *CInstr) {
         Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
-        if (intrinsicID == Intrinsic::memcpy || intrinsicID == Intrinsic::memset) {
+        if (intrinsicID != Intrinsic::not_intrinsic /* intrinsicID == Intrinsic::memcpy || intrinsicID == Intrinsic::memset */) {
             return true; 
         }    
 
@@ -181,21 +187,25 @@ bool isIntrinsicToDuplicate(CallBase *CInstr) {
 }
 
 void createFtFunc(Module &Md, StringRef name) {
-  auto FnValue = Md.getOrInsertFunction(name, FunctionType::getVoidTy(Md.getContext())).getCallee();
+  Value *FnValue = Md.getFunction(name);
 
-  assert(isa<Function>(FnValue) && "The function name must correspond to a function.");
+  if (FnValue != nullptr) {
+    FnValue = Md.getOrInsertFunction(name, FunctionType::getVoidTy(Md.getContext())).getCallee();
+    assert(isa<Function>(FnValue) && "The function name must correspond to a function.");
 
-  auto Fn = cast<Function>(FnValue);
+    auto Fn = cast<Function>(FnValue);
 
-  if (Fn->isDeclaration()) {
-    BasicBlock *StartBB = BasicBlock::Create(Md.getContext(), "start", Fn);
-    BasicBlock *LoopBB = BasicBlock::Create(Md.getContext(), "loop", Fn);
+    if (Fn->isDeclaration()) {
+      BasicBlock *StartBB = BasicBlock::Create(Md.getContext(), "start", Fn);
+      BasicBlock *LoopBB = BasicBlock::Create(Md.getContext(), "loop", Fn);
 
-    IRBuilder<> B(StartBB);
-    B.CreateBr(LoopBB);
+      IRBuilder<> B(StartBB);
+      B.CreateBr(LoopBB);
 
-    B.SetInsertPoint(LoopBB);
-    B.CreateBr(LoopBB);
+      B.SetInsertPoint(LoopBB);
+      B.CreateBr(LoopBB);
+    }
+    Fn->addFnAttr(Attribute::NoInline);
   }
 }
 
