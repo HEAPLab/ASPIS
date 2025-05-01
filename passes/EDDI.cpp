@@ -182,6 +182,12 @@ void EDDI::duplicateOperands(
         IClone->setOperand(
             J,
             Duplicate->second); // set the J-th operand with the duplicate value
+
+      // let us see whether we need to use always the dup for this operand
+      Duplicate = ValuesToAlwaysDup.find(V);
+      if (Duplicate != ValuesToAlwaysDup.end()) { // in this case, we want to use the dup also for the original instruction
+        I.setOperand(J, Duplicate->second);
+      }
     }
     J++;
   }
@@ -421,6 +427,29 @@ Function *EDDI::getFunctionFromDuplicate(Function *Fn) {
   return FnDup;
 }
 
+Constant *EDDI::duplicateConstant(Constant *C) {
+  Constant *ret = C;
+
+  if(isa<Function>(C)) {
+    return getFunctionDuplicate(cast<Function>(C));
+  }
+  else if (isa<ConstantArray>(C)) {
+    ConstantArray *CArr = cast<ConstantArray>(C);
+    std::vector<Constant*> ConstArray;
+
+    for (auto &Elem : C->operands()) {
+      assert(isa<Constant>(Elem) && "Trying to duplicate a constant that has nonconstant operands!");
+      Constant *NewElem = duplicateConstant(cast<Constant>(Elem));
+      ConstArray.push_back(NewElem);
+    }
+    return ConstantArray::get(CArr->getType(), ConstArray);
+  }
+  else if (isa<ConstantStruct>(C)) {
+    // TODO create the constant struct
+  }
+  return ret;
+}
+
 void EDDI::duplicateGlobals(
     Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap) {
   Value *RuntimeSig;
@@ -458,14 +487,23 @@ void EDDI::duplicateGlobals(
     bool toExclude = !isa<Function>(GV) &&
                      FuncAnnotations.find(GV) != FuncAnnotations.end() &&
                      (FuncAnnotations.find(GV))->second.startswith("exclude");
-
-    if (! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude) // is not function, constant, struct and does not end with _dup
+    bool isConstStruct = GV->getSection() != "llvm.metadata" && GV->hasInitializer() && isa<ConstantAggregate>(GV->getInitializer());
+    bool isStructOfFunctions = false; // is true if and only if the global variable that we are duplicating contains at least a function pointer
+    if (isConstStruct) {
+      for (Value *Op : cast<ConstantAggregate>(GV->getInitializer())->operands()) {
+        if (isa<Function>(Op)) {
+          isStructOfFunctions = true;
+          break;
+        } 
+      }
+    }
+    if (isStructOfFunctions || ! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude) // is not function, constant, struct and does not end with _dup
         /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
             || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
         ) {
       Constant *Initializer = nullptr;
       if (GV->hasInitializer()) {
-        Initializer = GV->getInitializer();
+        Initializer = duplicateConstant(GV->getInitializer());
       }
 
       GlobalVariable *InsertBefore;
@@ -489,10 +527,13 @@ void EDDI::duplicateGlobals(
 
       GVCopy->setAlignment(GV->getAlign());
       GVCopy->setDSOLocal(GV->isDSOLocal());
+
       // Save the duplicated global so that the duplicate can be used as operand
       // of other duplicated instructions
       DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(GV, GVCopy));
       DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(GVCopy, GV));
+
+      if (isStructOfFunctions) ValuesToAlwaysDup.insert(std::pair(GV, GVCopy));
     }
   }
 }
@@ -750,6 +791,17 @@ EDDI::duplicateFnArgs(Function &Fn, Module &Md,
   CloneFunctionInto(ClonedFunc, &Fn, Params,
                     CloneFunctionChangeType::GlobalChanges, returns);
 
+  
+  // we may have a noundef ret attribute and we remove it as we have no return
+  if(ClonedFunc->hasRetAttribute(Attribute::NoUndef)){
+    ClonedFunc->removeRetAttr(Attribute::NoUndef);
+  }
+  for (int i=0; i < ClonedFunc->arg_size(); i++) {
+    if(ClonedFunc->hasParamAttribute(i, Attribute::StructRet)){
+      ClonedFunc->removeParamAttr(i, Attribute::StructRet);
+    }
+  }
+
   return ClonedFunc;
 }
 
@@ -777,7 +829,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         auto NextI = I;
         
         // iterate over the next instructions finding the first debug loc
-        while (NextI = NextI->getNextNode()) {
+        while ((NextI = NextI->getNextNode())) {
           if (NextI->getDebugLoc()) {
             I->setDebugLoc(NextI->getDebugLoc());
             break;
@@ -790,10 +842,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   std::map<Value *, Value *>
       DuplicatedInstructionMap; // is a map containing the instructions
                                 // and their duplicates
-
-  LLVM_DEBUG(dbgs() << "Duplicating globals... ");
-  duplicateGlobals(Md, DuplicatedInstructionMap);
-  LLVM_DEBUG(dbgs() << "[done]\n");
 
   // store the functions that are currently in the module
   std::list<Function *> FnList;
@@ -821,6 +869,10 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     Function *newFn = duplicateFnArgs(*Fn, Md, DuplicatedInstructionMap);
     DuplicatedFns.insert(newFn);
   }
+
+  LLVM_DEBUG(dbgs() << "Duplicating globals... ");
+  duplicateGlobals(Md, DuplicatedInstructionMap);
+  LLVM_DEBUG(dbgs() << "[done]\n");
 
   // list of duplicated instructions to remove since they are equal to the
   // original
