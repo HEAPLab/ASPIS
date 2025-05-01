@@ -33,6 +33,9 @@ class EDDI : public PassInfoMixin<EDDI> {
         std::set<Function*> CompiledFuncs;
         std::map<Value*, StringRef> FuncAnnotations;
         std::set<Function*> OriginalFunctions;
+        
+        // Map of <original, duplicate> for which we need to always use the duplicate in place of the original
+        std::map<Value*, Value*> ValuesToAlwaysDup;
 
         int isUsedByStore(Instruction &I, Instruction &Use);
         Instruction* cloneInstr(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap);
@@ -43,9 +46,11 @@ class EDDI : public PassInfoMixin<EDDI> {
         void fixFuncValsPassedByReference(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B);
         Function *getFunctionDuplicate(Function *Fn);
         Function *getFunctionFromDuplicate(Function *Fn);
-        void duplicateGlobals (Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
+        Constant *duplicateConstant(Constant *C);
+        void duplicateGlobals(Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
         bool isAllocaForExceptionHandling(AllocaInst &I);
-        int duplicateInstruction (Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
+        int transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B, BasicBlock &ErrBB);
+        int duplicateInstruction(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
         bool isValueDuplicated(std::map<Value *, Value *> &DuplicatedInstructionMap, Instruction &V);
         Function *duplicateFnArgs(Function &Fn, Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
 

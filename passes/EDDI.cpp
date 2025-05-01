@@ -974,7 +974,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         if (DebugEnabled) {
         for (Instruction &ErrI : *ErrBBCopy) {
           if (!I->getDebugLoc()) {
-            ErrI.setDebugLoc(findNearestDebugLoc(*Fn.back().getTerminator()));
+            ErrI.setDebugLoc(findNearestDebugLoc(Fn.back().getTerminator()));
           } else {
             ErrI.setDebugLoc(I->getDebugLoc());
             }
@@ -985,13 +985,14 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       ErrBB->eraseFromParent();
       #else 
       if (DebugEnabled) {
+        // TODO fix possible null derereference below
         for (Instruction &ErrI : *ErrBB) {
-          auto DL = findNearestDebugLoc(*getSingleReturnInst(Fn));
+          auto DL = findNearestDebugLoc(getSingleReturnInst(Fn));
           if (!DL) {
-            DL = findNearestDebugLoc(*Fn.back().getTerminator());
+            DL = findNearestDebugLoc(Fn.back().getTerminator());
           }
           if (!DL) {
-            DL = findNearestDebugLoc(*Fn.back().getTerminator());
+            DL = findNearestDebugLoc(Fn.back().getTerminator());
           }
           ErrI.setDebugLoc(DL);
         }

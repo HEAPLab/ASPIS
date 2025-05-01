@@ -115,13 +115,15 @@ bool shouldCompile(Function &Fn,
       && OriginalFunctions.find(&Fn) == OriginalFunctions.end();
 }
 
-DebugLoc findNearestDebugLoc(Instruction &I) {
+DebugLoc findNearestDebugLoc(Instruction *I) {
   std::list<BasicBlock*> candidates;
-  if (&I == nullptr) {
+  if (I == nullptr) {
     return nullptr;
   }
 
-  auto *PrevI = I.getPrevNonDebugInstruction();
+  if (I->getDebugLoc()) return I->getDebugLoc();
+
+  auto *PrevI = I->getPrevNonDebugInstruction();
 
   while (PrevI && (PrevI = PrevI->getPrevNonDebugInstruction())) {
     if (auto DL = PrevI->getDebugLoc()) {
@@ -129,7 +131,7 @@ DebugLoc findNearestDebugLoc(Instruction &I) {
     }
   }
 
-  for (auto *U : I.getParent()->users()) {
+  for (auto *U : I->getParent()->users()) {
     candidates.push_back(cast<Instruction>(U)->getParent());
   }
 
@@ -148,7 +150,9 @@ DebugLoc findNearestDebugLoc(Instruction &I) {
   }
 
   errs() << "Could not find nearest debug location!\n";
-  errs() << I << "\n";
+  errs() << "Instruction: " << *I << "\n";
+  errs() << "In function: \n";
+  errs() << *I->getParent()->getParent() << "\n";
   return nullptr;
 }
 

@@ -85,6 +85,9 @@ Function* FuncRetToRef::updateFnSignature(Function &Fn, Module &Md) {
         if(ClonedFunc->hasParamAttribute(i, Attribute::Returned)){
             ClonedFunc->removeParamAttr(i, Attribute::Returned);
         }
+        if(ClonedFunc->hasParamAttribute(i, Attribute::StructRet)){
+            ClonedFunc->removeParamAttr(i, Attribute::StructRet);
+        }
     }
 
     updateRetInstructions(*ClonedFunc);

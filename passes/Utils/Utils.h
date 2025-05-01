@@ -23,6 +23,9 @@ extern bool DebugEnabled;
 // Given a Use U, it returns true if the instruction is a PHI instruction
 bool IsNotAPHINode (Use &U);
 
+// Given a Use U, it returns true if the use is a global variable
+bool IsGlobalStructOfFunctions (Use &U);
+
 /**
  * TODO This function supports only one annotation for each function, multiple annotations are discarded, perhaps I can fix this lol
  * @param Md The module where to look for the annotations
@@ -37,7 +40,7 @@ bool shouldCompile(Function &Fn,
     const std::map<Value*, StringRef> &FuncAnnotations,
     const std::set<Function*> &OriginalFunctions = std::set<Function*>());
 
-DebugLoc findNearestDebugLoc(Instruction &I);
+DebugLoc findNearestDebugLoc(Instruction *I);
 
 LinkageMap mapFunctionLinkageNames(const Module &M);
 void printLinkageMap(const LinkageMap &linkageMap);
