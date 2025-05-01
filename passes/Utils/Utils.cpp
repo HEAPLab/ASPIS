@@ -34,6 +34,24 @@ bool IsNotAPHINode (Use &U){
   return !isa<PHINode>(U.getUser());
 }
 
+bool IsGlobalStructOfFunctions (Use &U) {
+  bool res = false;
+  Value *Val = U.get();
+  Value *ValUser = U.getUser();
+  if (isa<Function>(Val) && isa<Constant>(ValUser)) {
+    Constant *ConstUser = cast<Constant>(U.getUser());
+    errs() << "Found constant " << *ConstUser << "\n";
+
+    for (auto NestedUser : ConstUser->users()) {
+      errs() << "Used by " << NestedUser->getName() << "\n";
+      if (NestedUser->getName().ends_with("_dup")) {
+        res = true;
+      }
+    }
+  }
+  return false;
+}
+
 void getFuncAnnotations(Module &Md, std::map<Value*, StringRef> &FuncAnnotations) {
   if(GlobalVariable* GA = Md.getGlobalVariable("llvm.global.annotations")) {
     // the first operand holds the metadata

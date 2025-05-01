@@ -238,12 +238,12 @@ Value *EDDI::comparePtrs(Value &V1, Value &V2, IRBuilder<> &B) {
   Value *F1 = getPtrFinalValue(V1);
   Value *F2 = getPtrFinalValue(V2);
 
-  if (F1 != NULL && F2 != NULL && !F1->getType()->isPointerTy()) {
+  if (F1 != NULL && F2 != NULL && !F1->getType()->isPointerTy() && !F2->getType()->isPointerTy()) {
     Instruction *L1 = B.CreateLoad(F1->getType(), F1);
     Instruction *L2 = B.CreateLoad(F2->getType(), F2);
     if (L1->getType()->isFloatingPointTy()) {
       return B.CreateCmp(CmpInst::FCMP_UEQ, L1, L2);
-    } else {
+    } else if (L1->getType()->isIntegerTy()) {
       return B.CreateCmp(CmpInst::ICMP_EQ, L1, L2);
     }
   }
@@ -317,7 +317,7 @@ void EDDI::addConsistencyChecks(
                 if (OriginalElem->getType()->isFloatingPointTy()) {
                   CmpInstructions.push_back(
                       B.CreateCmp(CmpInst::FCMP_UEQ, OriginalElem, CopyElem));
-                } else {
+                } else if (OriginalElem->getType()->isIntegerTy()){
                   CmpInstructions.push_back(
                       B.CreateCmp(CmpInst::ICMP_EQ, OriginalElem, CopyElem));
                 }
@@ -330,7 +330,7 @@ void EDDI::addConsistencyChecks(
           if (Original->getType()->isFloatingPointTy()) {
             CmpInstructions.push_back(
                 B.CreateCmp(CmpInst::FCMP_UEQ, Original, Copy));
-          } else {
+          } else if (Original->getType()->isIntegerTy()) {
             CmpInstructions.push_back(
                 B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
           }
