@@ -1,5 +1,5 @@
 {
-	"llvm_bin": "<path/to/your/llvm/bin",
+	"llvm_bin": "/usr/lib/llvm-16/bin",
 	"tests": [
 		{
 			"test_name": "add1",
@@ -215,6 +215,54 @@
 			"test_name": "heap4",
 			"source_file": "cpp/simple/heap.cpp",
 			"expected_output": "4999950000\n",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "raii_filehandler1",
+			"source_file": "cpp/simple/file_handler.cpp",
+			"expected_output": "Handler created\nFile closed\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "raii_filehandler2",
+			"source_file": "cpp/simple/file_handler.cpp",
+			"expected_output": "Handler created\nFile closed\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "raii_filehandler3",
+			"source_file": "cpp/simple/file_handler.cpp",
+			"expected_output": "Handler created\nFile closed\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "raii_filehandler4",
+			"source_file": "cpp/simple/file_handler.cpp",
+			"expected_output": "Handler created\nFile closed\n",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "multithreading_atomic1",
+			"source_file": "cpp/simple/threads.cpp",
+			"expected_output": "4000\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "multithreading_atomic2",
+			"source_file": "cpp/simple/threads.cpp",
+			"expected_output": "4000\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "multithreading_atomic3",
+			"source_file": "cpp/simple/threads.cpp",
+			"expected_output": "4000\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "multithreading_atomic4",
+			"source_file": "cpp/simple/threads.cpp",
+			"expected_output": "4000\n",
 			"aspis_options": "--eddi --no-cfc"
 		}
 	]
