@@ -200,11 +200,13 @@ PreservedAnalyses FuncRetToRef::run(Module &Md, ModuleAnalysisManager &AM) {
     std::map<Value*, StringRef> FuncAnnotations;
     getFuncAnnotations(Md, FuncAnnotations);
 
+    std::set<Function*> OriginalFunctions;
+
     // store the functions that are currently in the module
     std::list<Function*> FnList;
 
     for (Function &Fn : Md) {
-        if (Fn.size() != 0 && !(*FuncAnnotations.find(&Fn)).second.startswith("exclude") && !(*FuncAnnotations.find(&Fn)).second.startswith("to_duplicate")) {
+        if (shouldCompile(Fn, FuncAnnotations, OriginalFunctions)) {
             FnList.push_back(&Fn);
         }
     }
