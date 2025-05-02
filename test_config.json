@@ -1,29 +1,221 @@
 {
-  "llvm_bin": "<path/to/your/llvm/bin",
-  "tests": [
-    {
-      "test_name": "add1",
-      "source_file": "cpp/simple/add.cpp",
-      "expected_output": "7",
-      "aspis_options": "--eddi --cfcss"
-    },
-    {
-      "test_name": "add2",
-      "source_file": "cpp/simple/add.cpp",
-      "expected_output": "7",
-      "aspis_options": "--seddi --rasm"
-    },
-    {
-      "test_name": "add3",
-      "source_file": "cpp/simple/add.cpp",
-      "expected_output": "7",
-      "aspis_options": "--fdsc --rasm"
-    },
-    {
-      "test_name": "add4",
-      "source_file": "cpp/simple/add.cpp",
-      "expected_output": "7",
-      "aspis_options": "--eddi --no-cfc"
-    }
-  ]
+	"llvm_bin": "<path/to/your/llvm/bin",
+	"tests": [
+		{
+			"test_name": "add1",
+			"source_file": "cpp/simple/add.cpp",
+			"expected_output": "7",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "add2",
+			"source_file": "cpp/simple/add.cpp",
+			"expected_output": "7",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "add3",
+			"source_file": "cpp/simple/add.cpp",
+			"expected_output": "7",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "add4",
+			"source_file": "cpp/simple/add.cpp",
+			"expected_output": "7",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "class_polymorphism1",
+			"source_file": "cpp/simple/class.cpp",
+			"expected_output": "12\n5, 7\n3, 6, 9\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "class_polymorphism2",
+			"source_file": "cpp/simple/class.cpp",
+			"expected_output": "12\n5, 7\n3, 6, 9\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "class_polymorphism3",
+			"source_file": "cpp/simple/class.cpp",
+			"expected_output": "12\n5, 7\n3, 6, 9\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "class_polymorphism4",
+			"source_file": "cpp/simple/class.cpp",
+			"expected_output": "12\n5, 7\n3, 6, 9\n",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "exception_handling1",
+			"source_file": "cpp/simple/exceptions.cpp",
+			"expected_output": "200000\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "exception_handling2",
+			"source_file": "cpp/simple/exceptions.cpp",
+			"expected_output": "200000\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "exception_handling3",
+			"source_file": "cpp/simple/exceptions.cpp",
+			"expected_output": "200000\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "exception_handling4",
+			"source_file": "cpp/simple/exceptions.cpp",
+			"expected_output": "200000\n",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "fact1",
+			"source_file": "cpp/simple/fact.cpp",
+			"expected_output": "3628800\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "fact2",
+			"source_file": "cpp/simple/fact.cpp",
+			"expected_output": "3628800\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "fact3",
+			"source_file": "cpp/simple/fact.cpp",
+			"expected_output": "3628800\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "fact4",
+			"source_file": "cpp/simple/fact.cpp",
+			"expected_output": "3628800\n",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "func1",
+			"source_file": "cpp/simple/func.cpp",
+			"expected_output": "Hello world!\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "func2",
+			"source_file": "cpp/simple/func.cpp",
+			"expected_output": "Hello world!\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "func3",
+			"source_file": "cpp/simple/func.cpp",
+			"expected_output": "Hello world!\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "func4",
+			"source_file": "cpp/simple/func.cpp",
+			"expected_output": "Hello world!\n",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "mul1",
+			"source_file": "cpp/simple/mul.cpp",
+			"expected_output": "42\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "mul2",
+			"source_file": "cpp/simple/mul.cpp",
+			"expected_output": "42\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "mul3",
+			"source_file": "cpp/simple/mul.cpp",
+			"expected_output": "42\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "mul4",
+			"source_file": "cpp/simple/mul.cpp",
+			"expected_output": "42\n",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "template1",
+			"source_file": "cpp/simple/template.cpp",
+			"expected_output": "25\n12\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "template2",
+			"source_file": "cpp/simple/template.cpp",
+			"expected_output": "25\n12\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "template3",
+			"source_file": "cpp/simple/template.cpp",
+			"expected_output": "25\n12\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "template4",
+			"source_file": "cpp/simple/template.cpp",
+			"expected_output": "25\n12\n",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "ptrsSharedUnique1",
+			"source_file": "cpp/simple/ptr.cpp",
+			"expected_output": "4992\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "ptrsSharedUnique2",
+			"source_file": "cpp/simple/ptr.cpp",
+			"expected_output": "4992\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "ptrsSharedUnique3",
+			"source_file": "cpp/simple/ptr.cpp",
+			"expected_output": "4992\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "ptrsSharedUnique4",
+			"source_file": "cpp/simple/ptr.cpp",
+			"expected_output": "4992\n",
+			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "heap1",
+			"source_file": "cpp/simple/heap.cpp",
+			"expected_output": "4999950000\n",
+			"aspis_options": "--eddi --cfcss"
+		},
+		{
+			"test_name": "heap2",
+			"source_file": "cpp/simple/heap.cpp",
+			"expected_output": "4999950000\n",
+			"aspis_options": "--seddi --rasm"
+		},
+		{
+			"test_name": "heap3",
+			"source_file": "cpp/simple/heap.cpp",
+			"expected_output": "4999950000\n",
+			"aspis_options": "--fdsc --rasm"
+		},
+		{
+			"test_name": "heap4",
+			"source_file": "cpp/simple/heap.cpp",
+			"expected_output": "4999950000\n",
+			"aspis_options": "--eddi --no-cfc"
+		}
+	]
 }
