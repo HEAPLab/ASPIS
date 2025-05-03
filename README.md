@@ -165,3 +165,26 @@ Then, apply the last pass and emit the executable:
 opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libEDDI.so -duplicate-globals out.ll -o out.ll
 clang out.ll -o out.elf
 ```
+
+## Using ASPIS with Docker
+
+You can run ASPIS inside a container to ensure a consistent environment. The container is configured with the necessary dependencies, and a volume is mounted to allow interaction with files on your local machine.
+
+### 1. Build the Docker Image
+
+From the directory containing the Dockerfile, run:
+
+``` bash
+docker build -t aspis
+```
+
+### 2. Compile with ASPIS
+
+Run ASPIS inside the container:
+
+```bash
+docker compose run --rm aspis /workspace/<path-to-your-file>
+```
+
+> [!WARNING]
+> The aspis.sh script runs automatically inside the container with the `--llvm-bin` option set by default. This is necessary because `which clang` does not work correctly inside the container.

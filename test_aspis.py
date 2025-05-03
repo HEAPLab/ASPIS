@@ -5,7 +5,7 @@ import json
 
 # Default configurations
 ASPIS_SCRIPT = "./aspis.sh"  # Path to the ASPIS compilation script
-TEST_DIR = "./tests"  # Directory containing the test cases
+TEST_DIR = "./tests/"  # Directory containing the test cases
 
 # Load the test configuration
 def load_config():
@@ -35,7 +35,6 @@ def execute_binary(binary_file):
   if exit_code != 0:
     raise RuntimeError(f"Execution failed: {stderr}")
   return stdout
-
 
 # Tests
 @pytest.mark.parametrize("test", load_config()["tests"])

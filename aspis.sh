@@ -205,6 +205,12 @@ EOF
     esac
 done
 
+if [[ -z "$input_files" ]]; then
+    echo "Error: No input files specified."
+    echo "Usage: aspis.sh [options] file(s)..." 
+    exit 1
+fi
+
 if [[ $verbose == true ]]; then
     echo "Verbose mode ON"
     # Function to display commands
