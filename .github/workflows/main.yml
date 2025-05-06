@@ -1,7 +1,7 @@
 name: ASPIS main CI
 on: [push]
 jobs:
-  Explore-GitHub-Actions:
+  compile-ASPIS:
     runs-on: ubuntu-latest
     steps:
       - name: Checking out ASPIS
@@ -25,8 +25,16 @@ jobs:
                 -B "$builddir" \
                 -S llvm \
                 -DLLVM_ENABLE_PROJECTS="clang" \
-                -DCMAKE_BUILD_TYPE=Debug \
-                -DLLVM_ENABLE_ASSERTIONS=ON \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_ENABLE_ASSERTIONS=OFF \
                 -DLLDB_INCLUDE_TESTS=OFF \
                 -DLIBCLC_TARGETS_TO_BUILD="RISCV;X86"
            cmake --build "$builddir"
+      - name: Compiling ASPIS
+        shell: bash
+        working-directory: ./ASPIS
+        run: |
+           mkdir build
+           cmake -B build -DLLVM_DIR=/mnt/build/lib/cmake/llvm/
+           cmake --build build
+           
