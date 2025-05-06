@@ -4,10 +4,14 @@ jobs:
   Explore-GitHub-Actions:
     runs-on: ubuntu-latest
     steps:
+      - name: Checking out ASPIS
+        uses: actions/checkout@v4
+        with:
+          path: ASPIS
       - name: Checking out LLVM project
         uses: actions/checkout@master
         with:
-          name: llvm/llvm-project
+          repository: llvm/llvm-project
           ref: llvmorg-16.0.6
           path: llvm-project
       - name: Compiling LLVM
