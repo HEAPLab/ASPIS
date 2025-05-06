@@ -1,0 +1,40 @@
+name: ASPIS main CI
+on: [push]
+jobs:
+  compile-ASPIS:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking out ASPIS
+        uses: actions/checkout@v4
+        with:
+          path: ASPIS
+      - name: Checking out LLVM project
+        uses: actions/checkout@master
+        with:
+          repository: llvm/llvm-project
+          ref: llvmorg-16.0.6
+          path: llvm-project
+      - name: Compiling LLVM
+        shell: bash
+        working-directory: ./llvm-project
+        run: |
+           builddir="/mnt/build/"
+           sudo mkdir -p $builddir
+           sudo chmod 777 $builddir
+           cmake -G Ninja \
+                -B "$builddir" \
+                -S llvm \
+                -DLLVM_ENABLE_PROJECTS="clang" \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_ENABLE_ASSERTIONS=OFF \
+                -DLLDB_INCLUDE_TESTS=OFF \
+                -DLIBCLC_TARGETS_TO_BUILD="RISCV;X86"
+           cmake --build "$builddir"
+      - name: Compiling ASPIS
+        shell: bash
+        working-directory: ./ASPIS
+        run: |
+           mkdir build
+           cmake -B build -DLLVM_DIR=/mnt/build/lib/cmake/llvm/
+           cmake --build build
+           

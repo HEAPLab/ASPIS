@@ -14,6 +14,7 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ModRef.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -81,6 +82,7 @@ Function* FuncRetToRef::updateFnSignature(Function &Fn, Module &Md) {
         ClonedFunc->removeRetAttr(Attribute::NoUndef);
     }
 
+    ClonedFunc->setMemoryEffects(MemoryEffects::unknown());
     for (int i=0; i < ClonedFunc->arg_size(); i++) {
         if(ClonedFunc->hasParamAttribute(i, Attribute::Returned)){
             ClonedFunc->removeParamAttr(i, Attribute::Returned);

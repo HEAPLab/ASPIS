@@ -658,8 +658,9 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
     // Replace the old instruction with the new one
     CInstr->replaceNonMetadataUsesWith(NewCInstr);
 
+    DuplicatedInstructionMap.insert(std::pair(NewCInstr, NewCInstr));
     // Remove original instruction since we created the duplicated version
-    CInstr->eraseFromParent();
+    res = 1;
   } else {
     Instruction *NewCInstr;
     IRBuilder<> CallBuilder(CInstr);
@@ -674,7 +675,8 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
       NewCInstr->setDebugLoc(CInstr->getDebugLoc());
     }
     CInstr->replaceNonMetadataUsesWith(NewCInstr);
-    CInstr->eraseFromParent();
+    DuplicatedInstructionMap.insert(std::pair(NewCInstr, NewCInstr));
+    res = 1;
   }
 
   return res;
@@ -809,7 +811,7 @@ int EDDI::duplicateInstruction(
       // if the _dup function exists, we substitute the call instruction with a
       // call to the function with duplicated arguments
       if (CInstr->getCalledFunction() == NULL || (Fn != NULL && Fn != CInstr->getCalledFunction())) {
-        transformCallBaseInst(CInstr, DuplicatedInstructionMap, B, ErrBB);
+        res = transformCallBaseInst(CInstr, DuplicatedInstructionMap, B, ErrBB);
       } else {
         fixFuncValsPassedByReference(*CInstr, DuplicatedInstructionMap, B);
       }
@@ -985,7 +987,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       i++;
       LLVM_DEBUG(dbgs() << "Compiling " << i << "/" << tot_funcs << ": "
                         << Fn.getName() << "\n");
-      //"                                                              \r" );
       CompiledFuncs.insert(&Fn);
       BasicBlock *ErrBB = BasicBlock::Create(Fn.getContext(), "ErrBB", &Fn);
 
@@ -1015,14 +1016,24 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
               std::pair<Value *, Value *>(ArgClone, Arg));
           for (User *U : Arg->users()) {
             if (isa<Instruction>(U)) {
-              // duplicate the uses of each argument
-              duplicateInstruction(cast<Instruction>(*U),
-                                   DuplicatedInstructionMap, *ErrBB);
+              auto *I = cast<Instruction>(U);
+              if (!isValueDuplicated(DuplicatedInstructionMap, *I)) {
+                int shouldDelete =
+                  duplicateInstruction(*I, DuplicatedInstructionMap, *ErrBB);
+                // the instruction duplicated may be equal to the original, so we
+                // return shouldDelete in order to drop the duplicates
+                if (shouldDelete) {
+                  InstructionsToRemove.push_back(&*I);
+                }
+              }
             }
           }
         }
       }
-
+      for (Instruction *I2rm : InstructionsToRemove) {
+        I2rm->eraseFromParent();
+      }
+      InstructionsToRemove.clear();
       std::list<Instruction*> instructionsToDuplicate;
       for (BasicBlock &BB : Fn) {
         for (Instruction &I : BB) {
@@ -1034,12 +1045,14 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
       for (auto &I : instructionsToDuplicate) {
         // perform the duplication
-        int shouldDelete =
+        if (!isValueDuplicated(DuplicatedInstructionMap, *I)) {
+          int shouldDelete =
             duplicateInstruction(*I, DuplicatedInstructionMap, *ErrBB);
-        // the instruction duplicated may be equal to the original, so we
-        // return shouldDelete in order to drop the duplicates
-        if (shouldDelete) {
-          InstructionsToRemove.push_back(&*I);
+          // the instruction duplicated may be equal to the original, so we
+          // return shouldDelete in order to drop the duplicates
+          if (shouldDelete) {
+            InstructionsToRemove.push_back(&*I);
+          }
         }
       }
 
