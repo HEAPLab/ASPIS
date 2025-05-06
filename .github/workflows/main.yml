@@ -29,4 +29,4 @@ jobs:
                 -DLLVM_ENABLE_ASSERTIONS=ON \
                 -DLLDB_INCLUDE_TESTS=OFF \
                 -DLIBCLC_TARGETS_TO_BUILD="RISCV;X86"
-           cmake --build build
+           cmake --build "$builddir"
