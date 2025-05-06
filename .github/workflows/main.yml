@@ -20,7 +20,7 @@ jobs:
         run: |
            builddir="/mnt/build/"
            sudo mkdir -p $builddir
-           sudo chown gha $builddir
+           sudo chmod 777 $builddir
            cmake -G Ninja \
                 -B "$builddir" \
                 -S llvm \
