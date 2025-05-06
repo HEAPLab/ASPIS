@@ -1,5 +1,5 @@
 {
-	"llvm_bin": "/usr/lib/llvm-16/bin",
+	"llvm_bin": "<path/to/your/llvm/bin",
 	"tests": [
 		{
 			"test_name": "add1",
