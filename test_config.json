@@ -264,6 +264,102 @@
 			"source_file": "cpp/simple/threads.cpp",
 			"expected_output": "4000\n",
 			"aspis_options": "--eddi --no-cfc"
+		},
+		{
+			"test_name": "inline_constexpr1",
+			"source_file": "cpp/simple/inline_constexpr.cpp",
+			"aspis_options": "--eddi --cfcss",
+			"expected_output": "40\n"
+		},
+		{
+			"test_name": "inline_constexpr2",
+			"source_file": "cpp/simple/inline_constexpr.cpp",
+			"aspis_options": "--seddi --rasm",
+			"expected_output": "40\n"
+		},
+		{
+			"test_name": "inline_constexpr3",
+			"source_file": "cpp/simple/inline_constexpr.cpp",
+			"aspis_options": "--fdsc --rasm",
+			"expected_output": "40\n"
+		},
+		{
+			"test_name": "inline_constexpr4",
+			"source_file": "cpp/simple/inline_constexpr.cpp",
+			"aspis_options": "--eddi --no-cfc",
+			"expected_output": "40\n"
+		},
+		{
+			"test_name": "lambda_captures1",
+			"source_file": "cpp/simple/lambda_captures.cpp",
+			"aspis_options": "--eddi --cfcss",
+			"expected_output": "10\n5\n15\n"
+		},
+		{
+			"test_name": "lambda_captures2",
+			"source_file": "cpp/simple/lambda_captures.cpp",
+			"aspis_options": "--seddi --rasm",
+			"expected_output": "10\n5\n15\n"
+		},
+		{
+			"test_name": "lambda_captures3",
+			"source_file": "cpp/simple/lambda_captures.cpp",
+			"aspis_options": "--fdsc --rasm",
+			"expected_output": "10\n5\n15\n"
+		},
+		{
+			"test_name": "lambda_captures4",
+			"source_file": "cpp/simple/lambda_captures.cpp",
+			"aspis_options": "--eddi --no-cfc",
+			"expected_output": "10\n5\n15\n"
+		},
+		{
+			"test_name": "volatile_memory_order1",
+			"source_file": "cpp/simple/volatile_memory_order.cpp",
+			"aspis_options": "--eddi --cfcss",
+			"expected_output": "42\n"
+		},
+		{
+			"test_name": "volatile_memory_order2",
+			"source_file": "cpp/simple/volatile_memory_order.cpp",
+			"aspis_options": "--seddi --rasm",
+			"expected_output": "42\n"
+		},
+		{
+			"test_name": "volatile_memory_order3",
+			"source_file": "cpp/simple/volatile_memory_order.cpp",
+			"aspis_options": "--fdsc --rasm",
+			"expected_output": "42\n"
+		},
+		{
+			"test_name": "volatile_memory_order4",
+			"source_file": "cpp/simple/volatile_memory_order.cpp",
+			"aspis_options": "--eddi --no-cfc",
+			"expected_output": "42\n"
+		},
+		{
+			"test_name": "stl_containers_advanced1",
+			"source_file": "cpp/simple/stl_containers_advanced.cpp",
+			"aspis_options": "--eddi --cfcss",
+			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\n"
+		},
+		{
+			"test_name": "stl_containers_advanced2",
+			"source_file": "cpp/simple/stl_containers_advanced.cpp",
+			"aspis_options": "--seddi --rasm",
+			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\n"
+		},
+		{
+			"test_name": "stl_containers_advanced3",
+			"source_file": "cpp/simple/stl_containers_advanced.cpp",
+			"aspis_options": "--fdsc --rasm",
+			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\n"
+		},
+		{
+			"test_name": "stl_containers_advanced4",
+			"source_file": "cpp/simple/stl_containers_advanced.cpp",
+			"aspis_options": "--eddi --no-cfc",
+			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\n"
 		}
 	]
 }
