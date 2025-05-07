@@ -589,6 +589,27 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
     if(DuplicatedInstructionMap.find(Arg) != DuplicatedInstructionMap.end()) {
       Copy = DuplicatedInstructionMap.find(Arg)->second;
     }
+    else if (isa<GEPOperator>(Arg) && isa<ConstantExpr>(Arg)) {
+      GEPOperator *GEPOperand = cast<GEPOperator>(Arg);
+      Value *PtrOperand = GEPOperand->getPointerOperand();
+      // update the duplicate GEP operator using the duplicate of the pointer
+      // operand
+      if (DuplicatedInstructionMap.find(PtrOperand) !=
+          DuplicatedInstructionMap.end()) {
+        std::vector<Value *> indices;
+        for (auto &Idx : GEPOperand->indices()) {
+          indices.push_back(Idx);
+        }
+        Constant *CloneGEPOperand =
+            cast<ConstantExpr>(GEPOperand)
+                ->getInBoundsGetElementPtr(
+                    GEPOperand->getSourceElementType(),
+                    cast<Constant>(
+                        DuplicatedInstructionMap.find(PtrOperand)->second),
+                    ArrayRef<Value *>(indices));
+        Copy = CloneGEPOperand;
+      }
+    }
 
     // Duplicating only fixed parameters, passing just one time the variadic arguments
     if(Callee != NULL && Callee->getFunctionType() != NULL && i >= Callee->getFunctionType()->getNumParams()) {
