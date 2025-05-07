@@ -46,7 +46,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         void fixFuncValsPassedByReference(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B);
         Function *getFunctionDuplicate(Function *Fn);
         Function *getFunctionFromDuplicate(Function *Fn);
-        Constant *duplicateConstant(Constant *C);
+        Constant *duplicateConstant(Constant *C, std::map<Value *, Value *> &DuplicatedInstructionMap);
         void duplicateGlobals(Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
         bool isAllocaForExceptionHandling(AllocaInst &I);
         int transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B, BasicBlock &ErrBB);

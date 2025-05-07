@@ -182,14 +182,14 @@ void EDDI::duplicateOperands(
     if (IClone != NULL) {
       // use the duplicated instruction as operand of IClone
       auto Duplicate = DuplicatedInstructionMap.find(V);
-      if (Duplicate != DuplicatedInstructionMap.end())
-        IClone->setOperand(
-            J,
-            Duplicate->second); // set the J-th operand with the duplicate value
+      if (Duplicate != DuplicatedInstructionMap.end()) {
+        IClone->setOperand(J, Duplicate->second); // set the J-th operand with the duplicate value
+      }
 
       // let us see whether we need to use always the dup for this operand
       Duplicate = ValuesToAlwaysDup.find(V);
       if (Duplicate != ValuesToAlwaysDup.end()) { // in this case, we want to use the dup also for the original instruction
+        //errs() << "Overriding operand for instructions: \n" << I << "\n" << *IClone << "\n";
         I.setOperand(J, Duplicate->second);
         IClone->setOperand(J, Duplicate->second);
       }
@@ -432,11 +432,14 @@ Function *EDDI::getFunctionFromDuplicate(Function *Fn) {
   return FnDup;
 }
 
-Constant *EDDI::duplicateConstant(Constant *C) {
+Constant *EDDI::duplicateConstant(Constant *C, std::map<Value *, Value *> &DuplicatedInstructionMap) {
   Constant *ret = C;
 
   if(isa<Function>(C)) {
     return getFunctionDuplicate(cast<Function>(C));
+  }
+  else if (isa<GlobalValue>(C) && DuplicatedInstructionMap.find(C) != DuplicatedInstructionMap.end()) {
+    return cast<Constant>(DuplicatedInstructionMap.find(C)->second);
   }
   else if (isa<ConstantArray>(C)) {
     ConstantArray *CArr = cast<ConstantArray>(C);
@@ -444,12 +447,13 @@ Constant *EDDI::duplicateConstant(Constant *C) {
 
     for (auto &Elem : C->operands()) {
       assert(isa<Constant>(Elem) && "Trying to duplicate a constant that has nonconstant operands!");
-      Constant *NewElem = duplicateConstant(cast<Constant>(Elem));
+      Constant *NewElem = duplicateConstant(cast<Constant>(Elem), DuplicatedInstructionMap);
       ConstArray.push_back(NewElem);
     }
     return ConstantArray::get(CArr->getType(), ConstArray);
   }
   else if (isa<ConstantStruct>(C)) {
+    errs() << "WARNING - Constant struct duplication is not supported! Possible undefined behaviour...\n";
     // TODO create the constant struct
   }
   return ret;
@@ -493,22 +497,24 @@ void EDDI::duplicateGlobals(
                      FuncAnnotations.find(GV) != FuncAnnotations.end() &&
                      (FuncAnnotations.find(GV))->second.startswith("exclude");
     bool isConstStruct = GV->getSection() != "llvm.metadata" && GV->hasInitializer() && isa<ConstantAggregate>(GV->getInitializer());
-    bool isStructOfFunctions = false; // is true if and only if the global variable that we are duplicating contains at least a function pointer
+    bool isStructOfGlobals = false; // is true if and only if the global variable that we are duplicating contains at least a global pointer
+    bool isStructOfFunctions = false; // is true if the global variable that we are duplicating contains at least a global pointer, and such global pointer is a function pointer
     if (isConstStruct) {
       for (Value *Op : cast<ConstantAggregate>(GV->getInitializer())->operands()) {
-        if (isa<Function>(Op)) {
-          isStructOfFunctions = true;
+        if (isa<GlobalValue>(Op)) {
+          isStructOfGlobals = true;
+          if(isa<Function>(Op)) isStructOfFunctions = true;
           break;
         } 
       }
     }
-    if (isStructOfFunctions || ! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude) // is not function, constant, struct and does not end with _dup
+    if (isStructOfGlobals || ! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude) // is not function, constant, struct and does not end with _dup
         /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
             || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
         ) {
       Constant *Initializer = nullptr;
       if (GV->hasInitializer()) {
-        Initializer = duplicateConstant(GV->getInitializer());
+        Initializer = duplicateConstant(GV->getInitializer(), DuplicatedInstructionMap);
       }
 
       GlobalVariable *InsertBefore;
@@ -963,7 +969,11 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     auto FAnns = FuncAnnotations;
     auto OFunc = OriginalFunctions;
     Fn->replaceUsesWithIf(newFn, [FAnns, OFunc] (Use &U) {
-      return isa<Instruction>(U.getUser()) && shouldCompile(*cast<Instruction>(U.getUser())->getParent()->getParent(), FAnns, OFunc);
+      auto res = false;
+      if (isa<Instruction>(U.getUser()) && shouldCompile(*cast<Instruction>(U.getUser())->getParent()->getParent(), FAnns, OFunc)) {
+        res = true;
+      }
+      return res;
     });
   }
 
