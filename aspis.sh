@@ -189,6 +189,9 @@ EOF
                     --fdsc)
                         dup=2
                         ;;
+                    --no-dup)
+                        dup=-1
+                        ;;
                     --cfcss)
                         cfc=0
                         ;;
@@ -287,7 +290,7 @@ EOF
 }
 
 run_aspis() {
-    if [ -z ${input_files} ]; then
+    if [[ -z ${input_files} ]]; then
         error_msg "No input files provided."
     fi
 
@@ -303,7 +306,6 @@ run_aspis() {
         # Compile the file to LLVM IR (.ll) and save it in the build directory
         exe $CLANG "$input_file" $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
     done
-    #exe $CLANG $input_files $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone
 
     ## LINK & PREPROCESS
     exe $LLVM_LINK $build_dir/*.ll -o $build_dir/out.ll -opaque-pointers
@@ -318,7 +320,9 @@ run_aspis() {
         exe $OPT --enable-new-pm=1 --passes="lowerswitch" $build_dir/out.ll -o $build_dir/out.ll
 
     ## FuncRetToRef
-    exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="func-ret-to-ref" $build_dir/out.ll -o $build_dir/out.ll
+    if [[ dup != -1 ]]; then
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="func-ret-to-ref" $build_dir/out.ll -o $build_dir/out.ll
+    fi;
 
     title_msg "ASPIS transformations"
     ## DATA PROTECTION
@@ -369,15 +373,17 @@ run_aspis() {
             # Extract the filename without extension
             filename=$(basename "$input_file" | sed 's/\.[^.]*$//')
             # Compile the file to LLVM IR (.ll) and save it in the build directory
-            exe $CLANG "$input_file" $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
+            exe $CLANG "$input_file" $clang_options -S -emit-llvm -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
         done
         exe $LLVM_LINK $build_dir/*.ll -o $build_dir/out.ll
     fi;
     success_msg "Linked excluded files to the compilation."
 
     ## DuplicateGlobals
-    exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="duplicate-globals" $build_dir/out.ll -o $build_dir/out.ll -S $eddi_options
-    success_msg "Duplicated globals."
+    if [[ dup != -1 ]]; then
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="duplicate-globals" $build_dir/out.ll -o $build_dir/out.ll -S $eddi_options
+        success_msg "Duplicated globals."
+    fi;
 
     title_msg "Back-end"
     if [[ -n "$asm_file" ]]; then
@@ -389,7 +395,7 @@ run_aspis() {
     fi;
 
     ## Backend
-    exe $CLANG $clang_options -O0 $build_dir/out.ll $asm_files -o $build_dir/$output_file 
+    exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
     success_msg "Binary emitted."
 
     #Cleanup
