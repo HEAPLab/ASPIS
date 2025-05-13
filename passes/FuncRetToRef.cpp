@@ -68,19 +68,22 @@ Function* FuncRetToRef::updateFnSignature(Function &Fn, Module &Md) {
     SmallVector<ReturnInst*, 8> returns;
     CloneFunctionInto(ClonedFunc, &Fn, Params, CloneFunctionChangeType::LocalChangesOnly, returns);
 
-    // we may have a zeroext ret attribute and we remove it as we have no return
-    if(ClonedFunc->hasRetAttribute(Attribute::ZExt)) {
-        ClonedFunc->removeRetAttr(Attribute::ZExt);
+    std::list<Attribute> attrs_to_remove;
+    for (auto AttrSet : ClonedFunc->getAttributes()) {
+        for (auto Attr : AttrSet) {
+            if (Attr.isEnumAttribute() || Attr.isIntAttribute() || Attr.isTypeAttribute())
+            attrs_to_remove.push_back(Attr);
+        }
+    }
+    for (auto elem : attrs_to_remove) {
+        try {
+            ClonedFunc->removeRetAttr(elem.getKindAsEnum());
+        }
+        catch (int e) {
+            continue;
+        }
     }
     
-    if(ClonedFunc->hasRetAttribute(Attribute::SExt)) {
-        ClonedFunc->removeRetAttr(Attribute::SExt);
-    }
-
-    // we may have a noundef ret attribute and we remove it as we have no return
-    if(ClonedFunc->hasRetAttribute(Attribute::NoUndef)){
-        ClonedFunc->removeRetAttr(Attribute::NoUndef);
-    }
 
     ClonedFunc->setMemoryEffects(MemoryEffects::unknown());
     for (int i=0; i < ClonedFunc->arg_size(); i++) {
@@ -142,6 +145,7 @@ void FuncRetToRef::updateFunctionCalls(Function &Fn, Function &NewFn) {
         }
     }
     for (CallBase *CInstr : FnUsers) {
+        bool createdNewCall = false;
         // duplicate all the args of the original instruction and add a new arg for the ret value
         std::vector<Value*> args;
         for (Value *V : CInstr->args()) {
@@ -167,9 +171,18 @@ void FuncRetToRef::updateFunctionCalls(Function &Fn, Function &NewFn) {
                     SI->eraseFromParent();
                     
                     // do the call
-                    B.CreateCall(NewFn.getFunctionType(), &NewFn, args);
-        
+                    if (isa<CallInst>(CInstr)) {
+                        B.CreateCall(NewFn.getFunctionType(), &NewFn, args);
+                    } else if (isa<InvokeInst>(CInstr)) {
+                        auto IInstr = cast<InvokeInst>(CInstr);
+                        B.CreateInvoke(NewFn.getFunctionType(), &NewFn, IInstr->getNormalDest(), IInstr->getUnwindDest(), args);
+                        B.SetInsertPoint(&*(IInstr->getNormalDest()->getFirstInsertionPt()));
+                    } else {
+                        errs() << "ERROR - Unsupported call instruction:\n" << *CInstr << "\n";
+                        abort();
+                    } 
                     Instruction *TmpLoad = B.CreateLoad(CInstr->getType(), CandidateAlloca);
+                    createdNewCall = true; 
                     CInstr->replaceNonMetadataUsesWith(TmpLoad);
                     break;
                 }
@@ -183,12 +196,23 @@ void FuncRetToRef::updateFunctionCalls(Function &Fn, Function &NewFn) {
             Instruction *TmpAlloca = BInit.CreateAlloca(CInstr->getType());
             args.push_back(TmpAlloca);
             // do the call
-            B.CreateCall(NewFn.getFunctionType(), &NewFn, args);
+            if (isa<CallInst>(CInstr)) {
+                B.CreateCall(NewFn.getFunctionType(), &NewFn, args);
+            } else if (isa<InvokeInst>(CInstr)) {
+                auto IInstr = cast<InvokeInst>(CInstr);
+                B.CreateInvoke(NewFn.getFunctionType(), &NewFn, IInstr->getNormalDest(), IInstr->getUnwindDest(), args);
+                B.SetInsertPoint(&*(IInstr->getNormalDest()->getFirstInsertionPt()));
+            } else {
+                errs() << "ERROR - Unsupported call instruction:\n" << *CInstr << "\n";
+                abort();
+            } 
             // use the load on the return value instead of the previous function output
             Instruction *TmpLoad = B.CreateLoad(CInstr->getType(), TmpAlloca, true);
+            createdNewCall = true;
             CInstr->replaceNonMetadataUsesWith(TmpLoad);
         }
-        ListInstrToRemove.push_back(CInstr);
+        if (createdNewCall)
+            ListInstrToRemove.push_back(CInstr);
     }
 
     // remove all the older call instructions
