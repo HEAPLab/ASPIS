@@ -637,7 +637,10 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
   }
 
   // In case of duplication of an indirect call, call the function with doubled parameters
-  if (Callee == NULL && !CInstr->isInlineAsm()) {
+  if (Callee == NULL) {
+    if (CInstr->isInlineAsm()) {
+      return 0;
+    }
     // Create the new function type
     Type *ReturnType = CInstr->getType();
     if (ReturnType->isAggregateType() || ReturnType->isPointerTy()) {
