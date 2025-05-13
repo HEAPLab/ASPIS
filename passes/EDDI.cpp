@@ -491,7 +491,7 @@ void EDDI::duplicateGlobals(
     bool isArray = GV->getValueType()->isArrayTy();
     bool isPointer = GV->getValueType()->isOpaquePointerTy();
     bool endsWithDup = GV->getName().endswith("_dup");
-    bool hasInternalLinkage = GV->hasInternalLinkage();
+    bool hasExternalLinkage = GV->hasExternalLinkage();
     bool isMetadataInfo = GV->getSection() == "llvm.metadata";
     bool toExclude = !isa<Function>(GV) &&
                      FuncAnnotations.find(GV) != FuncAnnotations.end() &&
@@ -508,7 +508,7 @@ void EDDI::duplicateGlobals(
         } 
       }
     }
-    if (isStructOfGlobals || ! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude) // is not function, constant, struct and does not end with _dup
+    if (isStructOfFunctions || ! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude || hasExternalLinkage) // is not function, constant, struct and does not end with _dup
         /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
             || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
         ) {
@@ -637,7 +637,7 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
   }
 
   // In case of duplication of an indirect call, call the function with doubled parameters
-  if (Callee == NULL) {
+  if (Callee == NULL && !CInstr->isInlineAsm()) {
     // Create the new function type
     Type *ReturnType = CInstr->getType();
     if (ReturnType->isAggregateType() || ReturnType->isPointerTy()) {
