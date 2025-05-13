@@ -22,29 +22,30 @@ def run_command(command, cwd=None):
 
 def compile_with_aspis(source_file, output_file, options, llvm_bin, build_dir):
   """Compile a file using ASPIS with specified options."""
-  command = f"{ASPIS_SCRIPT} --llvm-bin {llvm_bin} {options} {source_file} -o {output_file} --build-dir ./{build_dir} --verbose"
+  command = f"{ASPIS_SCRIPT} --llvm-bin {llvm_bin} {options} {source_file} -o {output_file} --build-dir ./{build_dir} --verbose -O0 --no-cleanup"
   print(command)
   stdout, stderr, exit_code = run_command(command)
   if exit_code != 0:
-    raise RuntimeError(f"Compilation failed: {stderr}")
+    raise RuntimeError(f"[{test_name}] Compilation failed: {stderr}")
   return stdout
 
 def execute_binary(binary_file):
   """Execute the compiled binary and return its output."""
   stdout, stderr, exit_code = run_command(binary_file)
   if exit_code != 0:
-    raise RuntimeError(f"Execution failed: {stderr}")
+    raise RuntimeError(f"[{test_name}] Execution failed: {stderr}")
   return stdout
 
 
 # Tests
 @pytest.mark.parametrize("test", load_config()["tests"])
 def test_aspis(test):
+  global test_name
   """Run a single ASPIS test."""
   config = load_config()
   llvm_bin = config["llvm_bin"]
   test_name = test["test_name"]
-  build_dir = test_name
+  build_dir = "./build/test/"+test_name
   source_file = test["source_file"]
   aspis_options = test["aspis_options"]
   expected_output = test["expected_output"]

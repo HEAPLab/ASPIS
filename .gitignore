@@ -50,6 +50,7 @@ include/divisible/*
 .venv/*
 
 build/**/*
+test_build/**/*
 
 include/*
 lib/*
