@@ -459,6 +459,8 @@ Constant *EDDI::duplicateConstant(Constant *C, std::map<Value *, Value *> &Dupli
   return ret;
 }
 
+int globcnt = 0;
+
 void EDDI::duplicateGlobals(
     Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap) {
   Value *RuntimeSig;
@@ -491,7 +493,7 @@ void EDDI::duplicateGlobals(
     bool isArray = GV->getValueType()->isArrayTy();
     bool isPointer = GV->getValueType()->isOpaquePointerTy();
     bool endsWithDup = GV->getName().endswith("_dup");
-    bool hasExternalLinkage = GV->hasExternalLinkage();
+    bool hasExternalLinkage = GV->isExternallyInitialized();
     bool isMetadataInfo = GV->getSection() == "llvm.metadata";
     bool toExclude = !isa<Function>(GV) &&
                      FuncAnnotations.find(GV) != FuncAnnotations.end() &&
@@ -515,6 +517,11 @@ void EDDI::duplicateGlobals(
       Constant *Initializer = nullptr;
       if (GV->hasInitializer()) {
         Initializer = duplicateConstant(GV->getInitializer(), DuplicatedInstructionMap);
+      }
+      // set a placeholder for the name of the global variable
+      if (!GV->hasName()) {
+        GV->setName("glob_"+std::to_string(globcnt));
+        globcnt++;
       }
 
       GlobalVariable *InsertBefore;

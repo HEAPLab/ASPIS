@@ -231,9 +231,14 @@ PreservedAnalyses FuncRetToRef::run(Module &Md, ModuleAnalysisManager &AM) {
     // store the functions that are currently in the module
     std::list<Function*> FnList;
 
+    int fncnt = 0;
     for (Function &Fn : Md) {
         if (shouldCompile(Fn, FuncAnnotations, OriginalFunctions)) {
             FnList.push_back(&Fn);
+            if (!Fn.hasName()){
+                Fn.setName("fn_"+std::to_string(fncnt));
+                fncnt++;
+            }
         }
     }
 
