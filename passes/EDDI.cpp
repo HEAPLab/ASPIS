@@ -182,14 +182,14 @@ void EDDI::duplicateOperands(
     if (IClone != NULL) {
       // use the duplicated instruction as operand of IClone
       auto Duplicate = DuplicatedInstructionMap.find(V);
-      if (Duplicate != DuplicatedInstructionMap.end())
-        IClone->setOperand(
-            J,
-            Duplicate->second); // set the J-th operand with the duplicate value
+      if (Duplicate != DuplicatedInstructionMap.end()) {
+        IClone->setOperand(J, Duplicate->second); // set the J-th operand with the duplicate value
+      }
 
       // let us see whether we need to use always the dup for this operand
       Duplicate = ValuesToAlwaysDup.find(V);
       if (Duplicate != ValuesToAlwaysDup.end()) { // in this case, we want to use the dup also for the original instruction
+        //errs() << "Overriding operand for instructions: \n" << I << "\n" << *IClone << "\n";
         I.setOperand(J, Duplicate->second);
         IClone->setOperand(J, Duplicate->second);
       }
@@ -432,11 +432,14 @@ Function *EDDI::getFunctionFromDuplicate(Function *Fn) {
   return FnDup;
 }
 
-Constant *EDDI::duplicateConstant(Constant *C) {
+Constant *EDDI::duplicateConstant(Constant *C, std::map<Value *, Value *> &DuplicatedInstructionMap) {
   Constant *ret = C;
 
   if(isa<Function>(C)) {
     return getFunctionDuplicate(cast<Function>(C));
+  }
+  else if (isa<GlobalValue>(C) && DuplicatedInstructionMap.find(C) != DuplicatedInstructionMap.end()) {
+    return cast<Constant>(DuplicatedInstructionMap.find(C)->second);
   }
   else if (isa<ConstantArray>(C)) {
     ConstantArray *CArr = cast<ConstantArray>(C);
@@ -444,16 +447,19 @@ Constant *EDDI::duplicateConstant(Constant *C) {
 
     for (auto &Elem : C->operands()) {
       assert(isa<Constant>(Elem) && "Trying to duplicate a constant that has nonconstant operands!");
-      Constant *NewElem = duplicateConstant(cast<Constant>(Elem));
+      Constant *NewElem = duplicateConstant(cast<Constant>(Elem), DuplicatedInstructionMap);
       ConstArray.push_back(NewElem);
     }
     return ConstantArray::get(CArr->getType(), ConstArray);
   }
   else if (isa<ConstantStruct>(C)) {
+    errs() << "WARNING - Constant struct duplication is not supported! Possible undefined behaviour...\n";
     // TODO create the constant struct
   }
   return ret;
 }
+
+int globcnt = 0;
 
 void EDDI::duplicateGlobals(
     Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap) {
@@ -487,28 +493,35 @@ void EDDI::duplicateGlobals(
     bool isArray = GV->getValueType()->isArrayTy();
     bool isPointer = GV->getValueType()->isOpaquePointerTy();
     bool endsWithDup = GV->getName().endswith("_dup");
-    bool hasInternalLinkage = GV->hasInternalLinkage();
+    bool hasExternalLinkage = GV->isExternallyInitialized() || GV->hasExternalLinkage();
     bool isMetadataInfo = GV->getSection() == "llvm.metadata";
     bool toExclude = !isa<Function>(GV) &&
                      FuncAnnotations.find(GV) != FuncAnnotations.end() &&
                      (FuncAnnotations.find(GV))->second.startswith("exclude");
     bool isConstStruct = GV->getSection() != "llvm.metadata" && GV->hasInitializer() && isa<ConstantAggregate>(GV->getInitializer());
-    bool isStructOfFunctions = false; // is true if and only if the global variable that we are duplicating contains at least a function pointer
+    bool isStructOfGlobals = false; // is true if and only if the global variable that we are duplicating contains at least a global pointer
+    bool isStructOfFunctions = false; // is true if the global variable that we are duplicating contains at least a global pointer, and such global pointer is a function pointer
     if (isConstStruct) {
       for (Value *Op : cast<ConstantAggregate>(GV->getInitializer())->operands()) {
-        if (isa<Function>(Op)) {
-          isStructOfFunctions = true;
+        if (isa<GlobalValue>(Op)) {
+          isStructOfGlobals = true;
+          if(isa<Function>(Op)) isStructOfFunctions = true;
           break;
         } 
       }
     }
-    if (isStructOfFunctions || ! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude) // is not function, constant, struct and does not end with _dup
+    if (isStructOfFunctions || ! (isFunction || isConstant || endsWithDup || isMetadataInfo || toExclude || hasExternalLinkage || hasExternalLinkage) // is not function, constant, struct and does not end with _dup
         /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
             || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
         ) {
       Constant *Initializer = nullptr;
       if (GV->hasInitializer()) {
-        Initializer = duplicateConstant(GV->getInitializer());
+        Initializer = duplicateConstant(GV->getInitializer(), DuplicatedInstructionMap);
+      }
+      // set a placeholder for the name of the global variable
+      if (!GV->hasName()) {
+        GV->setName("glob_"+std::to_string(globcnt));
+        globcnt++;
       }
 
       GlobalVariable *InsertBefore;
@@ -583,6 +596,27 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
     if(DuplicatedInstructionMap.find(Arg) != DuplicatedInstructionMap.end()) {
       Copy = DuplicatedInstructionMap.find(Arg)->second;
     }
+    else if (isa<GEPOperator>(Arg) && isa<ConstantExpr>(Arg)) {
+      GEPOperator *GEPOperand = cast<GEPOperator>(Arg);
+      Value *PtrOperand = GEPOperand->getPointerOperand();
+      // update the duplicate GEP operator using the duplicate of the pointer
+      // operand
+      if (DuplicatedInstructionMap.find(PtrOperand) !=
+          DuplicatedInstructionMap.end()) {
+        std::vector<Value *> indices;
+        for (auto &Idx : GEPOperand->indices()) {
+          indices.push_back(Idx);
+        }
+        Constant *CloneGEPOperand =
+            cast<ConstantExpr>(GEPOperand)
+                ->getInBoundsGetElementPtr(
+                    GEPOperand->getSourceElementType(),
+                    cast<Constant>(
+                        DuplicatedInstructionMap.find(PtrOperand)->second),
+                    ArrayRef<Value *>(indices));
+        Copy = CloneGEPOperand;
+      }
+    }
 
     // Duplicating only fixed parameters, passing just one time the variadic arguments
     if(Callee != NULL && Callee->getFunctionType() != NULL && i >= Callee->getFunctionType()->getNumParams()) {
@@ -611,6 +645,9 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
 
   // In case of duplication of an indirect call, call the function with doubled parameters
   if (Callee == NULL) {
+    if (CInstr->isInlineAsm()) {
+      return 0;
+    }
     // Create the new function type
     Type *ReturnType = CInstr->getType();
     if (ReturnType->isAggregateType() || ReturnType->isPointerTy()) {
@@ -963,7 +1000,11 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     auto FAnns = FuncAnnotations;
     auto OFunc = OriginalFunctions;
     Fn->replaceUsesWithIf(newFn, [FAnns, OFunc] (Use &U) {
-      return isa<Instruction>(U.getUser()) && shouldCompile(*cast<Instruction>(U.getUser())->getParent()->getParent(), FAnns, OFunc);
+      auto res = false;
+      if (isa<Instruction>(U.getUser()) && shouldCompile(*cast<Instruction>(U.getUser())->getParent()->getParent(), FAnns, OFunc)) {
+        res = true;
+      }
+      return res;
     });
   }
 

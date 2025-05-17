@@ -210,25 +210,29 @@ bool isIntrinsicToDuplicate(CallBase *CInstr) {
 
 void createFtFunc(Module &Md, StringRef name) {
   Value *FnValue = Md.getFunction(name);
+  Function *Fn;
 
-  if (FnValue != nullptr) {
+  if (FnValue == nullptr) { // the function does not exist and has not even been declared
     FnValue = Md.getOrInsertFunction(name, FunctionType::getVoidTy(Md.getContext())).getCallee();
     assert(isa<Function>(FnValue) && "The function name must correspond to a function.");
-
-    auto Fn = cast<Function>(FnValue);
-
+  
+    Fn = cast<Function>(FnValue);
+  
     if (Fn->isDeclaration()) {
       BasicBlock *StartBB = BasicBlock::Create(Md.getContext(), "start", Fn);
       BasicBlock *LoopBB = BasicBlock::Create(Md.getContext(), "loop", Fn);
-
+  
       IRBuilder<> B(StartBB);
       B.CreateBr(LoopBB);
-
+  
       B.SetInsertPoint(LoopBB);
       B.CreateBr(LoopBB);
     }
-    Fn->addFnAttr(Attribute::NoInline);
+  } else {
+    Fn = cast<Function>(FnValue);
   }
+  
+  Fn->addFnAttr(Attribute::NoInline);
 }
 
 void createFtFuncs(Module &Md) {
