@@ -1,5 +1,5 @@
 {
-	"llvm_bin": "<path/to/your/llvm/bin",
+	"llvm_bin": "/usr/lib/llvm-16/bin",
 	"tests": [
 		{
 			"test_name": "add1",
@@ -341,25 +341,25 @@
 			"test_name": "stl_containers_advanced1",
 			"source_file": "cpp/simple/stl_containers_advanced.cpp",
 			"aspis_options": "--eddi --cfcss",
-			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\n"
+			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\napple\nbanana\ngrape\norange\n"
 		},
 		{
 			"test_name": "stl_containers_advanced2",
 			"source_file": "cpp/simple/stl_containers_advanced.cpp",
 			"aspis_options": "--seddi --rasm",
-			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\n"
+			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\napple\nbanana\ngrape\norange\n"
 		},
 		{
 			"test_name": "stl_containers_advanced3",
 			"source_file": "cpp/simple/stl_containers_advanced.cpp",
 			"aspis_options": "--fdsc --rasm",
-			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\n"
+			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\napple\nbanana\ngrape\norange\n"
 		},
 		{
 			"test_name": "stl_containers_advanced4",
 			"source_file": "cpp/simple/stl_containers_advanced.cpp",
 			"aspis_options": "--eddi --no-cfc",
-			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\n"
+			"expected_output": "apple: 2\nbanana: 2\ngrape: 1\norange: 1\napple\nbanana\ngrape\norange\n"
 		}
 	]
 }
