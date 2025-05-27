@@ -126,6 +126,8 @@ Value *RASM::getCondition(Instruction &I) {
     }
   }
   else if (isa<SwitchInst>(I)) {
+    errs() << "There is a switch!\n";
+    abort();
     return cast<SwitchInst>(I).getCondition();
   }
   else {
@@ -267,6 +269,7 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
       }
       switch (numSuccessors)
       {
+        case 0: break;
         case 1: {
           BasicBlock *Successor = Terminator->getSuccessor(0);
           if (NewBBs.find(Successor) != NewBBs.end()) { // we want to find the correct successor, i.e. if Successor is in NewBBs, it means that it has been added now so it doesn't have a signature... Therefore we take the successor's successor
@@ -318,6 +321,8 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
         }
         
         default:{ 
+          errs() << "There is a switch!\n";
+          abort();
           break;
         }
       }
