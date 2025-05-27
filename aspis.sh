@@ -409,7 +409,7 @@ run_aspis() {
 
     ## Backend
     exe $OPT $build_dir/out.ll -o $build_dir/out.ll -S $opt_flags
-    if [[ -n "$enable_profiling" ]]; then
+    if [[ "$enable_profiling" == "true" ]]; then
         title_msg "ASPIS Profiling"
         exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-insert-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
         success_msg "Code instrumented."
