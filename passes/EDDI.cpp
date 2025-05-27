@@ -255,6 +255,8 @@ Value *EDDI::comparePtrs(Value &V1, Value &V2, IRBuilder<> &B) {
   return NULL;
 }
 
+int syncpt_id = 0;
+
 /**
  * Adds a consistency check on the instruction I
  */
@@ -348,6 +350,13 @@ void EDDI::addConsistencyChecks(
   // them are true
   if (!CmpInstructions.empty()) {
     // all comparisons must be true
+    if (ProfilingEnabled) {
+      IRBuilder<> BProfiler(cast<Instruction>(CmpInstructions.front()));
+      BProfiler.CreateCall(I.getParent()->getParent()->getParent()->getFunction("aspis.datacheck.begin"));
+      auto EndCall = BProfiler.CreateCall(I.getParent()->getParent()->getParent()->getFunction("aspis.datacheck.end"));
+      EndCall->removeFromParent();
+      EndCall->insertAfter(cast<Instruction>(CmpInstructions.back()));
+    }
     Value *AndInstr = B.CreateAnd(CmpInstructions);
     auto CondBrInst = B.CreateCondBr(AndInstr, I.getParent(), &ErrBB);
     if (DebugEnabled) {
@@ -360,6 +369,11 @@ void EDDI::addConsistencyChecks(
     if (DebugEnabled) {
       BrInst->setDebugLoc(I.getDebugLoc());
     }
+  }
+
+  if (ProfilingEnabled) {
+    I.setMetadata("aspis.syncpt", MDNode::get(I.getContext(), MDString::get(I.getContext(), std::to_string(syncpt_id))));
+    syncpt_id++;
   }
 }
 
@@ -551,7 +565,8 @@ void EDDI::duplicateGlobals(
       DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(GV, GVCopy));
       DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(GVCopy, GV));
 
-      if (isStructOfFunctions) ValuesToAlwaysDup.insert(std::pair(GV, GVCopy));
+      if (isStructOfFunctions) 
+        ValuesToAlwaysDup.insert(std::pair(GV, GVCopy));
     }
   }
 }
@@ -1157,6 +1172,36 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
 
+  std::list<Function*> FnsToRemove;
+  int removed;
+  do {
+    FnsToRemove.clear();
+    removed = 0;
+    for (Function &Fn : Md) {
+      if ((Fn.getName().ends_with("_dup") || Fn.getName().ends_with("_ret") || Fn.getName().ends_with("original") )) {
+        bool shouldRemove = true;
+        for (auto U : Fn.users()) {
+          if (isa<Instruction>(U) || isa<Constant>(U)) {
+            shouldRemove = false; 
+            break;
+          }
+        }
+        if (shouldRemove) FnsToRemove.push_back(&Fn);
+      }
+      else {
+        //auto FnDup = getFunctionDuplicate(&Fn);
+        if (/* !Fn.getName().equals("main") && */ !Fn.getName().equals("DataCorruption_Handler") && !Fn.getName().equals("SigMismatch_Handler") && !Fn.isDeclaration() && Fn.getNumUses() == 0) {
+          FnsToRemove.push_back(&Fn);
+        }
+      }
+    }
+
+    for (auto Fn : FnsToRemove) {
+      //errs() << "Erasing: " << Fn->getName() << "\n";
+      Fn->eraseFromParent();
+      removed++;
+    }
+  } while (removed > 0);
   return PreservedAnalyses::none();
 }
 

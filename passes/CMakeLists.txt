@@ -48,3 +48,8 @@ add_library(INTER_RASM SHARED
     Utils/Utils.cpp
 )
 target_compile_definitions(INTER_RASM PRIVATE INTRA_FUNCTION_CFC=1)
+
+add_library(PROFILER SHARED
+    Profiling/ASPISCheckProfiler.cpp
+    Utils/Utils.cpp
+)

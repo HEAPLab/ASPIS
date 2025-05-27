@@ -27,6 +27,7 @@ debug_enabled=false
 verbose=false
 cleanup=true
 libstdcpp_added=false
+enable_profiling=false
 
 # Check if the shell supports colors
 if [ -t 1 ]; then
@@ -127,7 +128,8 @@ parse_commands() {
         --eddi              (Default) Enable EDDI.
         --seddi             Enable Selective-EDDI.
         --fdsc              Enable Full Duplication with Selective Checking.
-
+        --no-dup            Completely disable data duplication
+        
         --cfcss             (Default) Enable CFCSS.
         --rasm              Enable RASM.
         --inter-rasm        Enable inter-RASM with the default signature -0xDEAD.
@@ -138,6 +140,10 @@ parse_commands() {
                             duplicate variables. By default they are allocated in 
                             groups maximizing the distance between original and
                             duplicated value.
+
+        --enable-profiling  When set, enable the insertion of profiling function calls 
+                            at synchonization points, which can be used to trace where
+                            consistency checks are executed.
 
 EOF
                         exit 0
@@ -206,6 +212,11 @@ EOF
                         ;;
                     --alternate-memmap)
                         eddi_options="$eddi_options $opt=true";
+                        ;;
+                    --enable-profiling)
+                        eddi_options="$eddi_options $opt=true";
+                        cfc_options="$cfc_options $opt=true";
+                        enable_profiling=true;
                         ;;
                     -g)
                         debug_enabled=true;
@@ -336,10 +347,12 @@ run_aspis() {
         2) 
             exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libFDSC.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
             ;;
+        *)
+            echo -e "\t--no-dup specified!"
     esac
     success_msg "Applied data protection passes."
 
-    exe $OPT --enable-new-pm=1 --passes="dce,simplifycfg" $build_dir/out.ll -o $build_dir/out.ll
+    exe $OPT --enable-new-pm=1 --passes="simplifycfg" $build_dir/out.ll -o $build_dir/out.ll
 
 
     ## CONTROL-FLOW CHECKING
@@ -395,6 +408,23 @@ run_aspis() {
     fi;
 
     ## Backend
+    exe $OPT $build_dir/out.ll -o $build_dir/out.ll -S $opt_flags
+    if [[ -n "$enable_profiling" ]]; then
+        title_msg "ASPIS Profiling"
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-insert-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
+        success_msg "Code instrumented."
+
+        exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
+        success_msg "Instrumented binary emitted."
+
+        exe $build_dir/$output_file
+        success_msg "Profiled code executed."
+
+        echo -e "Analyzing..."
+        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
+        exit
+    fi;
+
     exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
     success_msg "Binary emitted."
 

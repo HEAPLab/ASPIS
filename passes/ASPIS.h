@@ -77,6 +77,28 @@ class DuplicateGlobals : public PassInfoMixin<DuplicateGlobals> {
         static bool isRequired() { return true; }
 };
 
+class ASPISCheckProfiler : public PassInfoMixin<ASPISCheckProfiler> {
+    private: 
+        std::map<Value*, StringRef> FuncAnnotations;
+
+    public:
+        PreservedAnalyses run(Module &M,
+                              ModuleAnalysisManager &);
+
+        static bool isRequired() { return true; }
+};
+
+
+class ASPISInsertCheckProfiler : public PassInfoMixin<ASPISInsertCheckProfiler> {
+    private: 
+        std::map<Value*, StringRef> FuncAnnotations;
+        
+    public:
+        PreservedAnalyses run(Module &M,
+                              ModuleAnalysisManager &);
+
+        static bool isRequired() { return true; }
+};
 
 // CONTROL-FLOW CHECKING
 class CFCSS : public PassInfoMixin<CFCSS> {

@@ -18,17 +18,23 @@
 using namespace llvm;
 using LinkageMap = std::unordered_map<std::string, std::vector<StringRef>>;
 
-  
-bool AlternateMemMapEnabled;
-std::string DuplicateSecName;
-bool DebugEnabled;
+enum class ProfilingType {
+  SynchronizationPoint,
+  ConsistencyCheck
+}; 
 
+bool DebugEnabled;
 static cl::opt<bool, true> DebugEnabledOpt("debug-enabled", cl::desc("Enable support for debug metadata"), cl::location(DebugEnabled), cl::init(false));
 
-
+bool AlternateMemMapEnabled;
 static cl::opt<bool, true> AlternateMemMap("alternate-memmap", cl::desc("Enable the alternate memory layout for alloca and global variables"), cl::location(AlternateMemMapEnabled), cl::init(false));
 
+std::string DuplicateSecName;
 static cl::opt<std::string, true> DuplicateSecNameOpt("duplicate-sec", cl::desc("Specify the name of the section where the duplicate data should be allocated"), cl::location(DuplicateSecName), cl::init(".dup_data"));
+
+bool ProfilingEnabled;
+static cl::opt<bool, true> ProfilingFuncCalls("enable-profiling", cl::desc("Enable the insertion of profiling function calls at synchonization points"), cl::location(ProfilingEnabled), cl::init(false));
+
 
 bool IsNotAPHINode (Use &U){
   return !isa<PHINode>(U.getUser());
@@ -107,6 +113,8 @@ bool shouldCompile(Function &Fn,
       !Fn.getName().contains("DataCorruption_Handler")
       &&
       !Fn.getName().contains("SigMismatch_Handler")
+      && 
+      !Fn.getName().contains("aspis.syncpt")
       // Moreover, it does not have to be marked as excluded or to_duplicate
       && (FuncAnnotations.find(&Fn) == FuncAnnotations.end() || 
       (!FuncAnnotations.find(&Fn)->second.startswith("exclude") /* && 
@@ -235,7 +243,70 @@ void createFtFunc(Module &Md, StringRef name) {
   Fn->addFnAttr(Attribute::NoInline);
 }
 
+void createProfilingFunc(Module &Md, StringRef name, ProfilingType PT) {
+  auto &Ctx = Md.getContext();
+  Type *RetType;
+  std::vector<Type*> ArgTypes;
+  AttributeList AL;
+
+  // common attributes
+  AL = AL.addFnAttribute(Ctx, Attribute::NoInline);
+
+  // create the function
+  switch (PT)
+  {
+  case ProfilingType::ConsistencyCheck :
+    RetType = Type::getVoidTy(Ctx);
+    //ArgTypes.push_back(Type::getVoidTy(Ctx));
+    AL = AL.addFnAttribute(Ctx, Attribute::NoUnwind);
+    AL = AL.addFnAttribute(Ctx, Attribute::OptimizeNone);
+    break;
+  case ProfilingType::SynchronizationPoint :
+    RetType = Type::getInt1Ty(Ctx);
+    ArgTypes.push_back(Type::getInt1Ty(Ctx));  // condition bit (1 if the check was successful)
+    ArgTypes.push_back(Type::getInt1Ty(Ctx));  // condition bit (1 if the check was successful)
+    break;
+  default:
+    assert(false && "No valid profiling type for profiling function.");
+    break;
+  }
+
+  Value *FnValue = Md.getOrInsertFunction(name, RetType, ArrayRef(ArgTypes)).getCallee();
+  assert(isa<Function>(FnValue) && "The function name must correspond to a function.");
+
+  Function *Fn = cast<Function>(FnValue);
+
+  Fn->setAttributes(AL);
+  Fn->setOnlyReadsMemory();
+
+  // create the body
+  if (Fn->isDeclaration()) {
+    BasicBlock *StartBB = BasicBlock::Create(Md.getContext(), "start", Fn);
+    IRBuilder<> B(StartBB);
+    Value *RetVal;
+    switch (PT)
+    {
+    case ProfilingType::ConsistencyCheck:
+      B.CreateRetVoid();
+      break;
+    case ProfilingType::SynchronizationPoint :
+      RetVal = B.CreateCmp(CmpInst::ICMP_EQ, Fn->getArg(0), Fn->getArg(1));
+      B.CreateRet(RetVal);
+      break;
+    default:
+      break;
+    }
+  }
+
+}
+
 void createFtFuncs(Module &Md) {
   createFtFunc(Md, "DataCorruption_Handler");
   createFtFunc(Md, "SigMismatch_Handler");
+  if (ProfilingEnabled) {
+    createProfilingFunc(Md, "aspis.syncpt", ProfilingType::SynchronizationPoint);
+    createProfilingFunc(Md, "aspis.cfcpt", ProfilingType::SynchronizationPoint);
+    createProfilingFunc(Md, "aspis.datacheck.begin", ProfilingType::ConsistencyCheck);
+    createProfilingFunc(Md, "aspis.datacheck.end", ProfilingType::ConsistencyCheck);
+  }
 }
