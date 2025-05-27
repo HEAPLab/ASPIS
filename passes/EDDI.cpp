@@ -1190,7 +1190,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       }
       else {
         //auto FnDup = getFunctionDuplicate(&Fn);
-        if (/* !Fn.getName().equals("main") && */ !Fn.getName().equals("DataCorruption_Handler") && !Fn.getName().equals("SigMismatch_Handler") && !Fn.isDeclaration() && Fn.getNumUses() == 0) {
+        if (!Fn.getName().equals("main") && !Fn.getName().equals("DataCorruption_Handler") && !Fn.getName().equals("SigMismatch_Handler") && !Fn.isDeclaration() && Fn.getNumUses() == 0) {
           FnsToRemove.push_back(&Fn);
         }
       }

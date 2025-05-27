@@ -153,7 +153,7 @@ PreservedAnalyses ASPISCheckProfiler::run(Module &Md, ModuleAnalysisManager &AM)
     }
   }
   
-  errs() << "Found " << SyncPts.size() << " Syncronization Points\n";
+  // errs() << "Found " << SyncPts.size() << " Syncronization Points\n";
 
   std::set<Instruction*> done;
   for (auto I : SyncPts) {
