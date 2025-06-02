@@ -31,10 +31,10 @@ using namespace llvm;
 #define DEBUG_TYPE "aspis_profiler"
 
 bool isCheckBarrierBegin(Instruction *I) {
-  return isa<CallBase>(I) && cast<CallBase>(I)->getCalledFunction()->getName().equals("aspis.datacheck.begin");
+  return isa<CallBase>(I) && cast<CallBase>(I)->getCalledFunction() && cast<CallBase>(I)->getCalledFunction()->hasName() && cast<CallBase>(I)->getCalledFunction()->getName().equals("aspis.datacheck.begin");
 }
 bool isCheckBarrierEnd(Instruction *I) {
-  return isa<CallBase>(I) && cast<CallBase>(I)->getCalledFunction()->getName().equals("aspis.datacheck.end");
+  return isa<CallBase>(I) && cast<CallBase>(I)->getCalledFunction() && cast<CallBase>(I)->getCalledFunction()->hasName() && cast<CallBase>(I)->getCalledFunction()->getName().equals("aspis.datacheck.end");
 }
 
 // returns true if the instruction is used within a consistency check
