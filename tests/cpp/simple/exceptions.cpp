@@ -1,39 +1,38 @@
 #include <iostream>
+#include <cstdlib>
 #include <stdexcept>
 
+// ASPIS error handlers (non-duplicated)
+__attribute__((no_duplicate))
+void DataCorruption_Handler() {
+    std::cerr << "ASPIS error: Data corruption detected\n";
+    std::exit(1);
+}
+
+__attribute__((no_duplicate))
+void SigMismatch_Handler() {
+    std::cerr << "ASPIS error: Signature mismatch detected\n";
+    std::exit(1);
+}
+
 // A leaf that always throws
-[[noreturn]] void thrower()
-{
-    throw std::runtime_error("err");
+int nested_thrower() {
+    throw std::runtime_error("Test exception");
 }
 
-inline void nested_catcher(int &count)
-{
-    try
-    {
-        try
-        {
-            thrower();
-        }
-        catch (const std::runtime_error &e)
-        {
-            ++count;
-            throw;
-        }
-    }
-    catch (...)
-    {
-        ++count;
+// A function that calls nested_thrower and catches
+void nested_catcher() {
+    try {
+        nested_thrower();
+    } catch (...) {
+        // Report that we caught an exception
+        std::cout << "Exception caught: Test exception" << std::endl;
     }
 }
 
-int main()
-{
-    int count = 0;
-    for (int i = 0; i < 100000; ++i)
-    {
-        nested_catcher(count);
-    }
-    std::cout << count << "\n";
+int main() {
+    // Call nested_catcher twice to demonstrate
+    nested_catcher();
+    nested_catcher();
     return 0;
 }

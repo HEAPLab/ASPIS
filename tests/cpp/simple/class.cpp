@@ -1,4 +1,15 @@
 #include <iostream>
+#include <cstdlib>
+
+// Gestori di errore ASPIS
+void DataCorruption_Handler() {
+    std::cerr << "Errore ASPIS: Data corruption rilevata\n";
+    std::exit(1);
+}
+void SigMismatch_Handler() {
+    std::cerr << "Errore ASPIS: Signature mismatch rilevata\n";
+    std::exit(1);
+}
 
 // Class with member functions and constructor
 class MyClass

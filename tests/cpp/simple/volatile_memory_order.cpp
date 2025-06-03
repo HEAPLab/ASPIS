@@ -1,5 +1,17 @@
 #include <iostream>
 
+// ASPIS error handlers (never duplicated)
+void DataCorruption_Handler() {
+    std::cerr << "Data corruption detected\n";
+    std::exit(1);
+}
+
+void SigMismatch_Handler() {
+    std::cerr << "Signature mismatch detected\n";
+    std::exit(1);
+}
+
+
 volatile int flag = 0;
 
 void writer()

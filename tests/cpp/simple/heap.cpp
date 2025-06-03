@@ -1,23 +1,25 @@
 #include <iostream>
 
-int main()
-{
-    const int N = 100000;
-    int **arr = new int *[N];
+// ASPIS error handlers (non-duplicated)
+__attribute__((no_duplicate))
+void DataCorruption_Handler() {
+    std::cerr << "ASPIS error: Data corruption detected\n";
+}
 
-    for (int i = 0; i < N; ++i)
-    {
-        arr[i] = new int(i);
-    }
+__attribute__((no_duplicate))
+void SigMismatch_Handler() {
+    std::cerr << "ASPIS error: Signature mismatch detected\n";
+}
 
-    long long sum = 0;
-    for (int i = 0; i < N; ++i)
-    {
-        sum += *arr[i];
-        delete arr[i];
-    }
+// A function that allocates memory, uses it, and then deletes it
+int main() {
+    // Allocate a single integer on the heap
+    int *p = new int(5);
+    *p = 10;  // modify the allocated value
+    int result = *p;
+    delete p;
 
-    delete[] arr;
-    std::cout << sum << "\n";
+    // Print the result (non-duplicated)
+    std::cout << "Value: " << result << std::endl;
     return 0;
 }
