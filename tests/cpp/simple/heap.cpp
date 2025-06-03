@@ -11,18 +11,15 @@ void SigMismatch_Handler() {
     std::cerr << "ASPIS error: Signature mismatch detected\n";
 }
 
-// Global variable used in the test
-int g = 0;
-
-// A function with a side effect on a global variable (non-duplicated)
-__attribute__((no_duplicate))
-void f() {
-    g++;
-    std::cout << "Function f called (g incremented to " << g << ")" << std::endl;
-}
-
+// A function that allocates memory, uses it, and then deletes it
 int main() {
-    f();  // Called once
-    std::cout << "Final value of g: " << g << std::endl;
+    // Allocate a single integer on the heap
+    int *p = new int(5);
+    *p = 10;  // modify the allocated value
+    int result = *p;
+    delete p;
+
+    // Print the result (non-duplicated)
+    std::cout << "Value: " << result << std::endl;
     return 0;
 }
