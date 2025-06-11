@@ -38,21 +38,23 @@ bool isCheckBarrierEnd(Instruction *I) {
 }
 
 // returns true if the instruction is used within a consistency check
-bool isInstructionChecked(Instruction *Inst) {
-  for (auto U : Inst->users()) {
-    if (isa<Instruction>(U)) {
-      auto I = cast<Instruction>(U);
-      Instruction *PrevI = I->getPrevNode();
-      Instruction *NextI = I->getNextNode();
+bool ASPISCheckProfiler::isInstructionChecked(Instruction *Inst) {
+  std::list<Instruction*> Worklist;
+  std::set<Instruction*> Visited;
+  Worklist.push_back(Inst);
 
-      while (PrevI != nullptr && !isCheckBarrierBegin(PrevI)) {
-        PrevI = PrevI->getPrevNode();
-      }
-      while (NextI != nullptr && !isCheckBarrierEnd(NextI)) {
-        NextI = NextI->getNextNode();
-      }
-      if (NextI != nullptr && PrevI != nullptr) {
-        return true;
+  while (Worklist.size() > 0) {
+    auto CurrI = Worklist.front();
+    Worklist.pop_front();
+    if (Visited.find(CurrI) != Visited.end()) continue;
+    Visited.insert(CurrI);
+    for (auto U : CurrI->users()) {
+      if (isa<Instruction>(U)) {
+        auto I = cast<Instruction>(U);
+        
+        if (CheckedInstructions.find(I) != CheckedInstructions.end()) return true;
+
+        Worklist.push_back(I);
       }
     }
   }
@@ -60,7 +62,7 @@ bool isInstructionChecked(Instruction *Inst) {
 }
 
 // returns the list of operands of I that are in a consistency check
-void findCheckedOps(Instruction &I, std::set<Instruction*> *checkedOps, std::set<Instruction*> *uncheckedOps) {
+void ASPISCheckProfiler::findCheckedOps(Instruction &I, std::set<Instruction*> *checkedOps, std::set<Instruction*> *uncheckedOps) {
   std::list<Instruction*> res;
   for (auto *Op : I.operand_values()) {
     if (isa<Instruction>(Op)){
@@ -123,12 +125,28 @@ void initializeInstructionWeights(Module &Md, std::map<Value*, StringRef> *FuncA
   }
 }
 
+void getInstructionsInConsistencyChecks(Module &Md, std::set<Instruction*> *CheckedInstructions) {
+
+  auto CheckBegin = Md.getFunction("aspis.datacheck.begin");
+
+  for (auto U : CheckBegin->users()) {
+    if (isa<Instruction>(U)) {
+      auto I = cast<Instruction>(U);
+      Instruction *INext = I->getNextNode();
+      while (INext != nullptr && !isCheckBarrierEnd(INext)) {
+        CheckedInstructions->insert(INext);
+        INext = INext->getNextNode();
+      }
+      assert(INext != nullptr && "Found check begin without check end!");
+    }
+  }
+}
+
 PreservedAnalyses ASPISCheckProfiler::run(Module &Md, ModuleAnalysisManager &AM) {
   std::list<Instruction*> SyncPts;
 
   std::set<Instruction*> CheckedData;
   std::set<Instruction*> UncheckedData;
-
   /* 
   This data structure contains the weights to apply to each instruction encountered.
   */
@@ -140,12 +158,15 @@ PreservedAnalyses ASPISCheckProfiler::run(Module &Md, ModuleAnalysisManager &AM)
 
   initializeInstructionWeights(Md, &FuncAnnotations, &InstWeights);
 
+  getInstructionsInConsistencyChecks(Md, &CheckedInstructions);
+
   for (auto &Fn : Md) {
     if (shouldCompile(Fn, FuncAnnotations)) {
       for (auto &BB : Fn) {
         for (auto &I : BB) {
           tot_instructions++;
-          if (I.hasMetadata("aspis.syncpt")) {            
+          if (isa<StoreInst, AtomicRMWInst, AtomicCmpXchgInst, BranchInst, SwitchInst, ReturnInst, IndirectBrInst, CallBase>(I) && !I.hasMetadata("aspis.rasm.store") && !I.hasMetadata("aspis.rasm.branch") && !I.hasMetadata("aspis.profiling.counter")) {
+          //if (I.hasMetadata("aspis.syncpt")) {            
             SyncPts.push_back(&I);
           }
         }
@@ -156,46 +177,45 @@ PreservedAnalyses ASPISCheckProfiler::run(Module &Md, ModuleAnalysisManager &AM)
   // errs() << "Found " << SyncPts.size() << " Syncronization Points\n";
 
   std::set<Instruction*> done;
+  std::list<Instruction*> worklist;
   for (auto I : SyncPts) {
-    std::list<Instruction*> worklist;
     findCheckedOps(*I, &CheckedData, &UncheckedData);
+  }
+  // fill the worklists
+  for (auto item : CheckedData) {
+    if (done.find(item) == done.end()) {
+      worklist.push_back(item);
+      done.insert(item);
+    }
+  }
+  for (auto item : UncheckedData) {
+    if (done.find(item) == done.end()) {
+      worklist.push_back(item);
+      done.insert(item);
+    }
+  }
 
-    // fill the worklists
-    for (auto item : CheckedData) {
-      if (done.find(item) == done.end()) {
-        worklist.push_back(item);
-        done.insert(item);
+  // iterate on the worklist
+  while (!worklist.empty()) {
+    // take the current instruction
+    Instruction *CurrI = worklist.front();
+    // iterate over the users
+    for (auto U : CurrI->operand_values()) {
+      // the user is an instruction that we did not find before
+      if (isa<Instruction>(U) && done.find(cast<Instruction>(U)) == done.end() ) {
+        // add it to the corresponding set
+        if (CheckedData.find(CurrI) != CheckedData.end())
+          CheckedData.insert(cast<Instruction>(U));
+        else if (UncheckedData.find(CurrI) != UncheckedData.end())
+          UncheckedData.insert(cast<Instruction>(U));
+
+        // add the new instruction to the worklist and mark it as done
+        worklist.push_back(cast<Instruction>(U));
+        done.insert(cast<Instruction>(U));
       }
     }
-    for (auto item : UncheckedData) {
-      if (done.find(item) == done.end()) {
-        worklist.push_back(item);
-        done.insert(item);
-      }
-    }
-
-    // iterate on the worklist
-    while (!worklist.empty()) {
-      // take the current instruction
-      Instruction *CurrI = worklist.front();
-      // iterate over the users
-      for (auto U : CurrI->operand_values()) {
-        // the user is an instruction that we did not find before
-        if (isa<Instruction>(U) && done.find(cast<Instruction>(U)) == done.end() ) {
-          // add it to the corresponding set
-          if (CheckedData.find(CurrI) != CheckedData.end())
-            CheckedData.insert(cast<Instruction>(U));
-          if (UncheckedData.find(CurrI) != UncheckedData.end())
-            UncheckedData.insert(cast<Instruction>(U));
-
-          // add the new instruction to the worklist and mark it as done
-          worklist.push_back(cast<Instruction>(U));
-          done.insert(cast<Instruction>(U));
-        }
-      }
-      worklist.pop_front();
-    }
-  }  
+    worklist.pop_front();
+  }
 
   double CheckedNumExecutedI = 0;
   double UncheckedNumExecutedI = 0;
@@ -305,7 +325,7 @@ void createCounter(Instruction &I, std::string MDName) {
   IRBuilder<> B(&I);
   auto GVInstr = B.CreateLoad(Type::getInt32Ty(Md->getContext()), GV);
   auto NewVal = B.CreateAdd(GVInstr, ConstantInt::get(Type::getInt32Ty(Md->getContext()), 1));
-  B.CreateStore(NewVal, GV);
+  B.CreateStore(NewVal, GV)->setMetadata("aspis.profiling.counter", MDNode::get(I.getContext(), {}));
 }
 
 int bb_id = 0;
@@ -319,7 +339,7 @@ PreservedAnalyses ASPISInsertCheckProfiler::run(Module &Md, ModuleAnalysisManage
 
   getFuncAnnotations(Md, FuncAnnotations);
   for (auto &Fn : Md) {
-    if (shouldCompile(Fn, FuncAnnotations)) {
+    //if (shouldCompile(Fn, FuncAnnotations)) {
       for (auto &BB : Fn) {
         (*BB.getFirstInsertionPt()).setMetadata("aspis.bb", MDNode::get(BB.getContext(), MDString::get(BB.getContext(), std::to_string(bb_id))));
         BBs.push_back(&*BB.getFirstInsertionPt());
@@ -331,7 +351,7 @@ PreservedAnalyses ASPISInsertCheckProfiler::run(Module &Md, ModuleAnalysisManage
           }
         }
       }
-    }
+    //}
   }
   for (auto SyncPt : SyncPts) {
     createCounter(*SyncPt, "aspis.syncpt");

@@ -114,7 +114,7 @@ bool shouldCompile(Function &Fn,
       &&
       !Fn.getName().contains("SigMismatch_Handler")
       && 
-      !Fn.getName().contains("aspis.syncpt")
+      !Fn.getName().contains("aspis.")
       // Moreover, it does not have to be marked as excluded or to_duplicate
       && (FuncAnnotations.find(&Fn) == FuncAnnotations.end() || 
       (!FuncAnnotations.find(&Fn)->second.startswith("exclude") /* && 

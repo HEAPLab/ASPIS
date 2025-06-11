@@ -80,24 +80,25 @@ class DuplicateGlobals : public PassInfoMixin<DuplicateGlobals> {
 class ASPISCheckProfiler : public PassInfoMixin<ASPISCheckProfiler> {
     private: 
         std::map<Value*, StringRef> FuncAnnotations;
+        std::set<Instruction*> CheckedInstructions;
 
     public:
+        void findCheckedOps(Instruction &I, std::set<Instruction*> *checkedOps, std::set<Instruction*> *uncheckedOps);
+        bool isInstructionChecked(Instruction *Inst);
         PreservedAnalyses run(Module &M,
                               ModuleAnalysisManager &);
 
         static bool isRequired() { return true; }
 };
 
-
 class ASPISInsertCheckProfiler : public PassInfoMixin<ASPISInsertCheckProfiler> {
     private: 
         std::map<Value*, StringRef> FuncAnnotations;
         
     public:
-        PreservedAnalyses run(Module &M,
-                              ModuleAnalysisManager &);
+      PreservedAnalyses run(Module &M, ModuleAnalysisManager &);
 
-        static bool isRequired() { return true; }
+      static bool isRequired() { return true; }
 };
 
 // CONTROL-FLOW CHECKING

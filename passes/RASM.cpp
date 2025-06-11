@@ -150,7 +150,7 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
     if (!BB.isEntryBlock()) {
         if (isa<LandingPadInst>(BB.getFirstNonPHI()) || BB.getName().contains_insensitive("verification")) {
           IRBuilder<> BChecker(&*BB.getFirstInsertionPt());
-          BChecker.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB),&RuntimeSig, true);
+          BChecker.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB),&RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
         }
         else if (!BB.getName().contains_insensitive("errbb")){
         BasicBlock *NewBB = BasicBlock::Create(BB.getContext(), "RASM_Verification_BB", BB.getParent(), &BB);
@@ -160,7 +160,7 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
           Value *InstrRuntimeSig = BChecker.CreateLoad(IntType, &RuntimeSig, true);
 
           Value *RuntimeSignatureVal = BChecker.CreateSub(InstrRuntimeSig, llvm::ConstantInt::get(IntType, subRanPrevVal));
-          BChecker.CreateStore(RuntimeSignatureVal, &RuntimeSig, true);
+          BChecker.CreateStore(RuntimeSignatureVal, &RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
 
           // update phi placing them in the new block
           while (isa<PHINode>(&BB.front())) {
@@ -178,7 +178,7 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
 
           // add instructions for checking the runtime signature
           Value *CmpVal = BChecker.CreateCmp(llvm::CmpInst::ICMP_EQ, RuntimeSignatureVal, llvm::ConstantInt::get(IntType, randomNumberBB));
-          BChecker.CreateCondBr(CmpVal, &BB, &ErrBB);
+          BChecker.CreateCondBr(CmpVal, &BB, &ErrBB)->setMetadata("aspis.rasm.branch", MDNode::get(BB.getContext(), {}));
 
           // add NewBB and BB into the NewBBs map
           NewBBs.insert(std::pair<BasicBlock*, BasicBlock*>(NewBB, &BB));
@@ -214,14 +214,14 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
       Value* RetSigBackup = B.CreateLoad(IntType, &RetSig, true);
 
       // Set the runtime signature as the input signature of the first basic block of the called function
-      B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberCalledBB+subRanPrevValCalledBB), &RuntimeSig, true);
+      B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberCalledBB+subRanPrevValCalledBB), &RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
       
       // Set the ret signature as the signature of the basic block after the call
-      B.CreateStore(llvm::ConstantInt::get(IntType, retSig), &RetSig, true);
+      B.CreateStore(llvm::ConstantInt::get(IntType, retSig), &RetSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
 
       // Restore the ret signature after the call
       B.SetInsertPoint(CallIn->getNextNonDebugInstruction());
-      B.CreateStore(RetSigBackup, &RetSig, true);
+      B.CreateStore(RetSigBackup, &RetSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
     }
     else
     #endif
@@ -246,11 +246,11 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
       // update the signature
       Value *InstrRuntimeSig = B.CreateLoad(IntType, &RuntimeSig, true);
       Value* NewSig = B.CreateSub(InstrRuntimeSig, AdjVal);
-      B.CreateStore(NewSig, &RuntimeSig, true);
+      B.CreateStore(NewSig, &RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
 
       // compare the new signature with RetSig
       Value *CmpValRet = B.CreateCmp(llvm::CmpInst::ICMP_EQ, NewSig, InstrRetSig);
-      B.CreateCondBr(CmpValRet, &BB, &ErrBB);
+      B.CreateCondBr(CmpValRet, &BB, &ErrBB)->setMetadata("aspis.rasm.branch", MDNode::get(BB.getContext(), {}));
     }
     // Case C, we need to update the signature depending on the target basic block
     else {
@@ -281,7 +281,7 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
 
           Value *InstrRuntimeSig = B.CreateLoad(IntType, &RuntimeSig, true);
           Value *NewSig = B.CreateSub(InstrRuntimeSig, llvm::ConstantInt::get(IntType, adjVal));
-          B.CreateStore(NewSig, &RuntimeSig, true);
+          B.CreateStore(NewSig, &RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
           break;
         }
         case 2: {
@@ -305,17 +305,17 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
 
           Value *AdjustValue;
           if (Successor_1->getName().contains_insensitive("errbb")) {
-            B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB-adjVal_2), &RuntimeSig, true);
+            B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB-adjVal_2), &RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
           }
           if (Successor_2->getName().contains_insensitive("errbb")) {
-            B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB-adjVal_1), &RuntimeSig, true);
+            B.CreateStore(llvm::ConstantInt::get(IntType, randomNumberBB-adjVal_1), &RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
           }
           else {
             AdjustValue = B.CreateSelect(BrCondition, llvm::ConstantInt::get(IntType, adjVal_1)
                                     , llvm::ConstantInt::get(IntType, adjVal_2));
             Value *InstrRuntimeSig = B.CreateLoad(IntType, &RuntimeSig, true);
             Value *NewSig = B.CreateSub(InstrRuntimeSig, AdjustValue);
-            B.CreateStore(NewSig, &RuntimeSig, true);
+            B.CreateStore(NewSig, &RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(BB.getContext(), {}));
           }
           break;
         }
@@ -382,8 +382,8 @@ PreservedAnalyses RASM::run(Module &Md, ModuleAnalysisManager &AM) {
           // initialize the runtime signature for the first basic block of the function
           Value *RuntimeSig = B.CreateAlloca(IntType);
           Value *RetSig = B.CreateAlloca(IntType);
-          B.CreateStore(llvm::ConstantInt::get(IntType, currSig), RuntimeSig, true);
-          B.CreateStore(llvm::ConstantInt::get(IntType, RandomNumberBBs.size() + currSig), RetSig, true);
+          B.CreateStore(llvm::ConstantInt::get(IntType, currSig), RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(Md.getContext(), {}));
+          B.CreateStore(llvm::ConstantInt::get(IntType, RandomNumberBBs.size() + currSig), RetSig, true)->setMetadata("aspis.rasm.store", MDNode::get(Md.getContext(), {}));
         #elif (INTRA_FUNCTION_CFC == 1)
           int subCurrSig = SubRanPrevVals.find(&Fn.front())->second;
           // add instructions for initializing the runtime signatures in case they have not been initialized
@@ -405,11 +405,11 @@ PreservedAnalyses RASM::run(Module &Md, ModuleAnalysisManager &AM) {
           // if they contain the initialization values, update them using sig and num_bbs+sig
           Value* NewRuntimeSig = B.CreateSelect(CondAnd, llvm::ConstantInt::get(IntType, currSig + subCurrSig), RuntimeSigInstr);
           Value* NewRetSig = B.CreateSelect(CondAnd, llvm::ConstantInt::get(IntType, RandomNumberBBs.size() + currSig), RetSigInstr);
-          B.CreateStore(NewRuntimeSig, RuntimeSig, true);
-          B.CreateStore(NewRetSig, RetSig, true);
+          B.CreateStore(NewRuntimeSig, RuntimeSig, true)->setMetadata("aspis.rasm.store", MDNode::get(Md.getContext(), {}));
+          B.CreateStore(NewRetSig, RetSig, true)->setMetadata("aspis.rasm.store", MDNode::get(Md.getContext(), {}));
 
           // add the branch to the previous frontBB
-          B.CreateBr(FrontBB);
+          B.CreateBr(FrontBB)->setMetadata("aspis.rasm.branch", MDNode::get(Md.getContext(), {}));
         #endif
         // create the ErrBB
         BasicBlock *ErrBB = BasicBlock::Create(Fn.getContext(), "ErrBB", &Fn);
