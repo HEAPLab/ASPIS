@@ -31,6 +31,24 @@ Where `your/llvm/dir` is the directory where LLVMConfig.cmake is found (check he
 
 In order to apply ASPIS, you can use the built-in compilation pipeline provided by the `aspis.sh` shell script, or you can make your own custom compilation pipeline using LLVM `opt`.
 
+## Fault Handler 
+In one of your compilation unit, you must declare two extern functions having these prototypes:
+```C
+void DataCorruption_Handler(void) {
+
+}
+```
+
+and
+
+```C
+void SigMismatch_Handler(void) {
+
+}
+```
+
+These functions are invoked by ASPIS when a fault is detected.
+
 ## Annotations
 
 When compiling `C`/`C++`, it is possible to use clang annotations in the source to manually tell the compiler what to do with specific variables and/or functions. The syntax for the annotation is the following:
@@ -165,3 +183,8 @@ Then, apply the last pass and emit the executable:
 opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libEDDI.so -duplicate-globals out.ll -o out.ll
 clang out.ll -o out.elf
 ```
+
+## References
+If you are using this tool in scientific works, please cite the following article:
+- Davide Baroffio, Federico Reghenzani, and William Fornaciari. 2024. Enhanced Compiler Technology for Software-based Hardware Fault Detection. ACM Trans. Des. Autom. Electron. Syst. 29, 5, Article 91 (September 2024), 23 pages. https://doi.org/10.1145/3660524
+
