@@ -1,7 +1,5 @@
-# Use Ubuntu 23.04 (or newer) as the base image
 FROM ubuntu:24.04
 
-# Set non-interactive mode to avoid some prompts during installation
 ARG DEBIAN_FRONTEND=noninteractive
 
 # ==== Dependencies
