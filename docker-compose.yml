@@ -1,0 +1,17 @@
+#services:
+#  aspis:
+#    image: aspis
+#    volumes:
+#      - ./tests/:/home/ubuntu/ASPIS/docker-tests/      # Mount local `./input` dir into the container
+#    working_dir: /home/ubuntu/ASPIS
+#    entrypoint: ["/bin/bash", "aspis.sh", "--llvm-bin /home/ubuntu/llvm-project-16.0.6.src/build/bin"]
+
+services:
+  aspis_runner:
+    image: aspis
+    container_name: aspis_runner # Optional: a memorable name for the container
+    volumes:
+      - ./tests/:/workspace/ASPIS/tmp/
+    entrypoint: ["/workspace/ASPIS/aspis.sh", "--llvm-bin", "/workspace/llvm-project-16.0.6.src/build/bin"]
+
+    # docker compose run --rm aspis_runner /workspace/ASPIS/tmp/c/Aritmetic/array_copy.c
