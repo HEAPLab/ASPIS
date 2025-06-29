@@ -3,5 +3,5 @@ services:
     image: aspis
     container_name: aspis_runner
     volumes:
-      - ./tests/:/workspace/ASPIS/tmp/
+      - .././testing/tests/:/workspace/ASPIS/tmp/
     entrypoint: ["/workspace/ASPIS/aspis.sh", "--llvm-bin", "/workspace/llvm-project-16.0.6.src/build/bin"]
