@@ -1,0 +1,268 @@
+{
+  "tests": [
+    {
+      "test_name": "function_pointer_v0",
+      "source_file": "c/control_flow/function_pointer.c",
+      "expected_output": "42",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "function_pointer_v1",
+      "source_file": "c/control_flow/function_pointer.c",
+      "expected_output": "42",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "function_pointer_v2",
+      "source_file": "c/control_flow/function_pointer.c",
+      "expected_output": "42",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "function_pointer_v3",
+      "source_file": "c/control_flow/function_pointer.c",
+      "expected_output": "42",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "loop_exit_v0",
+      "source_file": "c/control_flow/loop_exit.c",
+      "expected_output": "2",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "loop_exit_v1",
+      "source_file": "c/control_flow/loop_exit.c",
+      "expected_output": "2",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "loop_exit_v2",
+      "source_file": "c/control_flow/loop_exit.c",
+      "expected_output": "2",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "loop_exit_v3",
+      "source_file": "c/control_flow/loop_exit.c",
+      "expected_output": "2",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "nested-branch_v0",
+      "source_file": "c/control_flow/nested-branch.c",
+      "expected_output": "6",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "nested-branch_v1",
+      "source_file": "c/control_flow/nested-branch.c",
+      "expected_output": "6",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "nested-branch_v2",
+      "source_file": "c/control_flow/nested-branch.c",
+      "expected_output": "6",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "nested-branch_v3",
+      "source_file": "c/control_flow/nested-branch.c",
+      "expected_output": "6",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "simple-branch_v0",
+      "source_file": "c/control_flow/simple-branch.c",
+      "expected_output": "OK",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "simple-branch_v1",
+      "source_file": "c/control_flow/simple-branch.c",
+      "expected_output": "OK",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "simple-branch_v2",
+      "source_file": "c/control_flow/simple-branch.c",
+      "expected_output": "OK",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "simple-branch_v3",
+      "source_file": "c/control_flow/simple-branch.c",
+      "expected_output": "OK",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "switch-case_v0",
+      "source_file": "c/control_flow/switch-case.c",
+      "expected_output": "300",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "switch-case_v1",
+      "source_file": "c/control_flow/switch-case.c",
+      "expected_output": "300",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "switch-case_v2",
+      "source_file": "c/control_flow/switch-case.c",
+      "expected_output": "300",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "switch-case_v3",
+      "source_file": "c/control_flow/switch-case.c",
+      "expected_output": "300",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "data_dep_branches_v0",
+      "source_file": "c/data_duplication_integrity/data_dep_branches.c",
+      "expected_output": "7",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "data_dep_branches_v1",
+      "source_file": "c/data_duplication_integrity/data_dep_branches.c",
+      "expected_output": "7",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "data_dep_branches_v2",
+      "source_file": "c/data_duplication_integrity/data_dep_branches.c",
+      "expected_output": "7",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "data_dep_branches_v3",
+      "source_file": "c/data_duplication_integrity/data_dep_branches.c",
+      "expected_output": "7",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "global_var_across_functions_v0",
+      "source_file": "c/data_duplication_integrity/global_var_across_functions.c",
+      "expected_output": "2",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "global_var_across_functions_v1",
+      "source_file": "c/data_duplication_integrity/global_var_across_functions.c",
+      "expected_output": "2",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "global_var_across_functions_v2",
+      "source_file": "c/data_duplication_integrity/global_var_across_functions.c",
+      "expected_output": "2",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "global_var_across_functions_v3",
+      "source_file": "c/data_duplication_integrity/global_var_across_functions.c",
+      "expected_output": "2",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "volatile_io_v0",
+      "source_file": "c/data_duplication_integrity/volatile_io.c",
+      "expected_output": "42",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "volatile_io_v1",
+      "source_file": "c/data_duplication_integrity/volatile_io.c",
+      "expected_output": "42",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "volatile_io_v2",
+      "source_file": "c/data_duplication_integrity/volatile_io.c",
+      "expected_output": "42",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "volatile_io_v3",
+      "source_file": "c/data_duplication_integrity/volatile_io.c",
+      "expected_output": "42",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "arit_pipeline_v0",
+      "source_file": "c/simple_math/arit_pipeline.c",
+      "expected_output": "3",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "arit_pipeline_v1",
+      "source_file": "c/simple_math/arit_pipeline.c",
+      "expected_output": "3",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "arit_pipeline_v2",
+      "source_file": "c/simple_math/arit_pipeline.c",
+      "expected_output": "3",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "arit_pipeline_v3",
+      "source_file": "c/simple_math/arit_pipeline.c",
+      "expected_output": "3",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "mixed_ops_v0",
+      "source_file": "c/simple_math/mixed_ops.c",
+      "expected_output": "14.5",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "mixed_ops_v1",
+      "source_file": "c/simple_math/mixed_ops.c",
+      "expected_output": "14.5",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "mixed_ops_v2",
+      "source_file": "c/simple_math/mixed_ops.c",
+      "expected_output": "14.5",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "mixed_ops_v3",
+      "source_file": "c/simple_math/mixed_ops.c",
+      "expected_output": "14.5",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
+      "test_name": "misc_data_dup_v0",
+      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
+      "expected_output": "OK",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "misc_data_dup_v1",
+      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
+      "expected_output": "OK",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "misc_data_dup_v2",
+      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
+      "expected_output": "OK",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "misc_data_dup_v3",
+      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
+      "expected_output": "OK",
+      "aspis_options": "--eddi --no-cfc"
+    }
+  ]
+}
