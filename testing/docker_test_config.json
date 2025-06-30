@@ -169,6 +169,30 @@
       "aspis_options": "--eddi --no-cfc"
     },
     {
+      "test_name": "misc_data_dup_v0",
+      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
+      "expected_output": "OK",
+      "aspis_options": "--eddi --cfcss"
+    },
+    {
+      "test_name": "misc_data_dup_v1",
+      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
+      "expected_output": "OK",
+      "aspis_options": "--seddi --rasm"
+    },
+    {
+      "test_name": "misc_data_dup_v2",
+      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
+      "expected_output": "OK",
+      "aspis_options": "--fdsc --rasm"
+    },
+    {
+      "test_name": "misc_data_dup_v3",
+      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
+      "expected_output": "OK",
+      "aspis_options": "--eddi --no-cfc"
+    },
+    {
       "test_name": "volatile_io_v0",
       "source_file": "c/data_duplication_integrity/volatile_io.c",
       "expected_output": "42",
@@ -194,74 +218,74 @@
     },
     {
       "test_name": "arit_pipeline_v0",
-      "source_file": "c/simple_math/arit_pipeline.c",
+      "source_file": "c/misc_math/arit_pipeline.c",
       "expected_output": "3",
       "aspis_options": "--eddi --cfcss"
     },
     {
       "test_name": "arit_pipeline_v1",
-      "source_file": "c/simple_math/arit_pipeline.c",
+      "source_file": "c/misc_math/arit_pipeline.c",
       "expected_output": "3",
       "aspis_options": "--seddi --rasm"
     },
     {
       "test_name": "arit_pipeline_v2",
-      "source_file": "c/simple_math/arit_pipeline.c",
+      "source_file": "c/misc_math/arit_pipeline.c",
       "expected_output": "3",
       "aspis_options": "--fdsc --rasm"
     },
     {
       "test_name": "arit_pipeline_v3",
-      "source_file": "c/simple_math/arit_pipeline.c",
+      "source_file": "c/misc_math/arit_pipeline.c",
       "expected_output": "3",
       "aspis_options": "--eddi --no-cfc"
     },
     {
       "test_name": "mixed_ops_v0",
-      "source_file": "c/simple_math/mixed_ops.c",
+      "source_file": "c/misc_math/mixed_ops.c",
       "expected_output": "14.5",
       "aspis_options": "--eddi --cfcss"
     },
     {
       "test_name": "mixed_ops_v1",
-      "source_file": "c/simple_math/mixed_ops.c",
+      "source_file": "c/misc_math/mixed_ops.c",
       "expected_output": "14.5",
       "aspis_options": "--seddi --rasm"
     },
     {
       "test_name": "mixed_ops_v2",
-      "source_file": "c/simple_math/mixed_ops.c",
+      "source_file": "c/misc_math/mixed_ops.c",
       "expected_output": "14.5",
       "aspis_options": "--fdsc --rasm"
     },
     {
       "test_name": "mixed_ops_v3",
-      "source_file": "c/simple_math/mixed_ops.c",
+      "source_file": "c/misc_math/mixed_ops.c",
       "expected_output": "14.5",
       "aspis_options": "--eddi --no-cfc"
     },
     {
-      "test_name": "misc_data_dup_v0",
-      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
-      "expected_output": "OK",
+      "test_name": "xor_cypher_v0",
+      "source_file": "c/misc_math/xor_cypher.c",
+      "expected_output": "SUCCESS",
       "aspis_options": "--eddi --cfcss"
     },
     {
-      "test_name": "misc_data_dup_v1",
-      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
-      "expected_output": "OK",
+      "test_name": "xor_cypher_v1",
+      "source_file": "c/misc_math/xor_cypher.c",
+      "expected_output": "SUCCESS",
       "aspis_options": "--seddi --rasm"
     },
     {
-      "test_name": "misc_data_dup_v2",
-      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
-      "expected_output": "OK",
+      "test_name": "xor_cypher_v2",
+      "source_file": "c/misc_math/xor_cypher.c",
+      "expected_output": "SUCCESS",
       "aspis_options": "--fdsc --rasm"
     },
     {
-      "test_name": "misc_data_dup_v3",
-      "source_file": "c/data_duplication_integrity/misc_data_dup.c",
-      "expected_output": "OK",
+      "test_name": "xor_cypher_v3",
+      "source_file": "c/misc_math/xor_cypher.c",
+      "expected_output": "SUCCESS",
       "aspis_options": "--eddi --no-cfc"
     }
   ]
