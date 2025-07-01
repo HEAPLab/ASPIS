@@ -9,4 +9,3 @@ To run ASPIS using Docker Compose, you can execute the following command from th
 ```bash
 docker compose run --rm aspis_runner /workspace/ASPIS/tmp/c/control_flow/function_pointer.c -o /tmp/build/function_pointer.out
 ```
-./
