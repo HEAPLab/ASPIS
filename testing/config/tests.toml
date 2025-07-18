@@ -1,0 +1,796 @@
+
+[[tests]]
+test_name = "add1"
+source_file = "cpp/simple/add.cpp"
+expected_output = "7"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "add2"
+source_file = "cpp/simple/add.cpp"
+expected_output = "7"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "add3"
+source_file = "cpp/simple/add.cpp"
+expected_output = "7"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "add4"
+source_file = "cpp/simple/add.cpp"
+expected_output = "7"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "class_polymorphism1"
+source_file = "cpp/simple/class.cpp"
+expected_output = """
+12
+5, 7
+3, 6, 9
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "class_polymorphism2"
+source_file = "cpp/simple/class.cpp"
+expected_output = """
+12
+5, 7
+3, 6, 9
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "class_polymorphism3"
+source_file = "cpp/simple/class.cpp"
+expected_output = """
+12
+5, 7
+3, 6, 9
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "class_polymorphism4"
+source_file = "cpp/simple/class.cpp"
+expected_output = """
+12
+5, 7
+3, 6, 9
+"""
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "exception_handling1"
+source_file = "cpp/simple/exceptions.cpp"
+expected_output = """
+Exception caught: Test exception
+Exception caught: Test exception
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "exception_handling2"
+source_file = "cpp/simple/exceptions.cpp"
+expected_output = """
+Exception caught: Test exception
+Exception caught: Test exception
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "exception_handling3"
+source_file = "cpp/simple/exceptions.cpp"
+expected_output = """
+Exception caught: Test exception
+Exception caught: Test exception
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "exception_handling4"
+source_file = "cpp/simple/exceptions.cpp"
+expected_output = """
+Exception caught: Test exception
+Exception caught: Test exception
+"""
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "fact1"
+source_file = "cpp/simple/fact.cpp"
+expected_output = """
+3628800
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "fact2"
+source_file = "cpp/simple/fact.cpp"
+expected_output = """
+3628800
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "fact3"
+source_file = "cpp/simple/fact.cpp"
+expected_output = """
+3628800
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "fact4"
+source_file = "cpp/simple/fact.cpp"
+expected_output = """
+3628800
+"""
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "func1"
+source_file = "cpp/simple/func.cpp"
+expected_output = """
+Function f called (g incremented to 1)
+Final value of g: 1
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "func2"
+source_file = "cpp/simple/func.cpp"
+expected_output = """
+Function f called (g incremented to 1)
+Final value of g: 1
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "func3"
+source_file = "cpp/simple/func.cpp"
+expected_output = """
+Function f called (g incremented to 1)
+Final value of g: 1
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "func4"
+source_file = "cpp/simple/func.cpp"
+expected_output = """
+Function f called (g incremented to 1)
+Final value of g: 1
+"""
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "mul1"
+source_file = "cpp/simple/mul.cpp"
+expected_output = """
+42
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "mul2"
+source_file = "cpp/simple/mul.cpp"
+expected_output = """
+42
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "mul3"
+source_file = "cpp/simple/mul.cpp"
+expected_output = """
+42
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "mul4"
+source_file = "cpp/simple/mul.cpp"
+expected_output = """
+42
+"""
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "template1"
+source_file = "cpp/simple/template.cpp"
+expected_output = """
+Result: 42
+Result: 15
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "template2"
+source_file = "cpp/simple/template.cpp"
+expected_output = """
+Result: 42
+Result: 15
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "template3"
+source_file = "cpp/simple/template.cpp"
+expected_output = """
+Result: 42
+Result: 15
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "template4"
+source_file = "cpp/simple/template.cpp"
+expected_output = """
+Result: 42
+Result: 15
+"""
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "ptrsSharedUnique1"
+source_file = "cpp/simple/ptr.cpp"
+expected_output = """
+Value pointed by p1: 42, Value pointed by p2: 42
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "ptrsSharedUnique2"
+source_file = "cpp/simple/ptr.cpp"
+expected_output = """
+Value pointed by p1: 42, Value pointed by p2: 42
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "ptrsSharedUnique3"
+source_file = "cpp/simple/ptr.cpp"
+expected_output = """
+Value pointed by p1: 42, Value pointed by p2: 42
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "ptrsSharedUnique4"
+source_file = "cpp/simple/ptr.cpp"
+expected_output = """
+Value pointed by p1: 42, Value pointed by p2: 42
+"""
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "heap1"
+source_file = "cpp/simple/heap.cpp"
+expected_output = """
+Value: 10
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "heap2"
+source_file = "cpp/simple/heap.cpp"
+expected_output = """
+Value: 10
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "heap3"
+source_file = "cpp/simple/heap.cpp"
+expected_output = """
+Value: 10
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "heap4"
+source_file = "cpp/simple/heap.cpp"
+expected_output = """
+Value: 10
+"""
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "raii_filehandler1"
+source_file = "cpp/simple/file_handler.cpp"
+expected_output = """
+Handler created
+File closed
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "raii_filehandler2"
+source_file = "cpp/simple/file_handler.cpp"
+expected_output = """
+Handler created
+File closed
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "raii_filehandler3"
+source_file = "cpp/simple/file_handler.cpp"
+expected_output = """
+Handler created
+File closed
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "raii_filehandler4"
+source_file = "cpp/simple/file_handler.cpp"
+expected_output = """
+Handler created
+File closed
+"""
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "inline_constexpr1"
+source_file = "cpp/simple/inline_constexpr.cpp"
+aspis_options = "--eddi --cfcss"
+expected_output = """
+9
+16
+5
+"""
+
+[[tests]]
+test_name = "inline_constexpr2"
+source_file = "cpp/simple/inline_constexpr.cpp"
+aspis_options = "--seddi --rasm"
+expected_output = """
+9
+16
+5
+"""
+
+[[tests]]
+test_name = "inline_constexpr3"
+source_file = "cpp/simple/inline_constexpr.cpp"
+aspis_options = "--fdsc --rasm"
+expected_output = """
+9
+16
+5
+"""
+
+[[tests]]
+test_name = "inline_constexpr4"
+source_file = "cpp/simple/inline_constexpr.cpp"
+aspis_options = "--eddi --no-cfc"
+expected_output = """
+9
+16
+5
+"""
+
+[[tests]]
+test_name = "lambda_captures1"
+source_file = "cpp/simple/lambda_captures.cpp"
+aspis_options = "--eddi --cfcss"
+expected_output = """
+x incremented by 5
+Value pointed by p: 11
+"""
+
+[[tests]]
+test_name = "lambda_captures2"
+source_file = "cpp/simple/lambda_captures.cpp"
+aspis_options = "--seddi --rasm"
+expected_output = """
+x incremented by 5
+Value pointed by p: 11
+"""
+
+[[tests]]
+test_name = "lambda_captures3"
+source_file = "cpp/simple/lambda_captures.cpp"
+aspis_options = "--fdsc --rasm"
+expected_output = """
+x incremented by 5
+Value pointed by p: 11
+"""
+
+[[tests]]
+test_name = "lambda_captures4"
+source_file = "cpp/simple/lambda_captures.cpp"
+aspis_options = "--eddi --no-cfc"
+expected_output = """
+x incremented by 5
+Value pointed by p: 11
+"""
+
+[[tests]]
+test_name = "volatile_memory_order1"
+source_file = "cpp/simple/volatile_memory_order.cpp"
+aspis_options = "--eddi --cfcss"
+expected_output = """
+42
+"""
+
+[[tests]]
+test_name = "volatile_memory_order2"
+source_file = "cpp/simple/volatile_memory_order.cpp"
+aspis_options = "--seddi --rasm"
+expected_output = """
+42
+"""
+
+[[tests]]
+test_name = "volatile_memory_order3"
+source_file = "cpp/simple/volatile_memory_order.cpp"
+aspis_options = "--fdsc --rasm"
+expected_output = """
+42
+"""
+
+[[tests]]
+test_name = "volatile_memory_order4"
+source_file = "cpp/simple/volatile_memory_order.cpp"
+aspis_options = "--eddi --no-cfc"
+expected_output = """
+42
+"""
+
+[[tests]]
+test_name = "stl_containers_advanced1"
+source_file = "cpp/simple/stl_containers_advanced.cpp"
+aspis_options = "--eddi --cfcss"
+expected_output = """
+0 1 2 3 4 
+"""
+
+[[tests]]
+test_name = "stl_containers_advanced2"
+source_file = "cpp/simple/stl_containers_advanced.cpp"
+aspis_options = "--seddi --rasm"
+expected_output = """
+0 1 2 3 4 
+"""
+
+[[tests]]
+test_name = "stl_containers_advanced3"
+source_file = "cpp/simple/stl_containers_advanced.cpp"
+aspis_options = "--fdsc --rasm"
+expected_output = """
+0 1 2 3 4 
+"""
+
+[[tests]]
+test_name = "stl_containers_advanced4"
+source_file = "cpp/simple/stl_containers_advanced.cpp"
+aspis_options = "--eddi --no-cfc"
+expected_output = """
+0 1 2 3 4 
+"""
+
+# [[tests]]
+# test_name = "threads1"
+# source_file = "cpp/simple/threads.cpp"
+# aspis_options = "--eddi --cfcss"
+# expected_output = """
+# 4000
+# """
+# 
+# [[tests]]
+# test_name = "threads2"
+# source_file = "cpp/simple/threads.cpp"
+# aspis_options = "--seddi --rasm"
+# expected_output = """
+# 4000
+# """
+# 
+# [[tests]]
+# test_name = "threads3"
+# source_file = "cpp/simple/threads.cpp"
+# aspis_options = "--fdsc --rasm"
+# expected_output = """
+# 4000
+# """
+# 
+# [[tests]]
+# test_name = "threads4"
+# source_file = "cpp/simple/threads.cpp"
+# aspis_options = "--eddi --no-cfc"
+# expected_output = """
+# 4000
+# """
+
+[[tests]]
+test_name = "function_pointer_v0"
+source_file = "c/control_flow/function_pointer.c"
+expected_output = "42"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "function_pointer_v1"
+source_file = "c/control_flow/function_pointer.c"
+expected_output = "42"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "function_pointer_v2"
+source_file = "c/control_flow/function_pointer.c"
+expected_output = "42"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "function_pointer_v3"
+source_file = "c/control_flow/function_pointer.c"
+expected_output = "42"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "loop_exit_v0"
+source_file = "c/control_flow/loop_exit.c"
+expected_output = "2"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "loop_exit_v1"
+source_file = "c/control_flow/loop_exit.c"
+expected_output = "2"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "loop_exit_v2"
+source_file = "c/control_flow/loop_exit.c"
+expected_output = "2"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "loop_exit_v3"
+source_file = "c/control_flow/loop_exit.c"
+expected_output = "2"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "nested-branch_v0"
+source_file = "c/control_flow/nested-branch.c"
+expected_output = "6"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "nested-branch_v1"
+source_file = "c/control_flow/nested-branch.c"
+expected_output = "6"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "nested-branch_v2"
+source_file = "c/control_flow/nested-branch.c"
+expected_output = "6"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "nested-branch_v3"
+source_file = "c/control_flow/nested-branch.c"
+expected_output = "6"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "simple-branch_v0"
+source_file = "c/control_flow/simple-branch.c"
+expected_output = "OK"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "simple-branch_v1"
+source_file = "c/control_flow/simple-branch.c"
+expected_output = "OK"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "simple-branch_v2"
+source_file = "c/control_flow/simple-branch.c"
+expected_output = "OK"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "simple-branch_v3"
+source_file = "c/control_flow/simple-branch.c"
+expected_output = "OK"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "switch-case_v0"
+source_file = "c/control_flow/switch-case.c"
+expected_output = "300"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "switch-case_v1"
+source_file = "c/control_flow/switch-case.c"
+expected_output = "300"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "switch-case_v2"
+source_file = "c/control_flow/switch-case.c"
+expected_output = "300"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "switch-case_v3"
+source_file = "c/control_flow/switch-case.c"
+expected_output = "300"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "data_dep_branches_v0"
+source_file = "c/data_duplication_integrity/data_dep_branches.c"
+expected_output = "7"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "data_dep_branches_v1"
+source_file = "c/data_duplication_integrity/data_dep_branches.c"
+expected_output = "7"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "data_dep_branches_v2"
+source_file = "c/data_duplication_integrity/data_dep_branches.c"
+expected_output = "7"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "data_dep_branches_v3"
+source_file = "c/data_duplication_integrity/data_dep_branches.c"
+expected_output = "7"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "global_var_across_functions_v0"
+source_file = "c/data_duplication_integrity/global_var_across_functions.c"
+expected_output = "2"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "global_var_across_functions_v1"
+source_file = "c/data_duplication_integrity/global_var_across_functions.c"
+expected_output = "2"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "global_var_across_functions_v2"
+source_file = "c/data_duplication_integrity/global_var_across_functions.c"
+expected_output = "2"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "global_var_across_functions_v3"
+source_file = "c/data_duplication_integrity/global_var_across_functions.c"
+expected_output = "2"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "misc_data_dup_v0"
+source_file = "c/data_duplication_integrity/misc_data_dup.c"
+expected_output = "OK"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "misc_data_dup_v1"
+source_file = "c/data_duplication_integrity/misc_data_dup.c"
+expected_output = "OK"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "misc_data_dup_v2"
+source_file = "c/data_duplication_integrity/misc_data_dup.c"
+expected_output = "OK"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "misc_data_dup_v3"
+source_file = "c/data_duplication_integrity/misc_data_dup.c"
+expected_output = "OK"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "volatile_io_v0"
+source_file = "c/data_duplication_integrity/volatile_io.c"
+expected_output = "42"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "volatile_io_v1"
+source_file = "c/data_duplication_integrity/volatile_io.c"
+expected_output = "42"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "volatile_io_v2"
+source_file = "c/data_duplication_integrity/volatile_io.c"
+expected_output = "42"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "volatile_io_v3"
+source_file = "c/data_duplication_integrity/volatile_io.c"
+expected_output = "42"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "arit_pipeline_v0"
+source_file = "c/misc_math/arit_pipeline.c"
+expected_output = "3"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "arit_pipeline_v1"
+source_file = "c/misc_math/arit_pipeline.c"
+expected_output = "3"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "arit_pipeline_v2"
+source_file = "c/misc_math/arit_pipeline.c"
+expected_output = "3"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "arit_pipeline_v3"
+source_file = "c/misc_math/arit_pipeline.c"
+expected_output = "3"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "mixed_ops_v0"
+source_file = "c/misc_math/mixed_ops.c"
+expected_output = "14.5"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "mixed_ops_v1"
+source_file = "c/misc_math/mixed_ops.c"
+expected_output = "14.5"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "mixed_ops_v2"
+source_file = "c/misc_math/mixed_ops.c"
+expected_output = "14.5"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "mixed_ops_v3"
+source_file = "c/misc_math/mixed_ops.c"
+expected_output = "14.5"
+aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "xor_cypher_v0"
+source_file = "c/misc_math/xor_cypher.c"
+expected_output = "SUCCESS"
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "xor_cypher_v1"
+source_file = "c/misc_math/xor_cypher.c"
+expected_output = "SUCCESS"
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "xor_cypher_v2"
+source_file = "c/misc_math/xor_cypher.c"
+expected_output = "SUCCESS"
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "xor_cypher_v3"
+source_file = "c/misc_math/xor_cypher.c"
+expected_output = "SUCCESS"
+aspis_options = "--eddi --no-cfc"

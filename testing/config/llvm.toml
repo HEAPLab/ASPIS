@@ -1,0 +1,2 @@
+#llvm_bin = "<path/to/your/llvm/bin>"
+llvm_bin = "/mnt/build/lib/cmake/llvm/"
