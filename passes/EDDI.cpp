@@ -29,7 +29,6 @@
 
 #include "Utils/Utils.h"
 
-
 PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   PreprocessModule(Md);
@@ -44,10 +43,11 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   for (Value *V : SphereOfReplication) {
     if (isa<Instruction>(V)) {
-      ASPISInstr *AI = ValuesToASPISInstr.find(V)->second;
-      
+      ASPISInstr *AI =
+          static_cast<ASPISInstr *>(ValuesToASPISValues.find(V)->second);
+
       // AI must always exist
-      assert(AI); 
+      assert(AI);
 
       AI->harden();
     }
@@ -56,6 +56,15 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   return PreservedAnalyses::none();
 }
 
+void PreprocessModule(Module &Md) {}
+
+void FuncRetToRef(Module &Md) {}
+
+void DuplicateGlobals(Module &Md) {}
+
+void CreateDupFunctions(Module &Md) {}
+
+void CreateErrBB(Module &Md) {}
 
 //-----------------------------------------------------------------------------
 // New PM Registration

@@ -1,6 +1,8 @@
-#include "ASPISInstr.h"
+#include "ASPISValues.h"
 #include "../ASPIS.h"
 #include "../Utils/Utils.h"
+
+using namespace llvm;
 
 /**
  * @brief Creates a comparison instruction between two LLVM IR values.
@@ -8,7 +10,8 @@
  * @param V1        The first value to compare.
  * @param V2        The second value to compare.
  * @param insertPt  The instruction before which to insert the comparison.
- * @return          The resulting comparison Value, or nullptr if comparison is not applicable.
+ * @return          The resulting comparison Value, or nullptr if comparison is
+ * not applicable.
  */
 Value *createComparison(Value *V1, Value *V2, Instruction *insertPt) {
   // we don't compare two values if either of them is null or they are equal
@@ -19,26 +22,25 @@ Value *createComparison(Value *V1, Value *V2, Instruction *insertPt) {
   IRBuilder<> B(insertPt);
   if (V1->getType()->isPointerTy()) {
     // TODO
-  }
-  else if (V1->getType()->isArrayTy()) {
+  } else if (V1->getType()->isArrayTy()) {
     // TODO
-  } 
-  else if (V1->getType()->isIntegerTy()) {
+  } else if (V1->getType()->isIntegerTy()) {
     // TODO
-  }
-  else if (V1->getType()->isFloatingPointTy()) {
+  } else if (V1->getType()->isFloatingPointTy()) {
     // TODO
   }
 }
 
 void ASPISInstr::CreateConsistencyCheck() {
-  std::vector<Value*> cmpInstructions;
+  std::vector<Value *> cmpInstructions;
 
-  for (Value *V : original->operand_values()) {
+  for (Value *V : getOriginal()->operand_values()) {
     // The operand V is an ASPIS instruction
-    if (EDDIPass.getValuesToASPISInstr()->find(V) != EDDIPass.getValuesToASPISInstr()->end()) {
-      auto *Operand = EDDIPass.getValuesToASPISInstr()->find(V)->second;
-      Value *Cmp = createComparison(Operand->original, Operand->duplicate, original);
+    if (eddiPass.getValuesToASPISValues()->find(V) !=
+        eddiPass.getValuesToASPISValues()->end()) {
+      auto *Operand = eddiPass.getValuesToASPISValues()->find(V)->second;
+      Value *Cmp = createComparison(Operand->getOriginal(),
+                                    Operand->getDuplicate(), getOriginal());
     }
     // The operand V is not an instruction, we just assume it is a global
     else {
@@ -48,8 +50,9 @@ void ASPISInstr::CreateConsistencyCheck() {
 }
 
 void ASPISInstr::DuplicateInstruction() {
-  // it may be that the current instruction has been duplicated on-demand by other instructions
-  if (duplicate == nullptr) {
+  // it may be that the current instruction has been duplicated on-demand by
+  // other instructions
+  if (getDuplicate() == nullptr) {
     return; // we don't need to duplicate
   }
 }

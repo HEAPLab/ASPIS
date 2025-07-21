@@ -3,7 +3,7 @@ add_subdirectory(Utils Utils)
 # DataProtection
 add_library(DataProtection SHARED
     EDDI.cpp
-    Duplication/ASPISInstr.cpp
+    Duplication/ASPISValues.cpp
     Utils/Utils.cpp
 )
 
