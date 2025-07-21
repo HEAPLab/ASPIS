@@ -7,6 +7,7 @@
 #include <llvm/IR/Instructions.h>
 #include <map>
 #include <set>
+#include "Duplication/ASPISInstr.h"
 
 using namespace llvm;
 
@@ -17,7 +18,7 @@ using namespace llvm;
 #define LOG_COMPILED_FUNCS 1
 
 // DATA PROTECTION
-class FuncRetToRef : public PassInfoMixin<FuncRetToRef> {
+/* class FuncRetToRef : public PassInfoMixin<FuncRetToRef> {
     private:
         Function* updateFnSignature(Function &Fn, Module &Md);
         void updateRetInstructions(Function &Fn);
@@ -26,33 +27,46 @@ class FuncRetToRef : public PassInfoMixin<FuncRetToRef> {
     public:
         PreservedAnalyses run(Module &Md, ModuleAnalysisManager &AM);
         static bool isRequired() { return true; }
-};
+}; */
 
 class EDDI : public PassInfoMixin<EDDI> {
     private:
-        std::set<Function*> CompiledFuncs;
-        std::map<Value*, StringRef> FuncAnnotations;
-        std::set<Function*> OriginalFunctions;
-        
-        // Map of <original, duplicate> for which we need to always use the duplicate in place of the original
-        std::map<Value*, Value*> ValuesToAlwaysDup;
+        std::set<Value*> SphereOfReplication;
+        std::set<Value*> SphereOfDuplication;
+        std::set<Value*> SphereOfExclusion;
 
-        int isUsedByStore(Instruction &I, Instruction &Use);
-        Instruction* cloneInstr(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap);
-        void duplicateOperands (Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
-        Value* getPtrFinalValue(Value &V);
-        Value* comparePtrs(Value &V1, Value &V2, IRBuilder<> &B);
-        void addConsistencyChecks(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
-        void fixFuncValsPassedByReference(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B);
-        Function *getFunctionDuplicate(Function *Fn);
-        Function *getFunctionFromDuplicate(Function *Fn);
-        Constant *duplicateConstant(Constant *C, std::map<Value *, Value *> &DuplicatedInstructionMap);
-        void duplicateGlobals(Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
-        bool isAllocaForExceptionHandling(AllocaInst &I);
-        int transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B, BasicBlock &ErrBB);
-        int duplicateInstruction(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
-        bool isValueDuplicated(std::map<Value *, Value *> &DuplicatedInstructionMap, Instruction &V);
-        Function *duplicateFnArgs(Function &Fn, Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
+        std::map<Value*,ASPISInstr*> ValuesToASPISInstr;
+
+        BasicBlock *ErrBB;
+        
+        /**
+         * This function performs the following operations:
+         * - Resolves aliases.
+         * - Gathers annotations.
+         * - Defines spheres.
+         */
+        void PreprocessModule(Module &Md);
+
+        /**
+         * Transforms functions with a return value into functions where the return 
+         * value is passed by reference as a parameter.
+         */
+        void FuncRetToRef(Module &Md);
+
+        /**
+         * Duplicates the global variables of the module in the SOR.
+         */
+        void DuplicateGlobals(Module &Md);
+
+        /**
+         * Creates the signatures for the _dup functions in the SOR.
+         */
+        void CreateDupFunctions(Module &Md);
+
+        /**
+         * Create the skeleton of the ErrBB.
+         */
+        void CreateErrBB(Module &Md);
 
     public:
         PreservedAnalyses run(Module &M,
@@ -61,7 +75,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         static bool isRequired() { return true; }
 };
 
-class DuplicateGlobals : public PassInfoMixin<DuplicateGlobals> {
+/* class DuplicateGlobals : public PassInfoMixin<DuplicateGlobals> {
     private: 
         std::map<GlobalVariable*, GlobalVariable*> DuplicatedGlobals;
 
@@ -75,7 +89,7 @@ class DuplicateGlobals : public PassInfoMixin<DuplicateGlobals> {
                               ModuleAnalysisManager &);
 
         static bool isRequired() { return true; }
-};
+}; */
 
 class ASPISCheckProfiler : public PassInfoMixin<ASPISCheckProfiler> {
     private: 
