@@ -10,6 +10,7 @@ jobs:
           path: ASPIS
       - name: Cache LLVM build
         uses: actions/cache@v4
+        id: llvm-cache
         with:
           path: /mnt/build/
           key: llvm-build-${{ hashFiles('llvm-project/**', 'ASPIS/CMakeLists.txt') }}
@@ -17,11 +18,13 @@ jobs:
             llvm-build-
       - name: Checking out LLVM project
         uses: actions/checkout@master
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
         with:
           repository: llvm/llvm-project
           ref: llvmorg-16.0.6
           path: llvm-project
       - name: Compiling LLVM
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
         shell: bash
         working-directory: ./llvm-project
         run: |
@@ -46,13 +49,15 @@ jobs:
            cmake --build build
       - name: Cache pip
         uses: actions/cache@v4
+        id: pip-cache
         with:
           path: ~/.cache/pip
           key: pip-${{ hashFiles('ASPIS/testing/requirements.txt') }}
           restore-keys: |
             pip-
       - name: Install Python requirements
-        shell: bash
+        shell: bash        
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
         working-directory: ./ASPIS/testing
         run: |
            pip install -r requirements.txt
