@@ -6,13 +6,13 @@ using namespace llvm;
 class ASPISInstr {
 
 protected:
-  const EDDI &EDDIPass;
+  EDDI &EDDIPass;
   
   Instruction *original;
   Instruction *duplicate;
 
   BasicBlock *ErrBB = nullptr;
-
+  
   void CreateConsistencyCheck();
   void DuplicateInstruction();
 
