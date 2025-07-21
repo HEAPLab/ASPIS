@@ -20,6 +20,7 @@ extern bool AlternateMemMapEnabled;
 extern std::string DuplicateSecName;
 extern bool DebugEnabled;
 extern bool ProfilingEnabled;
+extern std::string RedundancyPolicy;
 
 // Given a Use U, it returns true if the instruction is a PHI instruction
 bool IsNotAPHINode (Use &U);

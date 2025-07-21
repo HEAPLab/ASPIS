@@ -35,6 +35,8 @@ static cl::opt<std::string, true> DuplicateSecNameOpt("duplicate-sec", cl::desc(
 bool ProfilingEnabled;
 static cl::opt<bool, true> ProfilingFuncCalls("enable-profiling", cl::desc("Enable the insertion of profiling function calls at synchonization points"), cl::location(ProfilingEnabled), cl::init(false));
 
+std::string RedundancyPolicy;
+static cl::opt<std::string, true> RedundancyPolicyOpt("redundancy-policy", cl::desc("Specify the algorithm for data protection"), cl::location(RedundancyPolicy), cl::init("eddi"));
 
 bool IsNotAPHINode (Use &U){
   return !isa<PHINode>(U.getUser());

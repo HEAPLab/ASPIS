@@ -330,11 +330,6 @@ run_aspis() {
 
         exe $OPT --enable-new-pm=1 --passes="lowerswitch" $build_dir/out.ll -o $build_dir/out.ll
 
-    ## FuncRetToRef
-    if [[ dup != -1 ]]; then
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="func-ret-to-ref" $build_dir/out.ll -o $build_dir/out.ll
-    fi;
-
     title_msg "ASPIS transformations"
     ## DATA PROTECTION
     case $dup in
@@ -371,6 +366,7 @@ run_aspis() {
     esac
     success_msg "Applied CFC passes."
 
+    # TODO: Usare addAnnotation pass per markare come exclude i moduli derivati da exclude.txt
     if [[ -n "$exclude_file" ]]; then
         # scan the directories of excluded files
         while IFS= read -r line 
@@ -391,12 +387,6 @@ run_aspis() {
         exe $LLVM_LINK $build_dir/*.ll -o $build_dir/out.ll
     fi;
     success_msg "Linked excluded files to the compilation."
-
-    ## DuplicateGlobals
-    if [[ dup != -1 ]]; then
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="duplicate-globals" $build_dir/out.ll -o $build_dir/out.ll -S $eddi_options
-        success_msg "Duplicated globals."
-    fi;
 
     title_msg "Back-end"
     if [[ -n "$asm_file" ]]; then

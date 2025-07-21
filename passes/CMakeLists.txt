@@ -1,32 +1,10 @@
 add_subdirectory(Utils Utils)
 
-# EDDI 
-add_library(EDDI SHARED
-    DuplicateGlobals.cpp
+# DataProtection
+add_library(DataProtection SHARED
     EDDI.cpp
-    FuncRetToRef.cpp
     Utils/Utils.cpp
 )
-target_compile_definitions(EDDI PRIVATE SELECTIVE_CHECKING=0 CHECK_AT_STORES CHECK_AT_CALLS CHECK_AT_BRANCH)
-
-# FDSC
-add_library(FDSC SHARED
-    DuplicateGlobals.cpp
-    EDDI.cpp
-    FuncRetToRef.cpp
-    Utils/Utils.cpp
-)
-target_compile_definitions(FDSC PRIVATE SELECTIVE_CHECKING=1 CHECK_AT_STORES CHECK_AT_CALLS CHECK_AT_BRANCH)
-
-# sEDDI
-add_library(SEDDI SHARED
-    DuplicateGlobals.cpp
-    EDDI.cpp
-    FuncRetToRef.cpp
-    Utils/Utils.cpp
-)
-target_compile_definitions(SEDDI PRIVATE SELECTIVE_CHECKING=0 CHECK_AT_CALLS CHECK_AT_BRANCH)
-
 
 # CFCSS
 add_library(CFCSS SHARED
