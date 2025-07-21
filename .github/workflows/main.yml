@@ -37,4 +37,29 @@ jobs:
            mkdir build
            cmake -B build -DLLVM_DIR=/mnt/build/lib/cmake/llvm/
            cmake --build build
-           
+      - name: Cache LLVM build
+        uses: actions/cache@v4
+        with:
+          path: /mnt/build/
+          key: llvm-build-${{ hashFiles('llvm-project/**', 'ASPIS/CMakeLists.txt') }}
+          restore-keys: |
+            llvm-build-
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('ASPIS/testing/requirements.txt') }}
+          restore-keys: |
+            pip-
+      - name: Install Python requirements
+        shell: bash
+        working-directory: ./ASPIS/testing
+        run: |
+           pip install -r requirements.txt
+      - name: Testing ASPIS
+        shell: bash
+        working-directory: ./ASPIS/testing
+        run: |
+           pytest test.py -n auto
+
