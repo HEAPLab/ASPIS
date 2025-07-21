@@ -69,6 +69,13 @@ class EDDI : public PassInfoMixin<EDDI> {
         void CreateErrBB(Module &Md);
 
     public:
+        std::set<Value*> *getSOR() {return &SphereOfReplication;}
+        std::set<Value*> *getSOD() {return &SphereOfReplication;}
+        std::set<Value*> *getSOE() {return &SphereOfExclusion;}
+        std::map<Value*, ASPISInstr*> *getValuesToASPISInstr() {return &ValuesToASPISInstr;}
+        BasicBlock *getErrBB() {return ErrBB;}
+
+        
         PreservedAnalyses run(Module &M,
                               ModuleAnalysisManager &);
 
