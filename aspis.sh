@@ -291,7 +291,7 @@ EOF
         }
     fi
 
-    CLANG="${llvm_bin}/clang" 
+    CLANG="${llvm_bin}/clang++-20" 
     OPT="${llvm_bin}/opt"
     LLVM_LINK="${llvm_bin}/llvm-link"
 
@@ -319,52 +319,52 @@ run_aspis() {
     done
 
     ## LINK & PREPROCESS
-    exe $LLVM_LINK $build_dir/*.ll -o $build_dir/out.ll -opaque-pointers
+    exe $LLVM_LINK $build_dir/*.ll -o $build_dir/out.ll
 
     success_msg "Emitted and linked IR."
 
     if [[ $debug_enabled == false ]]; then
-        exe $OPT --enable-new-pm=1 --passes="strip" $build_dir/out.ll -o $build_dir/out.ll
+        exe $OPT --passes="strip" $build_dir/out.ll -o $build_dir/out.ll
         echo "  Debug mode disabled, stripped debug symbols."
     fi
 
-        exe $OPT --enable-new-pm=1 --passes="lowerswitch" $build_dir/out.ll -o $build_dir/out.ll
+    # exe $OPT --passes="lowerswitch" $build_dir/out.ll -o $build_dir/out.ll
 
     ## FuncRetToRef
     if [[ dup != -1 ]]; then
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="func-ret-to-ref" $build_dir/out.ll -o $build_dir/out.ll
+        exe $OPT -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="func-ret-to-ref" $build_dir/out.ll -o $build_dir/out.ll
     fi;
 
     title_msg "ASPIS transformations"
     ## DATA PROTECTION
     case $dup in
         0) 
-            exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
+            exe $OPT -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
             ;;
         1) 
-            exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libSEDDI.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
+            exe $OPT -load-pass-plugin=$DIR/build/passes/libSEDDI.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
             ;;
         2) 
-            exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libFDSC.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
+            exe $OPT -load-pass-plugin=$DIR/build/passes/libFDSC.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
             ;;
         *)
             echo -e "\t--no-dup specified!"
     esac
     success_msg "Applied data protection passes."
 
-    exe $OPT --enable-new-pm=1 --passes="simplifycfg" $build_dir/out.ll -o $build_dir/out.ll
+    exe $OPT --passes="simplifycfg" $build_dir/out.ll -o $build_dir/out.ll
 
 
     ## CONTROL-FLOW CHECKING
     case $cfc in
         0) 
-            exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libCFCSS.so --passes="cfcss-verify" $build_dir/out.ll -o $build_dir/out.ll $cfc_options
+            exe $OPT -load-pass-plugin=$DIR/build/passes/libCFCSS.so --passes="cfcss-verify" $build_dir/out.ll -o $build_dir/out.ll $cfc_options
             ;;
         1) 
-            exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libRASM.so --passes="rasm-verify" $build_dir/out.ll -o $build_dir/out.ll $cfc_options
+            exe $OPT -load-pass-plugin=$DIR/build/passes/libRASM.so --passes="rasm-verify" $build_dir/out.ll -o $build_dir/out.ll $cfc_options
             ;;
         2) 
-            exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libINTER_RASM.so --passes="rasm-verify" $build_dir/out.ll -o $build_dir/out.ll $cfc_options
+            exe $OPT -load-pass-plugin=$DIR/build/passes/libINTER_RASM.so --passes="rasm-verify" $build_dir/out.ll -o $build_dir/out.ll $cfc_options
             ;;
         *)
             echo -e "\t--no-cfc specified!"
@@ -394,7 +394,7 @@ run_aspis() {
 
     ## DuplicateGlobals
     if [[ dup != -1 ]]; then
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="duplicate-globals" $build_dir/out.ll -o $build_dir/out.ll -S $eddi_options
+        exe $OPT -load-pass-plugin=$DIR/build/passes/libEDDI.so --passes="duplicate-globals" $build_dir/out.ll -o $build_dir/out.ll -S $eddi_options
         success_msg "Duplicated globals."
     fi;
 
@@ -411,7 +411,7 @@ run_aspis() {
     exe $OPT $build_dir/out.ll -o $build_dir/out.ll -S $opt_flags
     if [[ "$enable_profiling" == "true" ]]; then
         title_msg "ASPIS Profiling"
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-insert-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
+        exe $OPT -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-insert-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
         success_msg "Code instrumented."
 
         exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
@@ -421,7 +421,7 @@ run_aspis() {
         success_msg "Profiled code executed."
 
         echo -e "Analyzing..."
-        exe $OPT --enable-new-pm=1 -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
+        exe $OPT -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
         exit
     fi;
 

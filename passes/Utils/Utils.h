@@ -11,6 +11,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/Support/CommandLine.h>
 #include <map>
+#include <set>
 
 using namespace llvm;
 using LinkageMap = std::unordered_map<std::string, std::vector<StringRef>>;

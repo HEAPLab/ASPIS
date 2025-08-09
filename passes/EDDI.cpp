@@ -414,7 +414,7 @@ void EDDI::fixFuncValsPassedByReference(
 Function *EDDI::getFunctionDuplicate(Function *Fn) {
   // If Fn ends with "_dup" we have already the duplicated function.
   // If Fn is NULL, it means that we don't have a duplicate
-  if (Fn == NULL || Fn->getName().endswith("_dup")) {
+  if (Fn == NULL || Fn->getName().ends_with("_dup")) {
     return Fn;
   }
 
@@ -432,7 +432,7 @@ Function *EDDI::getFunctionDuplicate(Function *Fn) {
 Function *EDDI::getFunctionFromDuplicate(Function *Fn) {
   // If Fn ends with "_dup" we have already the duplicated function.
   // If Fn is NULL, it means that we don't have a duplicate
-  if (Fn == NULL || !Fn->getName().endswith("_dup")) {
+  if (Fn == NULL || !Fn->getName().ends_with("_dup")) {
     return Fn;
   }
 
@@ -486,8 +486,8 @@ void EDDI::duplicateGlobals(
   for (auto GV : GVars) {
     if (!isa<Function>(GV) &&
         FuncAnnotations.find(GV) != FuncAnnotations.end()) {
-      if ((FuncAnnotations.find(GV))->second.startswith("runtime_sig") ||
-          (FuncAnnotations.find(GV))->second.startswith("run_adj_sig")) {
+      if ((FuncAnnotations.find(GV))->second.starts_with("runtime_sig") ||
+          (FuncAnnotations.find(GV))->second.starts_with("run_adj_sig")) {
         continue;
       }
     }
@@ -505,13 +505,13 @@ void EDDI::duplicateGlobals(
     bool isConstant = GV->isConstant();
     bool isStruct = GV->getValueType()->isStructTy();
     bool isArray = GV->getValueType()->isArrayTy();
-    bool isPointer = GV->getValueType()->isOpaquePointerTy();
-    bool endsWithDup = GV->getName().endswith("_dup");
+    bool isPointer = GV->getValueType()->isPointerTy();
+    bool endsWithDup = GV->getName().ends_with("_dup");
     bool hasExternalLinkage = GV->isExternallyInitialized() || GV->hasExternalLinkage();
     bool isMetadataInfo = GV->getSection() == "llvm.metadata";
     bool toExclude = !isa<Function>(GV) &&
                      FuncAnnotations.find(GV) != FuncAnnotations.end() &&
-                     (FuncAnnotations.find(GV))->second.startswith("exclude");
+                     (FuncAnnotations.find(GV))->second.starts_with("exclude");
     bool isConstStruct = GV->getSection() != "llvm.metadata" && GV->hasInitializer() && isa<ConstantAggregate>(GV->getInitializer());
     bool isStructOfGlobals = false; // is true if and only if the global variable that we are duplicating contains at least a global pointer
     bool isStructOfFunctions = false; // is true if the global variable that we are duplicating contains at least a global pointer, and such global pointer is a function pointer
@@ -579,7 +579,7 @@ void EDDI::duplicateGlobals(
         auto *valueOperand =storeInst->getValueOperand();
         if(isa<CallBase>(valueOperand)){
           CallBase *callInst = cast<CallBase>(valueOperand);
-          if (callInst->getCalledFunction() && callInst->getCalledFunction()->getName().equals("__cxa_begin_catch"))
+          if (callInst->getCalledFunction() && callInst->getCalledFunction()->getName().equals_insensitive("__cxa_begin_catch"))
           {return true;}
         }
         
@@ -822,7 +822,7 @@ int EDDI::duplicateInstruction(
     Callee = getFunctionFromDuplicate(Callee);
     // check if the function call has to be duplicated
     if ((FuncAnnotations.find(Callee) != FuncAnnotations.end() &&
-         (*FuncAnnotations.find(Callee)).second.startswith("to_duplicate")) ||
+         (*FuncAnnotations.find(Callee)).second.starts_with("to_duplicate")) ||
         isIntrinsicToDuplicate(CInstr)) {
       // duplicate the instruction
       cloneInstr(*CInstr, DuplicatedInstructionMap);

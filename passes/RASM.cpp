@@ -264,7 +264,7 @@ void RASM::createCFGVerificationBB (  BasicBlock &BB,
        * 3) more than three successors -> we have a switch: impossible since we lower switches in a previous pass
       */
       int numSuccessors = Terminator->getNumSuccessors();
-      if (numSuccessors>1 and Terminator->isExceptionalTerminator()){
+      if (numSuccessors>1 and Terminator->isSpecialTerminator()){
         numSuccessors=1;
       }
       switch (numSuccessors)
@@ -348,10 +348,10 @@ PreservedAnalyses RASM::run(Module &Md, ModuleAnalysisManager &AM) {
       // find the global variables required for the runtime signatures
       for (GlobalVariable &GV : Md.globals()) {
         if (!isa<Function>(GV) && FuncAnnotations.find(&GV) != FuncAnnotations.end()) {
-          if ((FuncAnnotations.find(&GV))->second.startswith("runtime_sig")) {
+          if ((FuncAnnotations.find(&GV))->second.starts_with("runtime_sig")) {
             RuntimeSig = &GV;
           }
-          else if ((FuncAnnotations.find(&GV))->second.startswith("run_adj_sig")) {
+          else if ((FuncAnnotations.find(&GV))->second.starts_with("run_adj_sig")) {
             RetSig = &GV;
           }
         }

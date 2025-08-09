@@ -1,11 +1,12 @@
 #include "Utils.h"
-
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Metadata.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include <map>
@@ -117,8 +118,8 @@ bool shouldCompile(Function &Fn,
       !Fn.getName().contains("aspis.syncpt")
       // Moreover, it does not have to be marked as excluded or to_duplicate
       && (FuncAnnotations.find(&Fn) == FuncAnnotations.end() || 
-      (!FuncAnnotations.find(&Fn)->second.startswith("exclude") /* && 
-      !FuncAnnotations.find(&Fn)->second.startswith("to_duplicate") */))
+      (!FuncAnnotations.find(&Fn)->second.starts_with("exclude") /* && 
+      !FuncAnnotations.find(&Fn)->second.starts_with("to_duplicate") */))
       // nor it is one of the original functions
       && OriginalFunctions.find(&Fn) == OriginalFunctions.end();
 }

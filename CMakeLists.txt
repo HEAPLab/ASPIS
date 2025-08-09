@@ -21,7 +21,7 @@ include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 #endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
 
 message(STATUS "Found LLVM definitions ${LLVM_DEFINITIONS_LIST}")
 message(STATUS "Found LLVM include dirs ${LLVM_INCLUDE_DIRS}")
