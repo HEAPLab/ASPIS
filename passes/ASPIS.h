@@ -7,6 +7,7 @@
 #include <llvm/IR/Instructions.h>
 #include <map>
 #include <set>
+#include "TypeDeductionAnalysis.hpp"
 
 using namespace llvm;
 

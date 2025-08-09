@@ -27,4 +27,5 @@ message(STATUS "Found LLVM definitions ${LLVM_DEFINITIONS_LIST}")
 message(STATUS "Found LLVM include dirs ${LLVM_INCLUDE_DIRS}")
 message(STATUS "RTTI: ${LLVM_ENABLE_RTTI}")
 
+add_subdirectory(TypeDeductionAnalysis)
 add_subdirectory(passes)
