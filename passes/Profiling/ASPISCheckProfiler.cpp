@@ -31,10 +31,10 @@ using namespace llvm;
 #define DEBUG_TYPE "aspis_profiler"
 
 bool isCheckBarrierBegin(Instruction *I) {
-  return isa<CallBase>(I) && cast<CallBase>(I)->getCalledFunction()->getName().equals("aspis.datacheck.begin");
+  return isa<CallBase>(I) && cast<CallBase>(I)->getCalledFunction()->getName() == "aspis.datacheck.begin";
 }
 bool isCheckBarrierEnd(Instruction *I) {
-  return isa<CallBase>(I) && cast<CallBase>(I)->getCalledFunction()->getName().equals("aspis.datacheck.end");
+  return isa<CallBase>(I) && cast<CallBase>(I)->getCalledFunction()->getName() == "aspis.datacheck.end";
 }
 
 // returns true if the instruction is used within a consistency check
@@ -256,7 +256,7 @@ void createPrintProfileData(Module &M, std::string GVPrefix) {
 
   // print the counters
   for (GlobalVariable &GV : M.globals()) {
-    if (GV.getName().startswith(GVPrefix + ".counter.")) {
+    if (GV.getName().starts_with(GVPrefix + ".counter.")) {
       // Load counter
       Value *Count = Builder.CreateLoad(Type::getInt32Ty(Ctx), &GV);
 
