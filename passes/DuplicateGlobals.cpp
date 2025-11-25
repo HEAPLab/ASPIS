@@ -54,7 +54,7 @@ GlobalVariable* DuplicateGlobals::getDuplicatedGlobal(Module &Md, GlobalVariable
   if (DuplicatedGlobals.find(&GV) != DuplicatedGlobals.end()) {
     return DuplicatedGlobals.find(&GV)->second;
   }
-  else if (GV.getName().endswith("_dup")) {
+  else if (GV.getName().ends_with("_dup")) {
     return NULL;
   }
   else {
@@ -71,7 +71,7 @@ void DuplicateGlobals::duplicateCall(Module &Md, CallBase* UCall, Value* Origina
     return;
   }
   // if the function is already a _dup function, we just duplicate the operand corresponding to our global
-  if (UCall->getCalledFunction()->getName().endswith("_dup")) {
+  if (UCall->getCalledFunction()->getName().ends_with("_dup")) {
     int i = 0;
     for (auto &Op : UCall->args()) {
       if (Op == Original) {
@@ -167,9 +167,9 @@ PreservedAnalyses DuplicateGlobals::run(Module &Md, ModuleAnalysisManager &AM) {
     // if the global is a struct or an array we cannot just duplicate the stores
     bool toDuplicate = !isa<Function>(GV) && 
         FuncAnnotations.find(GV) != FuncAnnotations.end() && 
-        (FuncAnnotations.find(GV))->second.startswith("to_duplicate");
-    if (! (GV->getType()->isFunctionTy() || GV->isConstant() || GV->getValueType()->isStructTy() || GV->getValueType()->isArrayTy() || GV->getValueType()->isOpaquePointerTy())
-        || toDuplicate/* && ! GV.getName().endswith("_dup") */) {
+        (FuncAnnotations.find(GV))->second.starts_with("to_duplicate");
+    if (! (GV->getType()->isFunctionTy() || GV->isConstant() || GV->getValueType()->isStructTy() || GV->getValueType()->isArrayTy() || GV->getValueType()->isPointerTy())
+        || toDuplicate/* && ! GV.getName().ends_with("_dup") */) {
       // see if the global variable has already been cloned
       GlobalVariable *GVCopy = Md.getGlobalVariable((GV->getName() + "_dup").str(), true);
       Constant *Initializer = NULL;
@@ -182,7 +182,7 @@ PreservedAnalyses DuplicateGlobals::run(Module &Md, ModuleAnalysisManager &AM) {
           GVCopy->setExternallyInitialized(GV->isExternallyInitialized());
         }
       }
-      if (GVCopy == NULL && !GV->getName().endswith_insensitive("_dup")) {
+      if (GVCopy == NULL && !GV->getName().ends_with_insensitive("_dup")) {
         // get a copy of the global variable
         GVCopy = new GlobalVariable(
                                       Md,

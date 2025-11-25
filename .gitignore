@@ -63,3 +63,6 @@ examples/sha/sha
 
 examples/cuda/*.txt
 examples/cuda/add
+
+# IDE
+.idea/

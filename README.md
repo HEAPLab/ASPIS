@@ -10,10 +10,12 @@ The hardening process is done by the sequence of passes depicted in the followin
 ## Pre-requisites
 
 The toolchain has been tested with the following versions:
-- CMake 3.22.1
-- LLVM 16.0.0
+- CMake 3.22.1 | 4.2.3
+- LLVM 21.1.8
 
 During the development of ASPIS, done mostly on LLVM 15, we discovered a bug in the [`splitBasicBlock()`](https://llvm.org/doxygen/classllvm_1_1BasicBlock.html#a2bc5caaabd6841e4ab97237ebcaeb86d) procedure. The bug has been fixed in LLVM 16, so we recommend using it rather than applying the patch to the previous versions. 
+
+> ASPIS has been ported to LLVM 21
 
 ## Building
 
@@ -162,11 +164,11 @@ With the addition of some built-in LLVM passes (`lowerswitch` and `simplifycfg`)
 Run the following:
 
 ```bash
-opt -lowerswitch out.ll -o out.ll
-opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libEDDI.so -func-ret-to-ref out.ll -o out.ll
-opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libSEDDI.so -eddi-verify out.ll -o out.ll
-opt -passes=simplifycfg out.ll -o out.ll
-opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libRASM.so -rasm-verify out.ll -o out.ll
+opt -passes="lower-switch" out.ll -o out.ll
+opt -S -load-pass-plugin </path/to/ASPIS/>build/passes/libEDDI.so -passes="func-ret-to-ref" out.ll -o out.ll
+opt -S -load-pass-plugin </path/to/ASPIS/>build/passes/libSEDDI.so -passes="eddi-verify" out.ll -o out.ll
+opt -passes="simplifycfg" out.ll -o out.ll
+opt -S -load-pass-plugin </path/to/ASPIS/>build/passes/libRASM.so -"rasm-verify" out.ll -o out.ll
 ```
 You may also want to include other files in the compilation, that are previously excluded because of some architecture-dependent features. This is done with the following commands, which first remove the previously emitted single `.ll` files, then compile the excluded code and link it with the hardened code:
 
@@ -180,7 +182,7 @@ llvm-link -S *.ll out.ll.bak -o out.ll
 Then, apply the last pass and emit the executable: 
 
 ```bash
-opt --enable-new-pm=0 -S -load </path/to/ASPIS/>build/passes/libEDDI.so -duplicate-globals out.ll -o out.ll
+opt -S -load-pass-plugin </path/to/ASPIS/>build/passes/libEDDI.so -passes="duplicate-globals" out.ll -o out.ll
 clang out.ll -o out.elf
 ```
 

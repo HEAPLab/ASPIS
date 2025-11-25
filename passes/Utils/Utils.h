@@ -1,16 +1,14 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/Pass.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/Module.h"
 #include <llvm/Support/CommandLine.h>
 #include <map>
+#include <set>
 
 using namespace llvm;
 using LinkageMap = std::unordered_map<std::string, std::vector<StringRef>>;
