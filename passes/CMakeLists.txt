@@ -49,6 +49,12 @@ add_library(INTER_RASM SHARED
 )
 target_compile_definitions(INTER_RASM PRIVATE INTRA_FUNCTION_CFC=1)
 
+# RACFED
+add_library(RACFED SHARED
+        RACFED.cpp
+        Utils/Utils.cpp
+)
+
 add_library(PROFILER SHARED
     Profiling/ASPISCheckProfiler.cpp
     Utils/Utils.cpp
