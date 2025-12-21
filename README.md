@@ -97,6 +97,7 @@ ASPIS does not compile the annotated function or does not duplicate the annotate
  - `--cfcss`: **(Default)** Enable CFCSS.
  - `--rasm`: Enable RASM.
  - `--inter-rasm`: Enable inter-RASM with the default signature `-0xDEAD`.
+ - `--racfed`: Enable RACFED.
 
 ### Example
 
@@ -138,6 +139,7 @@ These are the alternative passes for control-flow checking:
 - `libCFCSS.so` with the `-cfcss-verify` is the implementation of CFCSS in LLVM;
 - `libRASM.so` with the `-rasm-verify` is the implementation of RASM in LLVM;
 - `libINTER_RASM` with the `-rasm-verify` is the implementation of RASM that achieves inter-function CFC.
+- `libRACFED.so` with the `-racfed-verify` is the implementation of RACFED in LLVM.
 
 ### Example of compilation with ASPIS (sEDDI + RASM)
 First, compile the codebase with the appropriate front-end.
