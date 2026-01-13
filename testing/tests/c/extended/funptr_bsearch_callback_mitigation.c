@@ -1,0 +1,45 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+__attribute__((annotate("exclude")))
+static int cmp_int(const void *a, const void *b) {
+    int x = *(const int *)a;
+    int y = *(const int *)b;
+    return (x > y) - (x < y);
+}
+
+static uint32_t checksum_u32(const int *a, size_t n) {
+    uint32_t h = 2166136261u;
+    for (size_t i = 0; i < n; i++) {
+        h ^= (uint32_t)a[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+int main(void) {
+    const size_t N = 10;
+    int *arr = malloc(N * sizeof(int));
+    if (!arr) return 1;
+
+    for (size_t i = 0; i < N; i++)
+        arr[i] = (int)i;
+
+    int key = 6;
+    int *found = bsearch(&key, arr, N, sizeof(int), cmp_int);
+
+    uint32_t cs = checksum_u32(arr, N);
+
+    printf("checksum=%u\n", cs);
+    printf("sentinels=%d %d %d %d\n", arr[0], arr[1], arr[N-2], arr[N-1]);
+
+    if (found) {
+        printf("found=%d idx=%ld\n", *found, (long)(found - arr));
+    } else {
+        printf("found=-1 idx=-1\n");
+    }
+
+    free(arr);
+    return 0;
+}

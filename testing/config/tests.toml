@@ -794,3 +794,879 @@ test_name = "xor_cypher_v3"
 source_file = "c/misc_math/xor_cypher.c"
 expected_output = "SUCCESS"
 aspis_options = "--eddi --no-cfc"
+
+# --------------------------------------------------------------------------------------------
+# The following tests have been developed for the project: 'Harden a C Application with ASPIS'
+# All the codes tested here can be found in the repository: testing/tests/c/extended
+# --------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 1 - struct_player
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "struct_player_v0"
+source_file = "c/extended/struct_player.c"
+expected_output = """
+SCORE: 95
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "struct_player_v1"
+source_file = "c/extended/struct_player.c"
+expected_output = """
+SCORE: 95
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "struct_player_v2"
+source_file = "c/extended/struct_player.c"
+expected_output = """
+SCORE: 95
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "struct_player_v3"
+source_file = "c/extended/struct_player.c"
+expected_output = """
+SCORE: 95
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 2 - array2d_sum
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "array2d_sum_v0"
+source_file = "c/extended/array2d_sum.c"
+expected_output = """
+SUM: 45
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "array2d_sum_v1"
+source_file = "c/extended/array2d_sum.c"
+expected_output = """
+SUM: 45
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "array2d_sum_v2"
+source_file = "c/extended/array2d_sum.c"
+expected_output = """
+SUM: 45
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "array2d_sum_v3"
+source_file = "c/extended/array2d_sum.c"
+expected_output = """
+SUM: 45
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 3 - ptr_to_ptr
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "ptr_to_ptr_v0"
+source_file = "c/extended/ptr_to_ptr.c"
+expected_output = """
+VAL: 12
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "ptr_to_ptr_v1"
+source_file = "c/extended/ptr_to_ptr.c"
+expected_output = """
+VAL: 12
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "ptr_to_ptr_v2"
+source_file = "c/extended/ptr_to_ptr.c"
+expected_output = """
+VAL: 12
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "ptr_to_ptr_v3"
+source_file = "c/extended/ptr_to_ptr.c"
+expected_output = """
+VAL: 12
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 4 - recursion_factorial
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "recursion_factorial_v0"
+source_file = "c/extended/recursion_factorial.c"
+expected_output = """
+FACT: 120
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "recursion_factorial_v1"
+source_file = "c/extended/recursion_factorial.c"
+expected_output = """
+FACT: 120
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "recursion_factorial_v2"
+source_file = "c/extended/recursion_factorial.c"
+expected_output = """
+FACT: 120
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "recursion_factorial_v3"
+source_file = "c/extended/recursion_factorial.c"
+expected_output = """
+FACT: 120
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 5 - heap_dynamic
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "heap_dynamic_v0"
+source_file = "c/extended/heap_dynamic.c"
+expected_output = """
+SUM: 30
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "heap_dynamic_v1"
+source_file = "c/extended/heap_dynamic.c"
+expected_output = """
+SUM: 30
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "heap_dynamic_v2"
+source_file = "c/extended/heap_dynamic.c"
+expected_output = """
+SUM: 30
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "heap_dynamic_v3"
+source_file = "c/extended/heap_dynamic.c"
+expected_output = """
+SUM: 30
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 6 - funptr_static_map
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "funptr_static_map_v0"
+source_file = "c/extended/funptr_static_map.c"
+expected_output = """
+checksum=2113704757
+sentinels=-4 -3 10 11
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "funptr_static_map_v1"
+source_file = "c/extended/funptr_static_map.c"
+expected_output = """
+checksum=2113704757
+sentinels=-4 -3 10 11
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "funptr_static_map_v2"
+source_file = "c/extended/funptr_static_map.c"
+expected_output = """
+checksum=2113704757
+sentinels=-4 -3 10 11
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "funptr_static_map_v3"
+source_file = "c/extended/funptr_static_map.c"
+expected_output = """
+checksum=2113704757
+sentinels=-4 -3 10 11
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 7 - funptr_heap_minimal
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "funptr_heap_minimal_v0"
+source_file = "c/extended/funptr_heap_minimal.c"
+expected_output = """
+checksum=1649235461
+sentinels=-2 -88 62 112
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "funptr_heap_minimal_v1"
+source_file = "c/extended/funptr_heap_minimal.c"
+expected_output = """
+checksum=1649235461
+sentinels=-2 -88 62 112
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "funptr_heap_minimal_v2"
+source_file = "c/extended/funptr_heap_minimal.c"
+expected_output = """
+checksum=1649235461
+sentinels=-2 -88 62 112
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "funptr_heap_minimal_v3"
+source_file = "c/extended/funptr_heap_minimal.c"
+expected_output = """
+checksum=1649235461
+sentinels=-2 -88 62 112
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 8 - funptr_heap_alias
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "funptr_heap_alias_v0"
+source_file = "c/extended/funptr_heap_alias.c"
+expected_output = """
+checksum=1158918729
+sentinels=1 3 26 30
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "funptr_heap_alias_v1"
+source_file = "c/extended/funptr_heap_alias.c"
+expected_output = """
+checksum=1158918729
+sentinels=1 3 26 30
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "funptr_heap_alias_v2"
+source_file = "c/extended/funptr_heap_alias.c"
+expected_output = """
+checksum=1158918729
+sentinels=1 3 26 30
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "funptr_heap_alias_v3"
+source_file = "c/extended/funptr_heap_alias.c"
+expected_output = """
+checksum=1158918729
+sentinels=1 3 26 30
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 9 - funptr_table_runtime
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "funptr_table_runtime_v0"
+source_file = "c/extended/funptr_table_runtime.c"
+expected_output = """
+checksum=3171147141
+sentinels=1 2 8 9
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "funptr_table_runtime_v1"
+source_file = "c/extended/funptr_table_runtime.c"
+expected_output = """
+checksum=3171147141
+sentinels=1 2 8 9
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "funptr_table_runtime_v2"
+source_file = "c/extended/funptr_table_runtime.c"
+expected_output = """
+checksum=3171147141
+sentinels=1 2 8 9
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "funptr_table_runtime_v3"
+source_file = "c/extended/funptr_table_runtime.c"
+expected_output = """
+checksum=3171147141
+sentinels=1 2 8 9
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 10 - funptr_factory_return
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "funptr_factory_return_v0"
+source_file = "c/extended/funptr_factory_return.c"
+expected_output = """
+checksum=2249736000
+sentinels=-3 4 67 74
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "funptr_factory_return_v1"
+source_file = "c/extended/funptr_factory_return.c"
+expected_output = """
+checksum=2249736000
+sentinels=-3 4 67 74
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "funptr_factory_return_v2"
+source_file = "c/extended/funptr_factory_return.c"
+expected_output = """
+checksum=2249736000
+sentinels=-3 4 67 74
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "funptr_factory_return_v3"
+source_file = "c/extended/funptr_factory_return.c"
+expected_output = """
+checksum=2249736000
+sentinels=-3 4 67 74
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 11 - funptr_qsort_callback
+# NOTE: data-flow protection crashes at runtime (segfault) when callback is
+# invoked from external uninstrumented library code (qsort).
+# -> control-flow-only variants are stable.
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "funptr_qsort_callback_v0"
+source_file = "c/extended/funptr_qsort_callback.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+"""
+aspis_options = "--no-dup --cfcss"
+
+[[tests]]
+test_name = "funptr_qsort_callback_v1"
+source_file = "c/extended/funptr_qsort_callback.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+"""
+aspis_options = "--no-dup --rasm"
+
+# ---------------------------------------------------------------------------
+# 11b - funptr_qsort_callback_mitigation
+# NOTE: callback annotated exclude -> stable even with data-flow protection.
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "funptr_qsort_callback_mitigation_v0"
+source_file = "c/extended/funptr_qsort_callback_mitigation.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "funptr_qsort_callback_mitigation_v1"
+source_file = "c/extended/funptr_qsort_callback_mitigation.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "funptr_qsort_callback_mitigation_v2"
+source_file = "c/extended/funptr_qsort_callback_mitigation.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "funptr_qsort_callback_mitigation_v3"
+source_file = "c/extended/funptr_qsort_callback_mitigation.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 12 - funptr_bsearch_callback
+# NOTE: same “external callback” boundary observed with bsearch.
+# Only control-flow-only variants are stable.
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "funptr_bsearch_callback_v0"
+source_file = "c/extended/funptr_bsearch_callback.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+found=6 idx=6
+"""
+aspis_options = "--no-dup --cfcss"
+
+[[tests]]
+test_name = "funptr_bsearch_callback_v1"
+source_file = "c/extended/funptr_bsearch_callback.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+found=6 idx=6
+"""
+aspis_options = "--no-dup --rasm"
+
+# ---------------------------------------------------------------------------
+# 12b - funptr_bsearch_callback_mitigation
+# NOTE: callback annotated exclude -> stable even with data-flow protection.
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "funptr_bsearch_callback_mitigation_v0"
+source_file = "c/extended/funptr_bsearch_callback_mitigation.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+found=6 idx=6
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "funptr_bsearch_callback_mitigation_v1"
+source_file = "c/extended/funptr_bsearch_callback_mitigation.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+found=6 idx=6
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "funptr_bsearch_callback_mitigation_v2"
+source_file = "c/extended/funptr_bsearch_callback_mitigation.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+found=6 idx=6
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "funptr_bsearch_callback_mitigation_v3"
+source_file = "c/extended/funptr_bsearch_callback_mitigation.c"
+expected_output = """
+checksum=797261938
+sentinels=0 1 8 9
+found=6 idx=6
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 13 - pthread_entry_callback
+# NOTE: entry-point invoked by external runtime (libpthread) -> segfault
+# ---------------------------------------------------------------------------
+# 
+# [[tests]]
+# test_name = "pthread_entry_callback_v0"
+# source_file = "c/extended/pthread_entry_callback.c"
+# expected_output = "EXPECTED_FAIL: segfault at runtime (external entry-point + data-flow)"
+# aspis_options = "--eddi --cfcss"
+# 
+# [[tests]]
+# test_name = "pthread_entry_callback_v1"
+# source_file = "c/extended/pthread_entry_callback.c"
+# expected_output = "EXPECTED_FAIL: segfault at runtime (external entry-point + data-flow)"
+# aspis_options = "--seddi --rasm"
+# 
+# [[tests]]
+# test_name = "pthread_entry_callback_v2"
+# source_file = "c/extended/pthread_entry_callback.c"
+# expected_output = "EXPECTED_FAIL: segfault at runtime (external entry-point + data-flow)"
+# aspis_options = "--fdsc --rasm"
+# 
+# [[tests]]
+# test_name = "pthread_entry_callback_v3"
+# source_file = "c/extended/pthread_entry_callback.c"
+# expected_output = "EXPECTED_FAIL: segfault at runtime (external entry-point + data-flow)"
+# aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 13b - pthread_entry_callback_mitigation
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "pthread_entry_callback_mitigation_v0"
+source_file = "c/extended/pthread_entry_callback_mitigation.c"
+expected_output = """
+checksum=260243592
+sentinels=1 3 13 15
+"""
+aspis_options = "--eddi --cfcss -pthread"
+
+[[tests]]
+test_name = "pthread_entry_callback_mitigation_v1"
+source_file = "c/extended/pthread_entry_callback_mitigation.c"
+expected_output = """
+checksum=260243592
+sentinels=1 3 13 15
+"""
+aspis_options = "--seddi --rasm -pthread"
+
+[[tests]]
+test_name = "pthread_entry_callback_mitigation_v2"
+source_file = "c/extended/pthread_entry_callback_mitigation.c"
+expected_output = """
+checksum=260243592
+sentinels=1 3 13 15
+"""
+aspis_options = "--fdsc --rasm -pthread"
+
+[[tests]]
+test_name = "pthread_entry_callback_mitigation_v3"
+source_file = "c/extended/pthread_entry_callback_mitigation.c"
+expected_output = """
+checksum=260243592
+sentinels=1 3 13 15
+"""
+aspis_options = "--eddi --no-cfc -pthread"
+
+# ---------------------------------------------------------------------------
+# 14 - varargs_sum
+# NOTE: hardening fails at compile-time (invalid LLVM IR) with data-flow passes.
+# ---------------------------------------------------------------------------
+# 
+# [[tests]]
+# test_name = "varargs_sum_v0"
+# source_file = "c/extended/varargs_sum.c"
+# expected_output = "EXPECTED_FAIL: compile-time (LLVM verifier error on varargs signature)"
+# aspis_options = "--eddi --cfcss"
+# 
+# [[tests]]
+# test_name = "varargs_sum_v1"
+# source_file = "c/extended/varargs_sum.c"
+# expected_output = "EXPECTED_FAIL: compile-time (LLVM verifier error on varargs signature)"
+# aspis_options = "--seddi --rasm"
+# 
+# [[tests]]
+# test_name = "varargs_sum_v2"
+# source_file = "c/extended/varargs_sum.c"
+# expected_output = "EXPECTED_FAIL: compile-time (LLVM verifier error on varargs signature)"
+# aspis_options = "--fdsc --rasm"
+# 
+# [[tests]]
+# test_name = "varargs_sum_v3"
+# source_file = "c/extended/varargs_sum.c"
+# expected_output = "EXPECTED_FAIL: compile-time (LLVM verifier error on varargs signature)"
+# aspis_options = "--eddi --no-cfc"
+# 
+# ---------------------------------------------------------------------------
+# 15 - bitfield_packet
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "bitfield_packet_v0"
+source_file = "c/extended/bitfield_packet.c"
+expected_output = """
+checksum=3739283678
+sentinels=0 22 1215 1430
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "bitfield_packet_v1"
+source_file = "c/extended/bitfield_packet.c"
+expected_output = """
+checksum=3739283678
+sentinels=0 22 1215 1430
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "bitfield_packet_v2"
+source_file = "c/extended/bitfield_packet.c"
+expected_output = """
+checksum=3739283678
+sentinels=0 22 1215 1430
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "bitfield_packet_v3"
+source_file = "c/extended/bitfield_packet.c"
+expected_output = """
+checksum=3739283678
+sentinels=0 22 1215 1430
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 16 - memcpy_struct_bulk
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "memcpy_struct_bulk_v0"
+source_file = "c/extended/memcpy_struct_bulk.c"
+expected_output = """
+checksum=1467585440
+sentinels=3 10 89 81
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "memcpy_struct_bulk_v1"
+source_file = "c/extended/memcpy_struct_bulk.c"
+expected_output = """
+checksum=1467585440
+sentinels=3 10 89 81
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "memcpy_struct_bulk_v2"
+source_file = "c/extended/memcpy_struct_bulk.c"
+expected_output = """
+checksum=1467585440
+sentinels=3 10 89 81
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "memcpy_struct_bulk_v3"
+source_file = "c/extended/memcpy_struct_bulk.c"
+expected_output = """
+checksum=1467585440
+sentinels=3 10 89 81
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 17 - signal_flag_handler
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "signal_flag_handler_v0"
+source_file = "c/extended/signal_flag_handler.c"
+expected_output = """
+checksum=839387125
+sentinels=93 81 89 93
+got_signal=1
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "signal_flag_handler_v1"
+source_file = "c/extended/signal_flag_handler.c"
+expected_output = """
+checksum=839387125
+sentinels=93 81 89 93
+got_signal=1
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "signal_flag_handler_v2"
+source_file = "c/extended/signal_flag_handler.c"
+expected_output = """
+checksum=839387125
+sentinels=93 81 89 93
+got_signal=1
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "signal_flag_handler_v3"
+source_file = "c/extended/signal_flag_handler.c"
+expected_output = """
+checksum=839387125
+sentinels=93 81 89 93
+got_signal=1
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 18 - signal_loop_break_volatile
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "signal_loop_break_volatile_v0"
+source_file = "c/extended/signal_loop_break_volatile.c"
+expected_output = """
+checksum=2911428346
+sentinels=1592477752 4188842368 145946737 927160124
+stop_flag=1 iters=201 tick=579148290
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "signal_loop_break_volatile_v1"
+source_file = "c/extended/signal_loop_break_volatile.c"
+expected_output = """
+checksum=2911428346
+sentinels=1592477752 4188842368 145946737 927160124
+stop_flag=1 iters=201 tick=579148290
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "signal_loop_break_volatile_v2"
+source_file = "c/extended/signal_loop_break_volatile.c"
+expected_output = """
+checksum=2911428346
+sentinels=1592477752 4188842368 145946737 927160124
+stop_flag=1 iters=201 tick=579148290
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "signal_loop_break_volatile_v3"
+source_file = "c/extended/signal_loop_break_volatile.c"
+expected_output = """
+checksum=2911428346
+sentinels=1592477752 4188842368 145946737 927160124
+stop_flag=1 iters=201 tick=579148290
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 19 - atomic_fetch_add
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "atomic_fetch_add_v0"
+source_file = "c/extended/atomic_fetch_add.c"
+expected_output = """
+checksum=2887388389
+sentinels=2931447553 1951191220 2572826555 1131159742
+ctr=10000
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "atomic_fetch_add_v1"
+source_file = "c/extended/atomic_fetch_add.c"
+expected_output = """
+checksum=2887388389
+sentinels=2931447553 1951191220 2572826555 1131159742
+ctr=10000
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "atomic_fetch_add_v2"
+source_file = "c/extended/atomic_fetch_add.c"
+expected_output = """
+checksum=2887388389
+sentinels=2931447553 1951191220 2572826555 1131159742
+ctr=10000
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "atomic_fetch_add_v3"
+source_file = "c/extended/atomic_fetch_add.c"
+expected_output = """
+checksum=2887388389
+sentinels=2931447553 1951191220 2572826555 1131159742
+ctr=10000
+"""
+aspis_options = "--eddi --no-cfc"
+
+# ---------------------------------------------------------------------------
+# 20 - mega_ok_domain
+# ---------------------------------------------------------------------------
+
+[[tests]]
+test_name = "mega_ok_domain_v0"
+source_file = "c/extended/mega_ok_domain.c"
+expected_output = """
+checksum=3577851111
+sentinels=1 8 2654436132 2654436026
+facts=3628800 s2d=325 diag=15->25 got_signal=1 iters=201
+"""
+aspis_options = "--eddi --cfcss"
+
+[[tests]]
+test_name = "mega_ok_domain_v1"
+source_file = "c/extended/mega_ok_domain.c"
+expected_output = """
+checksum=3577851111
+sentinels=1 8 2654436132 2654436026
+facts=3628800 s2d=325 diag=15->25 got_signal=1 iters=201
+"""
+aspis_options = "--seddi --rasm"
+
+[[tests]]
+test_name = "mega_ok_domain_v2"
+source_file = "c/extended/mega_ok_domain.c"
+expected_output = """
+checksum=3577851111
+sentinels=1 8 2654436132 2654436026
+facts=3628800 s2d=325 diag=15->25 got_signal=1 iters=201
+"""
+aspis_options = "--fdsc --rasm"
+
+[[tests]]
+test_name = "mega_ok_domain_v3"
+source_file = "c/extended/mega_ok_domain.c"
+expected_output = """
+checksum=3577851111
+sentinels=1 8 2654436132 2654436026
+facts=3628800 s2d=325 diag=15->25 got_signal=1 iters=201
+"""
+aspis_options = "--eddi --no-cfc"
