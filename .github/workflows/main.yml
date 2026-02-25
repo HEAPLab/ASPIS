@@ -21,7 +21,7 @@ jobs:
         if: steps.llvm-cache.outputs.cache-hit != 'true'
         with:
           repository: llvm/llvm-project
-          ref: llvmorg-16.0.6
+          ref: llvmorg-21.1.8
           path: llvm-project
       - name: Compiling LLVM
         if: steps.llvm-cache.outputs.cache-hit != 'true'
@@ -65,5 +65,7 @@ jobs:
         shell: bash
         working-directory: ./ASPIS/testing
         run: |
-           pytest test.py
+           pytest test.py --tests-file config/tests.toml
+           pytest test.py --tests-file config/racfed+eddi.toml
+           pytest test.py --tests-file config/racfed.toml
 
