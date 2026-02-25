@@ -1,0 +1,108 @@
+[[tests]]
+test_name = "racfed_eddi_ml_add"
+source_file = "c/multi_instruction/add.c"
+expected_output = "30"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_ml_function_call"
+source_file = "c/multi_instruction/function.c"
+expected_output = "foo() 25"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_preserve_runtime_sig"
+source_file = "c/multi_instruction/call_less_two.c"
+expected_output = "0"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_ml_if_then_else"
+source_file = "c/multi_instruction/if_then_else.c"
+expected_output = "1001"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_ml_phi_instruction"
+source_file = "c/multi_instruction/phi.c"
+expected_output = "SUCCESS"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_function_pointer"
+source_file = "c/control_flow/function_pointer.c"
+expected_output = "42"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_loop_exit"
+source_file = "c/control_flow/loop_exit.c"
+expected_output = "2"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_n-branch_eddi"
+source_file = "c/control_flow/nested-branch.c"
+expected_output = "6"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_s-branch_eddi"
+source_file = "c/control_flow/simple-branch.c"
+expected_output = "OK"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_s-case_eddi"
+source_file = "c/control_flow/switch-case.c"
+expected_output = "300"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_data_dep_branches"
+source_file = "c/data_duplication_integrity/data_dep_branches.c"
+expected_output = "7"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_global_var_across_functions"
+source_file = "c/data_duplication_integrity/global_var_across_functions.c"
+expected_output = "2"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_misc_data_dup"
+source_file = "c/data_duplication_integrity/misc_data_dup.c"
+expected_output = "OK"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_volatile_io"
+source_file = "c/data_duplication_integrity/volatile_io.c"
+expected_output = "42"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_arit_pipeline"
+source_file = "c/misc_math/arit_pipeline.c"
+expected_output = "3"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_mixed_ops"
+source_file = "c/misc_math/mixed_ops.c"
+expected_output = "14.5"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_eddi_xor_cypher"
+source_file = "c/misc_math/xor_cypher.c"
+expected_output = "SUCCESS"
+aspis_options = "--eddi --racfed"
+
+[[tests]]
+test_name = "racfed_ml_multi_if_else"
+source_file = "c/multi_instruction/multi_if_then_else.c"
+expected_output = "r > 200"
+aspis_options = "--eddi --racfed"
+
