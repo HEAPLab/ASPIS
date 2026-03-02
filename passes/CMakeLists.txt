@@ -7,7 +7,17 @@ add_library(EDDI SHARED
 				FuncRetToRef.cpp
 				Utils/Utils.cpp
 )
-target_compile_definitions(EDDI PRIVATE SELECTIVE_CHECKING=0 CHECK_AT_STORES CHECK_AT_CALLS CHECK_AT_BRANCH)
+target_compile_definitions(EDDI PRIVATE DUPLICATE_ALL SELECTIVE_CHECKING=0 CHECK_AT_STORES CHECK_AT_CALLS CHECK_AT_BRANCH)
+
+# REDDI 
+add_library(REDDI SHARED
+    DuplicateGlobals.cpp
+    EDDI.cpp
+    FuncRetToRef.cpp
+    Utils/Utils.cpp
+)
+target_compile_definitions(REDDI PRIVATE SELECTIVE_CHECKING=0 CHECK_AT_STORES CHECK_AT_CALLS CHECK_AT_BRANCH)
+
 
 # FDSC
 add_library(FDSC SHARED
