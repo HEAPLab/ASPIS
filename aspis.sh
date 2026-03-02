@@ -129,6 +129,7 @@ parse_commands() {
 
     Hardening mechanism:
         --eddi              (Default) Enable EDDI.
+        --reddi             Enable Recursive-EDDI.
         --seddi             Enable Selective-EDDI.
         --fdsc              Enable Full Duplication with Selective Checking.
         --no-dup            Completely disable data duplication.
@@ -200,6 +201,9 @@ EOF
                         ;;
                     --eddi)
                         dup=0
+                        ;;
+                    --reddi)
+                        dup=3
                         ;;
                     --seddi)
                         dup=1
@@ -365,6 +369,9 @@ run_aspis() {
             ;;
         2) 
             exe $OPT -load-pass-plugin=$DIR/build/passes/libFDSC.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
+            ;;
+        3)
+            exe $OPT -load-pass-plugin=$DIR/build/passes/libREDDI.so --passes="eddi-verify" $build_dir/out.ll -o $build_dir/out.ll $eddi_options
             ;;
         *)
             echo -e "\t--no-dup specified!"
