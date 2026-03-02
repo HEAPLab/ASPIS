@@ -1,5 +1,6 @@
 #include "Utils.h"
 
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
@@ -121,44 +122,46 @@ bool shouldCompile(Function &Fn,
       && OriginalFunctions.find(&Fn) == OriginalFunctions.end();
 }
 
-DebugLoc findNearestDebugLoc(Instruction *I) {
+DebugLoc findNearestDebugLoc(Instruction &I) {
   std::list<BasicBlock*> candidates;
-  if (I == nullptr) {
-    return nullptr;
-  }
 
-  if (I->getDebugLoc()) return I->getDebugLoc();
+  Instruction *PrevI = &I;
 
-  auto *PrevI = I->getPrevNonDebugInstruction();
-
-  while (PrevI && (PrevI = PrevI->getPrevNonDebugInstruction())) {
+  while (PrevI != NULL && (PrevI = PrevI->getPrevNonDebugInstruction())) {
     if (auto DL = PrevI->getDebugLoc()) {
       return DL;
     }
   }
 
-  for (auto *U : I->getParent()->users()) {
-    candidates.push_back(cast<Instruction>(U)->getParent());
-  }
-
-  for (auto *BB : candidates) {
-    PrevI = BB->getTerminator();
-    while ((PrevI = PrevI->getPrevNonDebugInstruction())) {
-      if (auto DL = PrevI->getDebugLoc()) {
-        return DL;
-      }
-    }
-    for (auto *U : BB->users()) {
-      if(std::find(candidates.begin(), candidates.end(), cast<Instruction>(U)->getParent()) == candidates.end()) {
-        candidates.push_back(cast<Instruction>(U)->getParent());
-      }
+  for (auto *U : I.getParent()->users()) {
+    if(isa<Instruction>(U)) {
+      candidates.push_back(cast<Instruction>(U)->getParent());
     }
   }
 
-  errs() << "Could not find nearest debug location!\n";
-  errs() << "Instruction: " << *I << "\n";
-  errs() << "In function: \n";
-  errs() << *I->getParent()->getParent() << "\n";
+  std::list<BasicBlock*> newCandidates{candidates};
+  while(!newCandidates.empty()) {
+    candidates = newCandidates;
+    newCandidates.clear();
+    for (auto *BB : candidates) {
+      PrevI = BB->getTerminator();
+      while (PrevI != NULL && (PrevI = PrevI->getPrevNonDebugInstruction(true))) {
+        if (auto DL = PrevI->getDebugLoc()) {
+          return DL;
+        }
+      }
+      for (auto *U : BB->users()) {
+        if(isa<Instruction>(U)) {
+          if(std::find(newCandidates.begin(), newCandidates.end(), cast<Instruction>(U)->getParent()) == newCandidates.end()) {
+            newCandidates.push_back(cast<Instruction>(U)->getParent());
+          }
+        }
+      }
+    }
+  }
+
+  errs() << "Could not find nearest debug location! Aborting compilation.\n";
+  errs() << *I.getParent()->getParent() << "\n";
   return nullptr;
 }
 
@@ -175,8 +178,6 @@ LinkageMap mapFunctionLinkageNames(const Module &M) {
     }
     return linkageMap;
 }
-
-#include "llvm/Support/raw_ostream.h"
 
 void printLinkageMap(const LinkageMap &linkageMap) {
     for (const auto &entry : linkageMap) {
@@ -205,13 +206,32 @@ StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functi
     }
 }
 
-bool isIntrinsicToDuplicate(CallBase *CInstr) {
-        Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
-        if (intrinsicID != Intrinsic::not_intrinsic /* intrinsicID == Intrinsic::memcpy || intrinsicID == Intrinsic::memset */) {
-            return true; 
-        }    
+bool isToDuplicate(CallBase *CInstr) {
+  Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
+  if (intrinsicID != Intrinsic::not_intrinsic) {
+    return true; 
+  } else if(CInstr->getCalledFunction() != NULL && isToDuplicateName(CInstr->getCalledFunction()->getName())) {
+    return true;
+  }
+  
+  return false;
+}
 
-    return false; 
+bool isToDuplicateName(StringRef FnMangledName) {
+  auto FnName = demangle(FnMangledName.str());
+  // outs() << FnName << " " << FnName.find("std::") << "\n";
+  if(FnName.find("operator new") == 0 || FnName.find("std::") != FnName.npos || FnName.find("fmt::") != FnName.npos || FnName.find("Eigen::") != FnName.npos) {
+    // outs() << "duplicated\n";
+
+    if(FnName.find("std::ostream") != FnName.npos || FnName.find("std::basic_ostream") != FnName.npos || FnName.find("std::basic_ios") != FnName.npos || FnName.find("std::basic_ios") != FnName.npos) {
+      // outs() << "not duplicated\n";
+      return false;
+    }
+
+    return true;
+  }
+
+  return false; 
 }
 
 void createFtFunc(Module &Md, StringRef name) {
