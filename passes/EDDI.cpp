@@ -462,7 +462,7 @@ void EDDI::preprocess(Module &Md) {
                 toHardenFunctions.insert(Fn);
                 toAddVariables.insert(U);
               } else {
-                LLVM_DEBUG(errs() << "[REDDI] Indirect Function to harden (called by " << V->getName() << ")\n");
+                errs() << "[REDDI] Indirect Function to harden (called by " << V->getName() << ")\n";
                 // continue;
               }
             } else {
@@ -517,7 +517,7 @@ void EDDI::preprocess(Module &Md) {
                 // LLVM_DEBUG(dbgs() << "[REDDI] Added: " << CalledFn->getName() << "\n");
               }
             } else {
-              // LLVM_DEBUG(errs() << "[REDDI] Indirect Function to harden (called by " << Fn->getName() << ")\n");
+              // errs() << "[REDDI] Indirect Function to harden (called by " << Fn->getName() << ")\n";
               // I.print(errs());
               // errs() << "\n";
             }
@@ -1492,6 +1492,17 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   // store the duplicated functions that are currently in the module
   std::set<Function *> DuplicatedFns;
 
+#ifdef DUPLICATE_ALL
+  // Insert in the set of "duplicated functions" the original "entrypoint" 
+  // function, to protect it "in place" and staring all the execution from 
+  // the Sphere of Replication.
+  if(Function *entryPointFn = Md.getFunction(entryPoint)) {
+    DuplicatedFns.insert(entryPointFn);
+  } else {
+    errs() << "[EDDI] Entry point function not found: " << entryPoint << "\n";
+  }
+#endif
+
   // then duplicate the function arguments using toHardenFunctions
   LLVM_DEBUG(dbgs() << "Creating _dup functions\n");
   for (Function *Fn : toHardenFunctions) {
@@ -1582,7 +1593,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         }
       }
     }
-    LLVM_DEBUG(dbgs() << "[done]\n");
+    LLVM_DEBUG(dbgs() << " [done]\n");
 
     // insert the code for calling the error basic block in case of a mismatch
     CreateErrBB(Md, *Fn, ErrBB);
@@ -1790,14 +1801,16 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   fixGlobalCtors(Md);
 
   // Fixing calls to default handlers
-  LLVM_DEBUG(dbgs() << "Fixing DataCorruptionHandlers\n");
-  auto *DataCorruptionH = Md.getFunction(getLinkageName(linkageMap, "DataCorruption_Handler"));
-  for(User *U : DataCorruptionH->users()) {
-    if(isa<CallBase>(U)) {
-      CallBase *CallI = cast<CallBase>(U);
-      auto dbgLoc = findNearestDebugLoc(*CallI);
-      if(dbgLoc)
-        CallI->setDebugLoc(dbgLoc);
+  if(DebugEnabled){
+    LLVM_DEBUG(dbgs() << "Fixing DataCorruptionHandlers\n");
+    auto *DataCorruptionH = Md.getFunction(getLinkageName(linkageMap, "DataCorruption_Handler"));
+    for(User *U : DataCorruptionH->users()) {
+      if(isa<CallBase>(U)) {
+        CallBase *CallI = cast<CallBase>(U);
+        auto dbgLoc = findNearestDebugLoc(*CallI);
+        if(dbgLoc)
+          CallI->setDebugLoc(dbgLoc);
+      }
     }
   }
 
@@ -1860,17 +1873,18 @@ void EDDI::CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB){
         Instruction *I = cast<Instruction>(U);
         errBranches.push_back(I);
       }
+
       for (Instruction *I : errBranches) {
         ValueToValueMapTy VMap;
         BasicBlock *ErrBBCopy = CloneBasicBlock(ErrBB, VMap);
         ErrBBCopy->insertInto(ErrBB->getParent(), I->getParent());
         // set the debug location to the instruction the ErrBB is related to
         if (DebugEnabled) {
-        for (Instruction &ErrI : *ErrBBCopy) {
-          if (!I->getDebugLoc()) {
-            ErrI.setDebugLoc(findNearestDebugLoc(*Fn.back().getTerminator()));
-          } else {
-            ErrI.setDebugLoc(I->getDebugLoc());
+          for (Instruction &ErrI : *ErrBBCopy) {
+            if (!I->getDebugLoc()) {
+              ErrI.setDebugLoc(findNearestDebugLoc(*Fn.back().getTerminator()));
+            } else {
+              ErrI.setDebugLoc(I->getDebugLoc());
             }
           }
         }
