@@ -40,6 +40,8 @@ class EDDI : public PassInfoMixin<EDDI> {
         std::set<Function*> toHardenFunctions;
         std::set<Value*> toHardenVariables;
         std::set<Value*> DuplicatedCalls;
+
+        std::string entryPoint;
         
         LinkageMap linkageMap;
 
@@ -68,7 +70,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         void fixGlobalCtors(Module &M);
         void fixNonDuplicatedFunctions(Module &Md, std::map<Value *, Value *> DuplicatedInstructionMap, std::set<Function *> DuplicatedFns);
     public:
-        explicit EDDI(bool duplicateAll) : duplicateAll(duplicateAll) {}
+        explicit EDDI(bool duplicateAll, std::string entryPoint = "main") : duplicateAll(duplicateAll), entryPoint(entryPoint) {}
 
         PreservedAnalyses run(Module &M,
                               ModuleAnalysisManager &);
