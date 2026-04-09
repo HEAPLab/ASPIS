@@ -742,3 +742,9 @@ test_name = "xor_cypher_v3"
 source_file = "c/misc_math/xor_cypher.c"
 expected_output = "SUCCESS"
 aspis_options = "--eddi --no-cfc"
+
+[[tests]]
+test_name = "printf_to_duplicate"
+source_file = "c/data_duplication_integrity/printf_to_duplicate.c"
+expected_output = "The string is: Hello WorldThe string is: Hello World"
+aspis_options = "--eddi --no-cfc"

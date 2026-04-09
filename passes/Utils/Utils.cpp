@@ -115,8 +115,8 @@ bool shouldCompile(Function &Fn,
       !Fn.getName().contains("aspis.syncpt")
       // Moreover, it does not have to be marked as excluded or to_duplicate
       && (FuncAnnotations.find(&Fn) == FuncAnnotations.end() || 
-      (!FuncAnnotations.find(&Fn)->second.starts_with("exclude") /* &&
-      !FuncAnnotations.find(&Fn)->second.startswith("to_duplicate") */))
+      (!FuncAnnotations.find(&Fn)->second.starts_with("exclude") &&
+      !FuncAnnotations.find(&Fn)->second.starts_with("to_duplicate")))
       // nor it is one of the original functions
       && OriginalFunctions.find(&Fn) == OriginalFunctions.end();
 }
