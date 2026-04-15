@@ -7,6 +7,7 @@
 #include <llvm/IR/Instructions.h>
 #include <map>
 #include <set>
+#include <unordered_set>
 
 using namespace llvm;
 
@@ -53,6 +54,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         int duplicateInstruction(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
         bool isValueDuplicated(std::map<Value *, Value *> &DuplicatedInstructionMap, Instruction &V);
         Function *duplicateFnArgs(Function &Fn, Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
+        void repairBasicBlock(BasicBlock &BB, std::unordered_set<Instruction *> &ClonedInstructions);
 
     public:
         PreservedAnalyses run(Module &M,
