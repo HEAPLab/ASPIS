@@ -93,6 +93,8 @@ int EDDI::isUsedByStore(Instruction &I, Instruction &Use) {
   return 0;
 }
 
+static std::unordered_set<Instruction *> ClonedInstructions;
+
 /**
  * Clones instruction `I` and adds the pair <I, IClone> to
  * DuplicatedInstructionMap, inserting the clone right after the original.
@@ -113,6 +115,9 @@ EDDI::cloneInstr(Instruction &I,
   } // else place it right after the instruction we are working on
   else {
     IClone->insertAfter(&I);
+    
+    ClonedInstructions.insert(IClone);
+    
   }
   DuplicatedInstructionMap.insert(
       std::pair<Instruction *, Instruction *>(&I, IClone));
@@ -414,7 +419,7 @@ void EDDI::fixFuncValsPassedByReference(
 Function *EDDI::getFunctionDuplicate(Function *Fn) {
   // If Fn ends with "_dup" we have already the duplicated function.
   // If Fn is NULL, it means that we don't have a duplicate
-  if (Fn == NULL || Fn->getName().endswith("_dup")) {
+  if (Fn == NULL || Fn->getName().ends_with("_dup")) {
     return Fn;
   }
 
@@ -432,7 +437,7 @@ Function *EDDI::getFunctionDuplicate(Function *Fn) {
 Function *EDDI::getFunctionFromDuplicate(Function *Fn) {
   // If Fn ends with "_dup" we have already the duplicated function.
   // If Fn is NULL, it means that we don't have a duplicate
-  if (Fn == NULL || !Fn->getName().endswith("_dup")) {
+  if (Fn == NULL || !Fn->getName().ends_with("_dup")) {
     return Fn;
   }
 
@@ -486,8 +491,8 @@ void EDDI::duplicateGlobals(
   for (auto GV : GVars) {
     if (!isa<Function>(GV) &&
         FuncAnnotations.find(GV) != FuncAnnotations.end()) {
-      if ((FuncAnnotations.find(GV))->second.startswith("runtime_sig") ||
-          (FuncAnnotations.find(GV))->second.startswith("run_adj_sig")) {
+      if ((FuncAnnotations.find(GV))->second.starts_with("runtime_sig") ||
+          (FuncAnnotations.find(GV))->second.starts_with("run_adj_sig")) {
         continue;
       }
     }
@@ -505,13 +510,13 @@ void EDDI::duplicateGlobals(
     bool isConstant = GV->isConstant();
     bool isStruct = GV->getValueType()->isStructTy();
     bool isArray = GV->getValueType()->isArrayTy();
-    bool isPointer = GV->getValueType()->isOpaquePointerTy();
-    bool endsWithDup = GV->getName().endswith("_dup");
+    bool isPointer = GV->getValueType()->isPointerTy();
+    bool endsWithDup = GV->getName().ends_with("_dup");
     bool hasExternalLinkage = GV->isExternallyInitialized() || GV->hasExternalLinkage();
     bool isMetadataInfo = GV->getSection() == "llvm.metadata";
     bool toExclude = !isa<Function>(GV) &&
                      FuncAnnotations.find(GV) != FuncAnnotations.end() &&
-                     (FuncAnnotations.find(GV))->second.startswith("exclude");
+                     (FuncAnnotations.find(GV))->second.starts_with("exclude");
     bool isConstStruct = GV->getSection() != "llvm.metadata" && GV->hasInitializer() && isa<ConstantAggregate>(GV->getInitializer());
     bool isStructOfGlobals = false; // is true if and only if the global variable that we are duplicating contains at least a global pointer
     bool isStructOfFunctions = false; // is true if the global variable that we are duplicating contains at least a global pointer, and such global pointer is a function pointer
@@ -579,7 +584,7 @@ void EDDI::duplicateGlobals(
         auto *valueOperand =storeInst->getValueOperand();
         if(isa<CallBase>(valueOperand)){
           CallBase *callInst = cast<CallBase>(valueOperand);
-          if (callInst->getCalledFunction() && callInst->getCalledFunction()->getName().equals("__cxa_begin_catch"))
+          if (callInst->getCalledFunction() && callInst->getCalledFunction()->getName() == "__cxa_begin_catch")
           {return true;}
         }
         
@@ -822,7 +827,7 @@ int EDDI::duplicateInstruction(
     Callee = getFunctionFromDuplicate(Callee);
     // check if the function call has to be duplicated
     if ((FuncAnnotations.find(Callee) != FuncAnnotations.end() &&
-         (*FuncAnnotations.find(Callee)).second.startswith("to_duplicate")) ||
+         (*FuncAnnotations.find(Callee)).second.starts_with("to_duplicate")) ||
         isIntrinsicToDuplicate(CInstr)) {
       // duplicate the instruction
       cloneInstr(*CInstr, DuplicatedInstructionMap);
@@ -950,6 +955,63 @@ EDDI::duplicateFnArgs(Function &Fn, Module &Md,
 }
 
 /**
+ * REPAIR groups all original instructions first, followed by all their
+ * duplicates, producing the coarse-grain order:
+ *     A, B, C, A_dup, B_dup, C_dup
+ *
+ * This layout increases the temporal and spatial distance between a MI/SI
+ * pair. As a result, a single transient fault (SEU) is less likely to
+ * corrupt both the original and its duplicate before a consistency check
+ * can detect the mismatch (improving error-detection coverage for
+ * spatially-correlated faults)
+ *
+ * The function is called after the EDDI duplication phase has already
+ * cloned every eligible instruction and wired up operands. It only moves
+ * instructions;
+ *
+ * @param BB                The basic block whose instructions are to be
+ *                          reordered
+ * @param ClonedInstructions Set of all instructions that were generated by
+ *                          cloneInstr() during the EDDI duplication phase.
+ *                          Membership in this set distinguishes duplicates
+ *                          from originals
+ */
+void EDDI::repairBasicBlock(
+    BasicBlock &BB,
+    std::unordered_set<Instruction *> &ClonedInstructions) {
+
+  // Collect all duplicated instructions in this BB,
+  // preserving their relative order so that data-flow dependencies
+  // among duplicates remain satisfied after the move
+  std::vector<Instruction *> DupsInOrder;
+
+  for (Instruction &I : BB) {
+    // PHINodes must stay at the top of the block (LLVM invariant).
+    // AllocaInsts are kept in the entry block's alloca region.
+    // Terminators (br, ret, switch, …) must remain last.
+    // None of these should be relocated
+    if (isa<PHINode>(&I) || isa<AllocaInst>(&I) || I.isTerminator())
+      continue;
+
+    // If this instruction belongs to the cloned set, it is a duplicate
+    // that needs to be sunk to the bottom of the block
+    if (ClonedInstructions.count(&I))
+      DupsInOrder.push_back(&I);
+  }
+
+  // If there are no duplicates in this block, nothing to reorder
+  if (DupsInOrder.empty())
+    return;
+
+  // Move every duplicate just before the terminator, in their
+  // original relative order
+  Instruction *InsertPt = BB.getTerminator();
+  for (Instruction *Dup : DupsInOrder) {
+    Dup->moveBefore(InsertPt);
+  }
+}
+
+/**
  * I have to duplicate all instructions except function calls and branches
  * @param Md
  * @return
@@ -1037,6 +1099,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       tot_funcs++;
     }
   }
+  ClonedInstructions.clear();
   LLVM_DEBUG(dbgs() << "Iterating over the module functions...\n");
   for (Function &Fn : Md) {
     if (shouldCompile(Fn, FuncAnnotations, OriginalFunctions)) {
@@ -1111,6 +1174,9 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
           }
         }
       }
+      for (BasicBlock &BB : Fn) {
+  repairBasicBlock(BB, ClonedInstructions);
+}
 
       // insert the code for calling the error basic block in case of a mismatch
       IRBuilder<> ErrB(ErrBB);
