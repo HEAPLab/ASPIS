@@ -46,6 +46,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         LinkageMap linkageMap;
 
         bool duplicateAll;
+        bool MultipleErrBBEnabled;
 
         void preprocess(Module &Md);
         void fixDuplicatedConstructors(Module &Md);
@@ -68,9 +69,8 @@ class EDDI : public PassInfoMixin<EDDI> {
         void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
 
         void fixGlobalCtors(Module &M);
-        void fixNonDuplicatedFunctions(Module &Md, std::map<Value *, Value *> DuplicatedInstructionMap, std::set<Function *> DuplicatedFns);
     public:
-        explicit EDDI(bool duplicateAll, std::string entryPoint = "main") : duplicateAll(duplicateAll), entryPoint(entryPoint) {}
+        explicit EDDI(bool duplicateAll, bool MultipleErrBBEnabled = false, std::string entryPoint = "main") : duplicateAll(duplicateAll), MultipleErrBBEnabled(MultipleErrBBEnabled), entryPoint(entryPoint) {}
 
         PreservedAnalyses run(Module &M,
                               ModuleAnalysisManager &);
@@ -135,7 +135,7 @@ class CFCSS : public PassInfoMixin<CFCSS> {
                                  const std::map<BasicBlock *, int> &BBSigs,
                                  std::map<int, BasicBlock *> *NewBBs,
                                  BasicBlock &ErrBB,
-                                 Value *G, Value *D);
+                                 Value *G, Value *D, int NeighborSig);
 
     public:
         PreservedAnalyses run(Module &M,

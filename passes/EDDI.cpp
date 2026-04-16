@@ -1622,11 +1622,13 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         BasicBlock *ErrBB = nullptr;
         bool newErrBB = true;
 
-        // Search pre-existant ErrBB
-        for(BasicBlock &BB : *Fn) {
-          if(BB.getName().starts_with("ErrBB")) {
-            ErrBB = &BB;
-            newErrBB = false; // ErrBB already present
+        // Search pre-existant ErrBB if single basic block error handling is enabled
+        if(!MultipleErrBBEnabled) {
+          for(BasicBlock &BB : *Fn) {
+            if(BB.getName().starts_with("ErrBB")) {
+              ErrBB = &BB;
+              newErrBB = false; // ErrBB already present
+            }
           }
         }
 
@@ -1644,10 +1646,8 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
           GrayAreaCallsToFix.insert(cast<CallBase>(I));
         }
 
-        if(newErrBB) {
-          // insert the code for calling the error basic block in case of a mismatch
-          CreateErrBB(Md, *Fn, ErrBB);
-        }
+        // insert the code for calling the error basic block in case of a mismatch
+        CreateErrBB(Md, *Fn, ErrBB);
       }
     }
   }
@@ -1692,11 +1692,13 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     BasicBlock *ErrBB = nullptr;
     bool newErrBB = true;        
 
-    // Search pre-existant ErrBB
-    for(BasicBlock &BB : *Fn) {
-      if(BB.getName().starts_with("ErrBB")) {
-        ErrBB = &BB;
-        newErrBB = false; // ErrBB already present
+    // Search pre-existant ErrBB if single basic block error handling is enabled
+    if(!MultipleErrBBEnabled) {
+      for(BasicBlock &BB : *Fn) {
+        if(BB.getName().starts_with("ErrBB")) {
+          ErrBB = &BB;
+          newErrBB = false; // ErrBB already present
+        }
       }
     }
 
@@ -1761,11 +1763,8 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       }
     }
 
-
-    if(newErrBB) {
-      // insert the code for calling the error basic block in case of a mismatch
-      CreateErrBB(Md, *Fn, ErrBB);
-    }
+    // insert the code for calling the error basic block in case of a mismatch
+    CreateErrBB(Md, *Fn, ErrBB);
   }
 
   LLVM_DEBUG(dbgs() << "Fixing invokes\n");
@@ -1806,10 +1805,11 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     auto *DataCorruptionH = Md.getFunction(getLinkageName(linkageMap, "DataCorruption_Handler"));
     for(User *U : DataCorruptionH->users()) {
       if(isa<CallBase>(U)) {
-        CallBase *CallI = cast<CallBase>(U);
-        auto dbgLoc = findNearestDebugLoc(*CallI);
-        if(dbgLoc)
-          CallI->setDebugLoc(dbgLoc);
+        if(auto *CallI = cast<CallBase>(U)) {
+          if(auto dbgLoc = findNearestDebugLoc(*CallI)) {
+            CallI->setDebugLoc(dbgLoc);
+          }
+        }
       }
     }
   }
@@ -1826,72 +1826,121 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   return PreservedAnalyses::none();
 }
 
-/**
- * @brief Fix all calls to duplicated funcitons or original functions, calling the relative _dup or _original version
- */
-void EDDI::fixNonDuplicatedFunctions(Module &Md, std::map<Value *, Value *> DuplicatedInstructionMap, std::set<Function *> DuplicatedFns){
-  for(auto &Fn : Md){
-    for(auto &B : Fn){
-      for(auto &I : B){
-        if(isa<CallBase>(I) ){
-          CallBase &ICall = cast<CallBase>(I);
-          Function *calledFn = ICall.getCalledFunction();
+Instruction *getSingleReturnInst(Function &F) {
+  for (BasicBlock &BB : F) {
+    if (auto *retInst = llvm::dyn_cast<llvm::ReturnInst>(BB.getTerminator())) {
+      return retInst;
+    }
+  }
+  return nullptr;
+}
 
-          if(DuplicatedFns.find(calledFn) !=  DuplicatedFns.end()){
-            // If duplicated function call the _dup variant
-            BasicBlock *ErrBB = BasicBlock::Create(Fn.getContext(), "ErrBB", &Fn);
-            duplicateInstruction(I, DuplicatedInstructionMap, *ErrBB);
-            CreateErrBB(Md, Fn, ErrBB);
-          } else {
-            if (calledFn != NULL && calledFn->hasName()) {
-              Function *OriginalFn = Md.getFunction(calledFn->getName().str() + "_original");
-              if (OriginalFn != NULL) {
-                ICall.setCalledFunction(OriginalFn);
+void EDDI::CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB){
+  if(ErrBB->getNumUses() == 0) {
+    ErrBB->eraseFromParent();
+    return;
+  }
+
+  IRBuilder<> ErrB(ErrBB);
+
+  assert(!getLinkageName(linkageMap, "DataCorruption_Handler").empty() &&
+          "Function DataCorruption_Handler is missing!");
+  auto CalleeF = ErrBB->getModule()->getOrInsertFunction(
+      getLinkageName(linkageMap, "DataCorruption_Handler"),
+      FunctionType::getVoidTy(Md.getContext()));
+
+  auto *CallI = ErrB.CreateCall(CalleeF);
+
+  if(MultipleErrBBEnabled) {
+    // Insert one error block for each consistency check so that a specific 
+    // recovery and continuation is possible
+
+    std::list<Instruction *> errBranches;
+    for (User *U : ErrBB->users()) {
+      Instruction *I = cast<Instruction>(U);
+      errBranches.push_back(I);
+    }
+
+    // For each consistency check branch to the ErrBB, we create a new 
+    // error block which jumps, at the end, to the normal continuation
+    for (Instruction *I : errBranches) {
+      ValueToValueMapTy VMap;
+      BasicBlock *ErrBBCopy = CloneBasicBlock(ErrBB, VMap);
+      ErrBBCopy->insertInto(ErrBB->getParent(), I->getParent());
+
+      BasicBlock *NormalContinuation = nullptr;
+      if (isa<BranchInst>(I)) {
+        BranchInst *BI = cast<BranchInst>(I);
+        if (BI->isConditional()) {
+          NormalContinuation = BI->getSuccessor(0) == ErrBB ?
+              BI->getSuccessor(1) : BI->getSuccessor(0);
+        }
+      } else if (isa<InvokeInst>(I)) {
+        InvokeInst *II = cast<InvokeInst>(I);
+        NormalContinuation = II->getNormalDest();
+      }
+
+      if (NormalContinuation) {
+        IRBuilder<> ErrBCopy(ErrBBCopy);
+        auto *BrInst = ErrBCopy.CreateBr(NormalContinuation);
+        if (DebugEnabled) {
+          BrInst->setDebugLoc(I->getDebugLoc());
+        }
+      } else {
+        errs() << "Error: consistency check without a normal continuation! " << *I << "\n";
+        IRBuilder<> ErrBCopy(ErrBBCopy);
+        ErrBCopy.CreateUnreachable();
+      }
+
+      I->replaceSuccessorWith(ErrBB, ErrBBCopy);
+    }
+    ErrBB->eraseFromParent();
+
+    if (DebugEnabled) {
+      for (Instruction *I : errBranches) {
+        auto *ErrBB = I->getSuccessor(1);
+        // set the debug location to the instruction the ErrBB is related to
+        for (Instruction &ErrI : *ErrBB) {
+          if (!I->getDebugLoc()) {
+            if(Fn.back().getTerminator()) {
+              if(auto DL = findNearestDebugLoc(*Fn.back().getTerminator())) {
+                ErrI.setDebugLoc(DL);
+              }
+            } else if(Fn.back().getPrevNode()->getTerminator()) {
+              // In some cases, the last block of the function may not have a terminator (e.g., an incomplete ErrBB),
+              // so we check the previous block's terminator as well
+              if(auto DL = findNearestDebugLoc(*Fn.back().getPrevNode()->getTerminator())) {
+                ErrI.setDebugLoc(DL);
               }
             }
+          } else {
+            ErrI.setDebugLoc(I->getDebugLoc());
+          }
+        }
+      }
+    }
+  } else {
+    // Leave just one error block for all consistency checks to minimize code size
+    ErrB.CreateUnreachable();
+    
+    if (DebugEnabled) {
+      for (Instruction &ErrI : *ErrBB) {
+        if(auto retInst = getSingleReturnInst(Fn)) {
+          auto DL = findNearestDebugLoc(*retInst);
+          if (!DL && Fn.back().getTerminator()) {
+            DL = findNearestDebugLoc(*Fn.back().getTerminator());
+          }
+
+          if(DL) {
+            ErrI.setDebugLoc(DL);
+          } else {
+            errs() << "Warning: no debug location found for error block in function " << Fn.getName() << "\n";
           }
         }
       }
     }
   }
 }
-
-void EDDI::CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB){
-      IRBuilder<> ErrB(ErrBB);
-
-      assert(!getLinkageName(linkageMap, "DataCorruption_Handler").empty() &&
-             "Function DataCorruption_Handler is missing!");
-      auto CalleeF = ErrBB->getModule()->getOrInsertFunction(
-          getLinkageName(linkageMap, "DataCorruption_Handler"),
-          FunctionType::getVoidTy(Md.getContext()));
-
-      auto *CallI = ErrB.CreateCall(CalleeF);
-      ErrB.CreateUnreachable();
-
-      std::list<Instruction *> errBranches;
-      for (User *U : ErrBB->users()) {
-        Instruction *I = cast<Instruction>(U);
-        errBranches.push_back(I);
-      }
-
-      for (Instruction *I : errBranches) {
-        ValueToValueMapTy VMap;
-        BasicBlock *ErrBBCopy = CloneBasicBlock(ErrBB, VMap);
-        ErrBBCopy->insertInto(ErrBB->getParent(), I->getParent());
-        // set the debug location to the instruction the ErrBB is related to
-        if (DebugEnabled) {
-          for (Instruction &ErrI : *ErrBBCopy) {
-            if (!I->getDebugLoc()) {
-              ErrI.setDebugLoc(findNearestDebugLoc(*Fn.back().getTerminator()));
-            } else {
-              ErrI.setDebugLoc(I->getDebugLoc());
-            }
-          }
-        }
-        I->replaceSuccessorWith(ErrBB, ErrBBCopy);
-      }
-      ErrBB->eraseFromParent();
-    }
 
 void EDDI::fixGlobalCtors(Module &M) {
   LLVMContext &Context = M.getContext();
@@ -1981,9 +2030,9 @@ llvm::PassPluginLibraryInfo getEDDIPluginInfo() {
                    ArrayRef<PassBuilder::PipelineElement>) {
                   if (Name == "eddi-verify") {
 #ifdef DUPLICATE_ALL
-                    FPM.addPass(EDDI(true));
+                    FPM.addPass(EDDI(true, true));
 #else
-                    FPM.addPass(EDDI(false));
+                    FPM.addPass(EDDI(false, true));
 #endif
                     return true;
                   }
