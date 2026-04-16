@@ -123,9 +123,19 @@ bool shouldCompile(Function &Fn,
 }
 
 DebugLoc findNearestDebugLoc(Instruction &I) {
+  // Safety check: ensure the instruction has a valid parent
+  if (!I.getParent()) {
+    errs() << "Instruction has no valid parent basic block. Returning null debug location.\n";
+    return nullptr;
+  }
+
   std::list<BasicBlock*> candidates;
 
   Instruction *PrevI = &I;
+
+  if(I.getDebugLoc()) {
+    return I.getDebugLoc();
+  }
 
   while (PrevI != NULL && (PrevI = PrevI->getPrevNonDebugInstruction())) {
     if (auto DL = PrevI->getDebugLoc()) {
@@ -133,9 +143,11 @@ DebugLoc findNearestDebugLoc(Instruction &I) {
     }
   }
 
-  for (auto *U : I.getParent()->users()) {
-    if(isa<Instruction>(U)) {
-      candidates.push_back(cast<Instruction>(U)->getParent());
+  if(I.getParent()) {
+    for (auto *U : I.getParent()->users()) {
+      if(isa<Instruction>(U)) {
+        candidates.push_back(cast<Instruction>(U)->getParent());
+      }
     }
   }
 
