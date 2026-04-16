@@ -1,13 +1,17 @@
 #include <iostream>
 #include <cstdlib>
 
-void DataCorruption_Handler() {
-    std::cerr << "Errore ASPIS: Data corruption rilevata\n";
-    std::exit(1);
-}
-void SigMismatch_Handler() {
-    std::cerr << "Errore ASPIS: Signature mismatch rilevata\n";
-    std::exit(1);
+extern "C" {
+    // ASPIS error handling functions
+    void DataCorruption_Handler() {
+        std::cerr << "Errore ASPIS: Data corruption detected\n";
+        std::exit(EXIT_FAILURE);
+    }
+
+    void SigMismatch_Handler() {
+        std::cerr << "Errore ASPIS: Signature mismatch detected\n";
+        std::exit(EXIT_FAILURE);
+    }
 }
 
 int multiply(int a, int b)

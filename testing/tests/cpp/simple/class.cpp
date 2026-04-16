@@ -2,12 +2,13 @@
 #include <cstdlib>
 
 // Gestori di errore ASPIS
+extern "C"
 void DataCorruption_Handler() {
-    std::cerr << "Errore ASPIS: Data corruption rilevata\n";
+    std::cerr << "Errore ASPIS: Data corruption detected\n";
     std::exit(1);
 }
 void SigMismatch_Handler() {
-    std::cerr << "Errore ASPIS: Signature mismatch rilevata\n";
+    std::cerr << "Errore ASPIS: Signature mismatch detected\n";
     std::exit(1);
 }
 
