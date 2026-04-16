@@ -1,14 +1,17 @@
 #include <iostream>
 
 // ASPIS error handlers (non-duplicated)
-__attribute__((no_duplicate))
-void DataCorruption_Handler() {
-    std::cerr << "ASPIS error: Data corruption detected\n";
-}
+extern "C" {
+    // ASPIS error handling functions
+    void DataCorruption_Handler() {
+        std::cerr << "Errore ASPIS: Data corruption detected\n";
+        std::exit(EXIT_FAILURE);
+    }
 
-__attribute__((no_duplicate))
-void SigMismatch_Handler() {
-    std::cerr << "ASPIS error: Signature mismatch detected\n";
+    void SigMismatch_Handler() {
+        std::cerr << "Errore ASPIS: Signature mismatch detected\n";
+        std::exit(EXIT_FAILURE);
+    }
 }
 
 // Print function (non-duplicated)
