@@ -130,6 +130,11 @@ std::set<Function *> EDDI::getVirtualMethodsFromConstructor(Function *Fn) {
   // Get all the virtual methods
   if(vtable) {
     // Ensure the vtable global variable has an initializer
+    if(!vtable->hasInitializer()) {
+      errs() << "Vtable does not have an initializer.\n";
+      return virtualMethods;
+    }
+
     Constant *Initializer = vtable->getInitializer();
     if (!Initializer || !isa<ConstantStruct>(Initializer)) {
       errs() << "Vtable initializer is not a ConstantStruct.\n";
@@ -661,6 +666,17 @@ void EDDI::duplicateOperands(
           IClone->setOperand(J, CloneGEPOperand);
         }
       }
+    } else if (isa<Function>(V)) {
+      // if the operand is a function we need to set the duplicate function as
+      // operand of the clone instruction
+      Function *FnOperand = cast<Function>(V);
+      auto DuplicateFn = getFunctionDuplicate(FnOperand);
+      if (DuplicateFn != NULL) {
+        I.setOperand(J, DuplicateFn);
+        if (IClone != NULL) {
+          IClone->setOperand(J, DuplicateFn);
+        }
+      }
     }
 
     if (IClone != NULL) {
@@ -738,6 +754,11 @@ Value *EDDI::comparePtrs(Value &V1, Value &V2, IRBuilder<> &B) {
 void EDDI::addConsistencyChecks(
     Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap,
     BasicBlock &ErrBB) {
+
+  if(InstructionsToRemove.find(&I) != InstructionsToRemove.end()) {
+    return ;
+  }
+
   std::vector<Value *> CmpInstructions;
 
   // split and add the verification BB
@@ -749,6 +770,19 @@ void EDDI::addConsistencyChecks(
   auto BI = cast<BranchInst>(BBpred->getTerminator());
   BI->setSuccessor(0, VerificationBB);
   IRBuilder<> B(VerificationBB);
+
+  // if the instruction is a call with indirect function, we try to get a compare
+  if(isa<CallBase>(I) && cast<CallBase>(I).isIndirectCall()) {
+    auto Duplicate = DuplicatedInstructionMap.find(cast<CallBase>(I).getCalledOperand());
+    if (Duplicate != DuplicatedInstructionMap.end()) {
+      Value *Original = Duplicate->first;
+      Value *Copy = Duplicate->second;
+      if (Original->getType()->isIntOrIntVectorTy() || Original->getType()->isPtrOrPtrVectorTy()) {
+        // DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, &I));
+        CmpInstructions.push_back(B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
+      }
+    }
+  }
 
   // add a comparison for each operand
   for (Value *V : I.operand_values()) {
@@ -1063,6 +1097,9 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
     }
   }
 
+  Instruction *NewCInstr = nullptr;
+  IRBuilder<> CallBuilder(CInstr);
+
   // In case of duplication of an indirect call, call the function with doubled parameters
   if (Callee == NULL) {
     // Create the new function type
@@ -1070,11 +1107,9 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
     FunctionType *FuncType = FunctionType::get(ReturnType, ParamTypes, false);
 
     // Create a dummy function pointer (Fn) for the new call
-    IRBuilder<> CallBuilder(CInstr);
     Value *Fn = CallBuilder.CreateBitCast(CInstr->getCalledOperand(), FuncType->getPointerTo());
 
     // Create the new call or invoke instruction
-    Instruction *NewCInstr;
     if (isa<InvokeInst>(CInstr)) {
       InvokeInst *IInst=cast<InvokeInst>(CInstr);
       NewCInstr = CallBuilder.CreateInvoke(
@@ -1111,8 +1146,6 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
     // Remove original instruction since we created the duplicated version
     res = 1;
   } else {
-    Instruction *NewCInstr;
-    IRBuilder<> CallBuilder(CInstr);
     if (isa<InvokeInst>(CInstr)) {
       InvokeInst *IInst=cast<InvokeInst>(CInstr);
       NewCInstr = CallBuilder.CreateInvoke(Fn->getFunctionType(), Fn,IInst->getNormalDest(),IInst->getUnwindDest(), args);
@@ -1125,6 +1158,10 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
     }
     res = 1;
     CInstr->replaceNonMetadataUsesWith(NewCInstr);
+  }
+
+  if(NewCInstr) {
+    DuplicatedCalls.insert(NewCInstr);
   }
 
   return res;
