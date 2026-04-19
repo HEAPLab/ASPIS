@@ -4,10 +4,10 @@ This directory contains utilities and scripts for testing ASPIS.
 
 ## Local Testing
 
-For local testing, use the `test.py` script. Configure your tests using `tests.toml`. Configure the llvm_bin flag in `llvm_bin.toml`.
+For local testing, use the `test.py` script. Configure your tests using `complete_testing.toml`. Configure the llvm_bin flag in `llvm_bin.toml`.
 Then run:
 ```bash
-pytest test.py
+pytest test.py --no-header -v
 ```
 
 > To run pytest the modules listed in requirements.txt must be installed.
@@ -26,11 +26,11 @@ Test config files must be `.toml` files with the following structure for each te
 [[tests]]
 test_name = <name_for_test>
 source_file = <relative_path_to_src_file>
-expected_output = <output_expected>
-aspis_options = <compilation_flags>
 ```
 
 > `<relative_path_to_src_file>` is a relative path from `./tests/` folder 
+
+All the combinations of ASPIS protection mechanisms will be used for each different test.
 
 ### Flags
 
