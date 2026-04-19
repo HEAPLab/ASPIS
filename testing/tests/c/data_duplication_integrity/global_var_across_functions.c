@@ -4,7 +4,8 @@
 
 #include <stdio.h>
 
-int __attribute__((annotate("to_duplicate"))) g = 0;
+__attribute__((annotate("to_harden")))
+int g = 0;
 
 void increment() {
     g += 1;

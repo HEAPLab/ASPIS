@@ -12,7 +12,7 @@ void DataCorruption_Handler(void) {}
 void SigMismatch_Handler(void) {}
 
 // Global key
-__attribute__((annotate("to_duplicate")))
+__attribute__((annotate("to_harden")))
 unsigned char key = 0x5A;
 
 // Encrypt/decrypt function
@@ -21,7 +21,7 @@ unsigned char xor_crypt(unsigned char data, unsigned char k) {
 }
 
 // Process buffer function
-__attribute__((annotate("to_duplicate")))
+__attribute__((annotate("to_harden")))
 void process_buffer(unsigned char *buf, size_t len, unsigned char k) {
     for (size_t i = 0; i < len; i++) {
         buf[i] = xor_crypt(buf[i], k);
