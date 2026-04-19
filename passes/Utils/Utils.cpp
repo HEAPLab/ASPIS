@@ -240,6 +240,20 @@ bool isToDuplicateName(StringRef FnMangledName) {
       return false;
     }
 
+    if(FnName.find("std::thread") != FnName.npos) {
+      return false;
+    }
+
+    return true;
+  }
+
+  return false; 
+}
+
+bool isToExcludeName(StringRef FnMangledName) {
+  auto FnName = demangle(FnMangledName.str());
+
+  if(FnName.find("std::thread") != FnName.npos) {
     return true;
   }
 

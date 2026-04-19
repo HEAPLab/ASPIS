@@ -204,7 +204,7 @@ void EDDI::fixDuplicatedConstructors(Module &Md) {
     }
 
     // Duplicate vtable
-    if(vtable) {
+    if(vtable && vtable->hasInitializer()) {
       // Ensure the vtable global variable has an initializer
       Constant *Initializer = vtable->getInitializer();
       if (!Initializer || !isa<ConstantStruct>(Initializer)) {
@@ -1264,6 +1264,11 @@ int EDDI::duplicateInstruction(
     // order to tell the pass to duplicate the function call.
     Function *Callee = CInstr->getCalledFunction();
     Callee = getFunctionFromDuplicate(Callee);
+
+    if(CInstr->getCalledFunction() != NULL && isToExcludeName(CInstr->getCalledFunction()->getName())) {
+      return 0;
+    }
+
     // check if the function call has to be duplicated
     if ((FuncAnnotations.find(Callee) != FuncAnnotations.end() && FuncAnnotations.find(Callee)->second.starts_with("to_duplicate")) ||
         isToDuplicate(CInstr)) {
