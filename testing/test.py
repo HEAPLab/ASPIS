@@ -1,6 +1,8 @@
 import os
 import subprocess
 import pytest
+
+import pytest_timeout
 import tomllib
 
 # Default configurations
@@ -10,6 +12,9 @@ TEST_DIR = "./tests"  # Directory containing the test cases
 DOCKER_SHARED_VOLUME = "/workspace/ASPIS/tmp"
 LOCAL_SHARED_VOLUME = "./tests/"
 DOCKER_COMPOSE_FILE = "../docker/docker-compose.yml"
+
+data_techniques = ["--no-dup", "--eddi", "--seddi", "--fdsc"] # "--reddi"
+cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm", "--racfed"] #"--inter-rasm"]
 
 # Load the test configuration
 def load_config():
@@ -29,6 +34,16 @@ def run_command(command, cwd=None):
 def compile_with_aspis(source_file, output_file, options, llvm_bin, build_dir):
   """Compile a file using ASPIS with specified options."""
   command = f"{ASPIS_SCRIPT} --llvm-bin {llvm_bin} {options} {source_file} -o {output_file}.out --build-dir ./{build_dir} --verbose"
+  print(command)
+  stdout, stderr, exit_code = run_command(command)
+  if exit_code != 0:
+    raise RuntimeError(f"[{output_file}] Compilation failed: {stderr}")
+  return stdout
+
+# Compile without ASPIS to get expected output
+def compile_without_aspis(source_file, output_file, llvm_bin, build_dir):
+  """Compile a file without ASPIS."""
+  command = f"{llvm_bin}/clang++ {source_file} -o {build_dir}/{output_file}.out --verbose"
   print(command)
   stdout, stderr, exit_code = run_command(command)
   if exit_code != 0:
@@ -59,15 +74,18 @@ def pytest_generate_tests(metafunc):
             ids = [t.get("test_name", str(i)) for i, t in enumerate(test_list)]
 
         metafunc.parametrize("test_data", test_list, ids=ids)
+    
 # Tests
-def test_aspis(test_data, use_container, aspis_addopt):
+@pytest.mark.timeout(60) # Set a timeout of 60 seconds for each test
+@pytest.mark.parametrize("data_technique", data_techniques)
+@pytest.mark.parametrize("cfc_technique", cfc_techniques)
+def test_aspis(test_data, use_container, aspis_addopt, data_technique, cfc_technique):
   """Run a single ASPIS test."""
   config = load_config()
   llvm_bin = config["llvm_bin"]
   test_name = test_data["test_name"]
   source_file = test_data["source_file"]
-  aspis_options = aspis_addopt + " " + test_data["aspis_options"]
-  expected_output = test_data["expected_output"]
+
   # use docker compose rather than ASPIS if --use-container is set
   if use_container:
     ASPIS_SCRIPT = f"docker compose -f {DOCKER_COMPOSE_FILE} run --rm aspis_runner"
@@ -78,14 +96,28 @@ def test_aspis(test_data, use_container, aspis_addopt):
     docker_build_dir = "./build/test/"+test_name
     local_build_dir = "./build/test/"+test_name
 
+  # Create build directory if it doesn't exist
+  os.makedirs(local_build_dir, exist_ok=True)
+
   source_path = os.path.join(TEST_DIR, source_file)
+  if not os.path.exists(docker_build_dir + "/" + test_name + ".out"):
+    print("Compiling without ASPIS to get expected output...")
+    compile_without_aspis(source_path, test_name, llvm_bin, docker_build_dir)
+
+  print("Executing binary compiled without ASPIS...")
+  expected_output = execute_binary(local_build_dir, test_name)
+  print(f"Expected output: {expected_output}")
+
+  aspis_options = aspis_addopt + " " + data_technique + " " + cfc_technique
+
+  test_name_complete = f"{test_name}_{data_technique}_{cfc_technique}"
 
   # Compile the source file
-  compile_with_aspis(source_path, test_name, aspis_options, llvm_bin, docker_build_dir)
+  compile_with_aspis(source_path, test_name_complete, aspis_options, llvm_bin, docker_build_dir)
 
   # Execute the binary and check output
-  result = execute_binary(local_build_dir, test_name)
-  assert result == expected_output, f"Test {test_name} failed: {result}"
+  result = execute_binary(local_build_dir, test_name_complete)
+  assert result == expected_output, f"Test {test_name_complete} failed: {result}"
 
 if __name__ == "__main__":
   pytest.main()
