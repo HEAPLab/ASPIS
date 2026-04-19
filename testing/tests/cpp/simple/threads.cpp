@@ -13,13 +13,13 @@ __attribute__((annotate("run_adj_sig")))
 thread_local int run_adj_sig = -0xDEAD;
 
 // ASPIS error handlers
-extern "C" __attribute__((no_duplicate))
+extern "C"
 void DataCorruption_Handler() {
     std::cerr << "ASPIS error: Data corruption detected\n";
     std::exit(EXIT_FAILURE);
 }
 
-extern "C" __attribute__((no_duplicate))
+extern "C"
 void SigMismatch_Handler() {
     std::cerr << "ASPIS error: Signature mismatch detected\n";
     std::exit(EXIT_FAILURE);
@@ -27,8 +27,6 @@ void SigMismatch_Handler() {
 
 std::atomic<int> counter{0};
 
-// Worker function marked as non-duplicable due to atomic update
-__attribute__((no_duplicate))
 void worker(int times) {
     int local_count = 0;
     for (int i = 0; i < times; ++i) {
@@ -37,8 +35,6 @@ void worker(int times) {
     counter.fetch_add(local_count, std::memory_order_relaxed);
 }
 
-// Thread launching logic is marked non-duplicable
-__attribute__((no_duplicate))
 void run_all_threads(int num_threads, int work_per_thread) {
     for (int i = 0; i < num_threads; ++i) {
         std::thread t(worker, work_per_thread);

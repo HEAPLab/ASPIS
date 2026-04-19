@@ -15,7 +15,7 @@ extern "C" {
 }
 
 // Print function (non-duplicated)
-__attribute__((no_duplicate))
+__attribute__((annotate("exclude")))
 void printResult(int value) {
     std::cout << "Result: " << value << std::endl;
 }

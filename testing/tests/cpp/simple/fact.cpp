@@ -1,12 +1,12 @@
 #include <iostream>
 
-extern "C" __attribute__((no_duplicate))
+extern "C"
 void DataCorruption_Handler() {
     std::cerr << "ASPIS error: Data corruption detected\n";
     std::exit(EXIT_FAILURE);
 }
 
-extern "C" __attribute__((no_duplicate))
+extern "C"
 void SigMismatch_Handler() {
     std::cerr << "ASPIS error: Signature mismatch detected\n";
     std::exit(EXIT_FAILURE);

@@ -7,7 +7,7 @@
 void DataCorruption_Handler(void) {}
 void SigMismatch_Handler(void) {}
 
-__attribute__((annotate("to_duplicate")))
+__attribute__((annotate("to_harden")))
 int duplicated_global = 100;
 
 __attribute__((annotate("exclude")))
@@ -17,7 +17,7 @@ int increment(int x) {
     return x + 1;
 }
 
-__attribute__((annotate("to_duplicate")))
+__attribute__((annotate("to_harden")))
 int multiply_by_two(int x) {
     return x * 2;
 }

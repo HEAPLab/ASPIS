@@ -2,13 +2,13 @@
 #include <cstdlib>
 
 // ASPIS handlers
-extern "C" __attribute__((no_duplicate))
+extern "C"
 void DataCorruption_Handler() {
     std::cerr << "Data corruption detected" << std::endl;
     std::exit(EXIT_FAILURE);
 }
 
-extern "C" __attribute__((no_duplicate))
+extern "C"
 void SigMismatch_Handler() {
     std::cerr << "Signature mismatch detected" << std::endl;
     std::exit(EXIT_FAILURE);

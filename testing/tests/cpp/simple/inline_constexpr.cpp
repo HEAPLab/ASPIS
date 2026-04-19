@@ -14,8 +14,6 @@ extern "C" {
     }
 }
 
-// Print function (non-duplicated)
-__attribute__((no_duplicate))
 void printResult(int value) {
     std::cout << value << std::endl;
 }

@@ -16,8 +16,13 @@ extern "C" {
 
 // Executes a function/lambda in a non-duplicated context
 template <typename F>
-__attribute__((no_duplicate))
+__attribute__((annotate("exclude")))  // Marked as non-duplicable
 void runNoDup(F func) {
+    func();
+}
+
+template <typename F>
+void run(F func) {
     func();
 }
 
@@ -36,6 +41,8 @@ int main() {
         (*p)++;
     };
     runNoDup(incPtr);  // non-duplicated increment of shared memory
+
+    run(incPtr);  // duplicated increment of shared memory
 
     std::cout << "Value pointed by p: " << *p << std::endl;
     delete p;
