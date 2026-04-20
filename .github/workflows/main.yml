@@ -1,4 +1,13 @@
 name: ASPIS main CI
+env:
+  LLVM_COMMIT: 2078da43e25a4623cab2d0d60decddf709aaea28 # llvmorg-21.1.8
+  CMAKE_VERSION: 4.3.0
+  MOLD_LINKER_FLAGS: -fuse-ld=mold
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 10G
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  CCACHE_COMPILERCHECK: content
+  CCACHE_NOHASHDIR: "true"
 on: [push]
 jobs:
   compile-ASPIS:
@@ -8,62 +17,73 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: ASPIS
-      - name: Cache LLVM build
-        uses: actions/cache@v4
-        id: llvm-cache
-        with:
-          path: /mnt/build/
-          key: llvm-build-${{ hashFiles('llvm-project/**', 'ASPIS/CMakeLists.txt') }}
-          restore-keys: |
-            llvm-build-
-      - name: Checking out LLVM project
-        uses: actions/checkout@master
-        if: steps.llvm-cache.outputs.cache-hit != 'true'
-        with:
-          repository: llvm/llvm-project
-          ref: llvmorg-21.1.8
-          path: llvm-project
-      - name: Compiling LLVM
-        if: steps.llvm-cache.outputs.cache-hit != 'true'
-        shell: bash
-        working-directory: ./llvm-project
+      
+      - name: Install system dependencies
         run: |
-           builddir="/mnt/build/"
-           sudo mkdir -p $builddir
-           sudo chmod 777 $builddir
-           cmake -G Ninja \
-                -B "$builddir" \
-                -S llvm \
-                -DLLVM_ENABLE_PROJECTS="clang" \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DLLVM_ENABLE_ASSERTIONS=OFF \
-                -DLLDB_INCLUDE_TESTS=OFF \
-                -DLIBCLC_TARGETS_TO_BUILD="RISCV;X86"
-           cmake --build "$builddir"
+          sudo apt update
+          sudo apt install -y cmake ninja-build build-essential mold curl ca-certificates ccache
+
+      - name: Prepare LLVM Cache
+        uses: ./ASPIS/.github/actions/prepare-llvm-cache
+        with:
+          llvm-commit: ${{ env.LLVM_COMMIT }}
+
+      - name: Restore ccache
+        id: restore-ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.ref_name }}-${{ env.LLVM_COMMIT }}-${{ env.CMAKE_VERSION }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.ref_name }}-${{ env.LLVM_COMMIT }}-${{ env.CMAKE_VERSION }}-
+            ccache-${{ runner.os }}-${{ env.LLVM_COMMIT }}-${{ env.CMAKE_VERSION }}-
+
       - name: Compiling ASPIS
         shell: bash
-        working-directory: ./ASPIS
+        working-directory: ${{ github.workspace }}/ASPIS
         run: |
-           mkdir build
-           cmake -B build -DLLVM_DIR=/mnt/build/lib/cmake/llvm/
-           cmake --build build
+          ccache --set-config=max_size=${CCACHE_MAXSIZE}
+          ccache --zero-stats
+          ccache --show-config
+          ccache --show-stats
+          
+          echo "\necho workspace: ${{ github.workspace }}"
+          ls ${{ github.workspace }}
+
+          echo "\necho llvm dir: ${{ github.workspace }}/llvm-project/"
+          ls ${{ github.workspace }}/llvm-project/
+
+          echo "\necho /mnt/llvm-build/"
+          ls /mnt/llvm-build/
+
+          mkdir build
+          cmake -B build -DLLVM_DIR=/mnt/llvm-build/lib/cmake/llvm/
+          cmake --build build
+
+      - name: Save ccache
+        if: steps.build-llvm.outcome == 'success' && steps.restore-ccache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.ref_name }}-${{ env.LLVM_COMMIT }}-${{ env.CMAKE_VERSION }}-${{ github.sha }}
+
       - name: Cache pip
         uses: actions/cache@v4
         id: pip-cache
         with:
           path: ~/.cache/pip
-          key: pip-${{ hashFiles('ASPIS/testing/requirements.txt') }}
+          key: pip-${{ hashFiles('${{ github.workspace }}/ASPIS/testing/requirements.txt') }}
           restore-keys: |
             pip-
       - name: Install Python requirements
         shell: bash        
-        if: steps.llvm-cache.outputs.cache-hit != 'true'
-        working-directory: ./ASPIS/testing
+        if: steps.restore-ccache.outputs.cache-hit != 'true'
+        working-directory: ${{ github.workspace }}/ASPIS/testing
         run: |
            pip install -r requirements.txt
       - name: Testing ASPIS
         shell: bash
-        working-directory: ./ASPIS/testing
+        working-directory: ${{ github.workspace }}/ASPIS/testing
         run: |
            pytest test.py
 
