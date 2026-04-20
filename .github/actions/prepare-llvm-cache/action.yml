@@ -1,0 +1,51 @@
+name: Prepare LLVM Cache
+description: Restore or build the cached LLVM toolchain.
+
+inputs:
+  llvm-commit:
+    description: LLVM commit to build.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Restore LLVM Cache
+      id: restore-llvm-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: /mnt/llvm-build/
+        key: llvm-${{ runner.os }}-${{ inputs.llvm-commit }}
+
+    - name: Clone LLVM
+      if: steps.restore-llvm-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        git clone --filter=blob:none --no-checkout https://github.com/llvm/llvm-project.git llvm-project
+        cd llvm-project
+        git fetch --depth 1 origin ${{ inputs.llvm-commit }}
+        git checkout FETCH_HEAD
+
+    - name: Build LLVM
+      if: steps.restore-llvm-cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ github.workspace }}/llvm-project
+      run: |
+        builddir="/mnt/llvm-build/"
+        sudo mkdir -p $builddir
+        sudo chmod 777 $builddir
+        cmake -G Ninja \
+            -B "$builddir" \
+            -S llvm \
+            -DLLVM_ENABLE_PROJECTS="clang" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_ASSERTIONS=OFF \
+            -DLLDB_INCLUDE_TESTS=OFF \
+            -DLIBCLC_TARGETS_TO_BUILD="RISCV;X86"
+        cmake --build "$builddir"
+
+    - name: Save LLVM Cache
+      if: steps.restore-llvm-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: /mnt/llvm-build/
+        key: llvm-${{ runner.os }}-${{ inputs.llvm-commit }}
