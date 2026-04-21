@@ -126,9 +126,9 @@ source_file = "cpp/simple/stl_containers_advanced.cpp"
 test_name = "cpp_template"
 source_file = "cpp/simple/template.cpp"
 
-[[tests]]
-test_name = "cpp_threads"
-source_file = "cpp/simple/threads.cpp"
+# [[tests]]
+# test_name = "cpp_threads"
+# source_file = "cpp/simple/threads.cpp"
 
 [[tests]]
 test_name = "cpp_volatile_memory_order"

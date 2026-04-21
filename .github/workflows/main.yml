@@ -46,18 +46,9 @@ jobs:
           ccache --zero-stats
           ccache --show-config
           ccache --show-stats
-          
-          echo "\necho workspace: ${{ github.workspace }}"
-          ls ${{ github.workspace }}
-
-          echo "\necho llvm dir: ${{ github.workspace }}/llvm-project/"
-          ls ${{ github.workspace }}/llvm-project/
-
-          echo "\necho /mnt/llvm-build/"
-          ls /mnt/llvm-build/
 
           mkdir build
-          cmake -B build -DLLVM_DIR=/mnt/llvm-build/lib/cmake/llvm/
+          cmake -B build -DLLVM_DIR=${{ github.workspace }}/llvm-build/lib/cmake/llvm/
           cmake --build build
 
       - name: Save ccache
