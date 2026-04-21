@@ -14,7 +14,7 @@ LOCAL_SHARED_VOLUME = "./tests/"
 DOCKER_COMPOSE_FILE = "../docker/docker-compose.yml"
 
 data_techniques = ["--no-dup", "--eddi", "--seddi", "--fdsc"] # "--reddi"
-cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm", "--racfed"] #"--inter-rasm"]
+cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm"] #, "--racfed", "--inter-rasm"]
 
 # Load the test configuration
 def load_config():

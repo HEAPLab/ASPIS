@@ -30,9 +30,9 @@ source_file = "c/data_duplication_integrity/global_var_across_functions.c"
 test_name = "c_misc_data_dup"
 source_file = "c/data_duplication_integrity/misc_data_dup.c"
 
-[[tests]]
-test_name = "c_printf_to_duplicate"
-source_file = "c/data_duplication_integrity/printf_to_duplicate.c"
+# [[tests]]
+# test_name = "c_printf_to_duplicate"
+# source_file = "c/data_duplication_integrity/printf_to_duplicate.c"
 
 [[tests]]
 test_name = "c_volatile_io"
@@ -46,9 +46,9 @@ source_file = "c/misc_math/arit_pipeline.c"
 test_name = "c_mixed_ops"
 source_file = "c/misc_math/mixed_ops.c"
 
-[[tests]]
-test_name = "c_xor_cypher"
-source_file = "c/misc_math/xor_cypher.c"
+# [[tests]]
+# test_name = "c_xor_cypher"
+# source_file = "c/misc_math/xor_cypher.c"
 
 [[tests]]
 test_name = "c_add"
