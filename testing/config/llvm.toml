@@ -1,2 +1,2 @@
 #llvm_bin = "<path/to/your/llvm/bin>"
-llvm_bin = "/mnt/llvm-build/bin/"
+llvm_bin = "/home/runner/work/ASPIS/ASPIS/llvm-build/bin"
