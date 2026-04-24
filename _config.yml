@@ -3,7 +3,7 @@ description: Automatic Software-based Protection and Integrity Suite #LLVM-based
 
 favicon: /ASPIS/favicon.ico
 show_downloads: true
-logo: /ASPIS/ASPIS_logo_text.png
+logo: /ASPIS_logo_text.png
 remote_theme: pages-themes/cayman@v0.2.0
 
 plugins:
