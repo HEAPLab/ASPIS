@@ -1,0 +1,17 @@
+---
+---
+@import "{{ site.theme }}";
+
+/* This targets the large colored header at the top */
+.page-header {
+  /* Option A: New Gradient (e.g., Deep Purple to Blue) */
+  background-image: linear-gradient(120deg, #2b2d42, #8d99ae);
+  
+  /* Option B: Solid Color (Uncomment the line below to use) */
+  /* background-color: #2c3e50; */
+}
+
+/* This targets the main white background of the page */
+body {
+  /* background-color: #f0f0f0; */
+}
