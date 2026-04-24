@@ -76,5 +76,5 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}/ASPIS/testing
         run: |
-           pytest test.py
+           pytest test.py --no-header -v
 

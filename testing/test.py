@@ -13,8 +13,8 @@ DOCKER_SHARED_VOLUME = "/workspace/ASPIS/tmp"
 LOCAL_SHARED_VOLUME = "./tests/"
 DOCKER_COMPOSE_FILE = "../docker/docker-compose.yml"
 
-data_techniques = ["--no-dup", "--eddi", "--seddi", "--fdsc"] # "--reddi"
-cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm"] #, "--racfed", "--inter-rasm"]
+data_techniques = ["--no-dup", "--eddi", "--seddi", "--fdsc"]
+cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm", "--racfed", "--inter-rasm"]
 
 # Load the test configuration
 def load_config():
@@ -85,6 +85,11 @@ def test_aspis(test_data, use_container, aspis_addopt, data_technique, cfc_techn
   llvm_bin = config["llvm_bin"]
   test_name = test_data["test_name"]
   source_file = test_data["source_file"]
+
+  if("black_list" in test_data):
+    black_list = test_data["black_list"]
+    if(data_technique in black_list or cfc_technique in black_list):
+      pytest.skip(f"Skipping {test_name} for {data_technique} and {cfc_technique} as it is in the black list")
 
   # use docker compose rather than ASPIS if --use-container is set
   if use_container:
