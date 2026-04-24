@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/ASPIS_logo_text.png" alt="Logo" width="200">
+  <img src="/ASPIS/ASPIS_logo_text.png" alt="Logo" width="200">
 </p>
 
 ## ASPIS
