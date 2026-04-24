@@ -1,5 +1,5 @@
 title: ASPIS
-description: LLVM-based Software-Implemented Hardware Fault Tolerance 
+description: Automatic Software-based Protection and Integrity Suite #LLVM-based Software-Implemented Hardware Fault Tolerance 
 
 favicon: /ASPIS/favicon.ico
 show_downloads: true
