@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="/ASPIS_logo_text.png" alt="Logo" width="200">
+</p>
+
 ## ASPIS
 
 ASPIS (from the ancient Greek Ἀσπίς Aspís, shield) is a set of LLVM passes that
@@ -5,7 +9,6 @@ harden the code against Single-Event Upsets (SEUs) by introducing fault
 detection mechanisms.
 
 **This webpage is still a Work-in-Progress. Please check to the [README file](https://github.com/HEAPLab/ASPIS/blob/master/README.md) for further information.**
-
 
 ### Scientific papers
 The main reference paper for the ASPIS tool is:
