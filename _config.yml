@@ -1,9 +1,9 @@
 title: ASPIS
 description: LLVM-based Software-Implemented Hardware Fault Tolerance 
 
-favicon: /favicon.ico
+favicon: /ASPIS/favico.ico
 show_downloads: true
-logo: /ASPIS_logo_text.png
+logo: /ASPIS/ASPIS_logo_text.png
 remote_theme: pages-themes/cayman@v0.2.0
 
 plugins:
