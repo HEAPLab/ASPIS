@@ -71,12 +71,15 @@ void DuplicateGlobals::duplicateCall(Module &Md, CallBase* UCall, Value* Origina
     return;
   }
   // if the function is already a _dup function, we just duplicate the operand corresponding to our global
+  // Only search the first half of arguments (originals); the second half holds the copies.
+  // Searching the second half would compute an out-of-range operand index.
   if (UCall->getCalledFunction()->getName().ends_with("_dup")) {
     int i = 0;
+    unsigned half = UCall->arg_size() / 2;
     for (auto &Op : UCall->args()) {
-      if (Op == Original) {
+      if (Op == Original && i < (int)half) {
         if (AlternateMemMapEnabled == false) {
-          UCall->setOperand(i + UCall->arg_size()/2, Copy);
+          UCall->setOperand(i + half, Copy);
         } else {
           UCall->setOperand(i+1, Copy);
         }
