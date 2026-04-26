@@ -993,7 +993,8 @@ void EDDI::duplicateGlobals(
                      GVAnnotation != FuncAnnotations.end() &&
                      GVAnnotation->second.starts_with("exclude");
 
-    if (! (isFunction || isConstant || ends_withDup || isMetadataInfo || isReservedName || toExclude) // is not function, constant, struct and does not end with _dup
+        if (! (isFunction || isConstant || isStruct || isArray || isPointer || ends_withDup || isMetadataInfo || isReservedName || toExclude)
+        // is not function, constant, struct and does not end with _dup
         /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
             || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
         ) {
