@@ -71,12 +71,15 @@ void DuplicateGlobals::duplicateCall(Module &Md, CallBase* UCall, Value* Origina
     return;
   }
   // if the function is already a _dup function, we just duplicate the operand corresponding to our global
+  // Only search the first half of arguments (originals); the second half holds the copies.
+  // Searching the second half would compute an out-of-range operand index.
   if (UCall->getCalledFunction()->getName().ends_with("_dup")) {
     int i = 0;
+    unsigned half = UCall->arg_size() / 2;
     for (auto &Op : UCall->args()) {
-      if (Op == Original) {
+      if (Op == Original && i < (int)half) {
         if (AlternateMemMapEnabled == false) {
-          UCall->setOperand(i + UCall->arg_size()/2, Copy);
+          UCall->setOperand(i + half, Copy);
         } else {
           UCall->setOperand(i+1, Copy);
         }
@@ -163,6 +166,10 @@ PreservedAnalyses DuplicateGlobals::run(Module &Md, ModuleAnalysisManager &AM) {
   }
   
   for (GlobalVariable *GV : Globals) {
+    // Skip the unnamed (compile-generated) globals, they will have the same name "@_dup"
+    if (GV->getName().empty()) {
+      continue;
+    }
     // we don't care if the global is constant as it should not change at runtime
     // if the global is a struct or an array we cannot just duplicate the stores
     bool toDuplicate = !isa<Function>(GV) && 
@@ -177,8 +184,11 @@ PreservedAnalyses DuplicateGlobals::run(Module &Md, ModuleAnalysisManager &AM) {
         Initializer = GV->getInitializer();
         // we may want to check whether our copy exists and is externally initialized
         if (GVCopy != NULL && !GVCopy->isExternallyInitialized()) {
-          // in case it exists and is not externally initialized, we set the initializer
-          GVCopy->setInitializer(Initializer);
+          // Guard against type mismatch
+          if (Initializer->getType() == GVCopy->getValueType()) {
+            // in case it exists and is not externally initialized, we set the initializer
+            GVCopy->setInitializer(Initializer);
+          }
           GVCopy->setExternallyInitialized(GV->isExternallyInitialized());
         }
       }

@@ -993,7 +993,8 @@ void EDDI::duplicateGlobals(
                      GVAnnotation != FuncAnnotations.end() &&
                      GVAnnotation->second.starts_with("exclude");
 
-    if (! (isFunction || isConstant || ends_withDup || isMetadataInfo || isReservedName || toExclude) // is not function, constant, struct and does not end with _dup
+        if (! (isFunction || isConstant || isStruct || isArray || isPointer || ends_withDup || isMetadataInfo || isReservedName || toExclude)
+        // is not function, constant, struct and does not end with _dup
         /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
             || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
         ) {
@@ -1328,7 +1329,9 @@ int EDDI::duplicateInstruction(
       Function *Fn = getFunctionDuplicate(CInstr->getCalledFunction());
       // if the _dup function exists (and it is not itself the dup version) or is an indirect call, 
       // we substitute the call instruction with a call to the function with duplicated arguments
-      if (CInstr->getCalledFunction() == NULL || (Fn != NULL && Fn != CInstr->getCalledFunction())) {
+      // Inline assembly calls are excluded: their constraint strings are fixed and cannot accept
+      // the doubled argument list that transformCallBaseInst would produce.
+      if ((CInstr->getCalledFunction() == NULL && !CInstr->isInlineAsm()) || (Fn != NULL && Fn != CInstr->getCalledFunction())) {
         res = transformCallBaseInst(CInstr, DuplicatedInstructionMap, B, ErrBB);
       } else {
         fixFuncValsPassedByReference(*CInstr, DuplicatedInstructionMap, B);
