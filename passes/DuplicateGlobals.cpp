@@ -163,6 +163,10 @@ PreservedAnalyses DuplicateGlobals::run(Module &Md, ModuleAnalysisManager &AM) {
   }
   
   for (GlobalVariable *GV : Globals) {
+    // Skip the unnamed (compile-generated) globals, they will have the same name "@_dup"
+    if (GV->getName().empty()) {
+      continue;
+    }
     // we don't care if the global is constant as it should not change at runtime
     // if the global is a struct or an array we cannot just duplicate the stores
     bool toDuplicate = !isa<Function>(GV) && 
@@ -177,8 +181,11 @@ PreservedAnalyses DuplicateGlobals::run(Module &Md, ModuleAnalysisManager &AM) {
         Initializer = GV->getInitializer();
         // we may want to check whether our copy exists and is externally initialized
         if (GVCopy != NULL && !GVCopy->isExternallyInitialized()) {
-          // in case it exists and is not externally initialized, we set the initializer
-          GVCopy->setInitializer(Initializer);
+          // Guard against type mismatch
+          if (Initializer->getType() == GVCopy->getValueType()) {
+            // in case it exists and is not externally initialized, we set the initializer
+            GVCopy->setInitializer(Initializer);
+          }
           GVCopy->setExternallyInitialized(GV->isExternallyInitialized());
         }
       }
