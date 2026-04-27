@@ -76,9 +76,17 @@ void DuplicateGlobals::duplicateCall(Module &Md, CallBase* UCall, Value* Origina
     for (auto &Op : UCall->args()) {
       if (Op == Original) {
         if (AlternateMemMapEnabled == false) {
-          UCall->setOperand(i + UCall->arg_size()/2, Copy);
+          if(i < UCall->arg_size()/2) {
+            UCall->setOperand(i + UCall->arg_size()/2, Copy);
+          } else {
+            UCall->setOperand(i - UCall->arg_size()/2, Copy);
+          }
         } else {
-          UCall->setOperand(i+1, Copy);
+          if(i%2 == 0) {
+            UCall->setOperand(i+1, Copy);
+          } else {
+            UCall->setOperand(i-1, Copy);
+          }
         }
       }
       i++;
@@ -163,6 +171,10 @@ PreservedAnalyses DuplicateGlobals::run(Module &Md, ModuleAnalysisManager &AM) {
   }
   
   for (GlobalVariable *GV : Globals) {
+    if (GV->getName().empty()) {
+      GV->setName("global_" + std::to_string(rand()));
+    }
+
     // we don't care if the global is constant as it should not change at runtime
     // if the global is a struct or an array we cannot just duplicate the stores
     bool toDuplicate = !isa<Function>(GV) && 
