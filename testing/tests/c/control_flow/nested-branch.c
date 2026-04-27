@@ -1,7 +1,9 @@
 #include <stdio.h>
 
+__attribute__((annotate("to_harden")))
+int sum = 0;
+
 int main() {
-    int sum = 0;
     for (int i = 0; i < 3; i++) {
         int x = i * 2;
         if (x % 2 == 0) {

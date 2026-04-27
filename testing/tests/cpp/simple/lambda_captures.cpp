@@ -22,6 +22,7 @@ void runNoDup(F func) {
 }
 
 template <typename F>
+__attribute__((annotate("to_harden")))
 void run(F func) {
     func();
 }

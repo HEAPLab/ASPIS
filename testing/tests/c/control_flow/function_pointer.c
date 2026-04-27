@@ -9,6 +9,7 @@ int foo() {
     return 42;
 }
 
+__attribute__((annotate("to_harden")))
 int add(int a, int b) {
     return a + b;
 }
@@ -25,6 +26,3 @@ int main() {
     printf("%d\n", sum);  
     return 0;
 }
-
-// expected output
-// 42

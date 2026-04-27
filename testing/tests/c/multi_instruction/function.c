@@ -3,6 +3,7 @@
 //
 #include <stdio.h>
 
+__attribute__((annotate("to_harden")))
 int foo();
 void print(int c);
 
@@ -14,6 +15,7 @@ int main() {
     return a > b ? 1 : 0;
 }
 
+__attribute__((annotate("to_harden")))
 int foo() {
     int c = 12;
     int d = 13;

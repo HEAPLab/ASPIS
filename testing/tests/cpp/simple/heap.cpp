@@ -14,10 +14,12 @@ extern "C" {
     }
 }
 
+// Allocate a single integer on the heap
+__attribute__((annotate("to_harden")))
+int *p = new int(5);
+
 // A function that allocates memory, uses it, and then deletes it
 int main() {
-    // Allocate a single integer on the heap
-    int *p = new int(5);
     *p = 10;  // modify the allocated value
     int result = *p;
     delete p;

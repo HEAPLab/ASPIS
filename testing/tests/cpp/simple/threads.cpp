@@ -25,6 +25,7 @@ void SigMismatch_Handler() {
     std::exit(EXIT_FAILURE);
 }
 
+__attribute__((annotate("to_harden")))
 std::atomic<int> counter{0};
 
 void worker(int times) {

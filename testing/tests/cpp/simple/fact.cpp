@@ -13,6 +13,7 @@ void SigMismatch_Handler() {
 }
 
 // compute n! recursively
+__attribute__((annotate("to_harden")))
 unsigned long long fact(unsigned int n)
 {
     return n <= 1 ? 1 : n * fact(n - 1);

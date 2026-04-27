@@ -13,6 +13,7 @@ extern "C" {
     }
 }
 
+__attribute__((annotate("to_harden")))
 int add(int a, int b) {
     return a + b;
 }

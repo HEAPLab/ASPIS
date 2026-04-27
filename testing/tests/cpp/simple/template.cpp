@@ -41,11 +41,13 @@ private:
     T sum;
 };
 
+__attribute__((annotate("to_harden")))
+Accumulator<int> acc;
+
 int main() {
     int x = 42, y = 17;
     int maxVal = myMax<int>(x, y);  // 42
 
-    Accumulator<int> acc;
     acc.add(5);
     acc.add(10);
     int sumVal = acc.total();  // 15

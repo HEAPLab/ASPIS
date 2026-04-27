@@ -2,7 +2,7 @@
 
 __attribute__((annotate("to_harden")))
 void print_string(char *s) {
-  printf("The string is: %s", s);
+  printf("The string is: %s\n", s);
 }
 
 int main() {

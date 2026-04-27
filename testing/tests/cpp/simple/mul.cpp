@@ -14,6 +14,7 @@ extern "C" {
     }
 }
 
+__attribute__((annotate("to_harden")))
 int multiply(int a, int b)
 {
     return a * b;

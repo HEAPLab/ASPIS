@@ -4,9 +4,6 @@
 
 #include <stdio.h>
 
-void DataCorruption_Handler(void) {}
-void SigMismatch_Handler(void) {}
-
 __attribute__((annotate("to_harden")))
 int duplicated_global = 100;
 

@@ -16,8 +16,12 @@ int switch_test(int value) {
     }
 }
 
+
+__attribute__((annotate("to_harden")))
+int switchN = 3;
+
 int main() {
-    int result = switch_test(3);
+    int result = switch_test(switchN);
     printf("%d", result);
     return 0;
 }

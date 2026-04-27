@@ -4,8 +4,10 @@
 
 #include <stdio.h>
 
+__attribute__((annotate("to_harden")))
+int sum = 0;
+
 int main() {
-    int sum = 0;
     for (int i = 0; i < 5; i++) {
         if (i == 1) continue;
         if (i == 3) break;

@@ -14,7 +14,7 @@ extern "C" {
     }
 }
 
-
+__attribute__((annotate("to_harden")))
 volatile int flag = 0;
 
 void writer()
