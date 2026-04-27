@@ -618,6 +618,9 @@ void EDDI::duplicateOperands(
     Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap,
     BasicBlock &ErrBB) {
   Instruction *IClone = NULL;
+
+  std::map<Value *, Value *> tmpDuplicatedInstructionMap{DuplicatedInstructionMap};
+
   // see if I has a clone
   if (DuplicatedInstructionMap.find(&I) != DuplicatedInstructionMap.end()) {
     Value *VClone = DuplicatedInstructionMap.find(&I)->second;
@@ -677,15 +680,22 @@ void EDDI::duplicateOperands(
           IClone->setOperand(J, DuplicateFn);
         }
       }
+    } else if (isa<StoreInst>(I) && isa<GlobalVariable>(V) && cast<GlobalVariable>(V)->isConstant()) {
+      IRBuilder<> B(&I);
+      temporaryArgumentDuplication(*I.getModule(), V, B, tmpDuplicatedInstructionMap);
     }
 
     if (IClone != NULL) {
       // use the duplicated instruction as operand of IClone
-      auto Duplicate = DuplicatedInstructionMap.find(V);
-      if (Duplicate != DuplicatedInstructionMap.end())
-        IClone->setOperand(
-            J,
-            Duplicate->second); // set the J-th operand with the duplicate value
+      auto Duplicate = tmpDuplicatedInstructionMap.find(V);
+      if (Duplicate != tmpDuplicatedInstructionMap.end()) {
+        IClone->setOperand(J, Duplicate->second); // set the J-th operand with the duplicate value
+      } else {
+        Duplicate = DuplicatedInstructionMap.find(V);
+        if (Duplicate != DuplicatedInstructionMap.end()) {
+          IClone->setOperand(J, Duplicate->second);
+        }
+      }
     }
     J++;
   }
@@ -870,6 +880,8 @@ void EDDI::addConsistencyChecks(
     if (DebugEnabled) {
       CondBrInst->setDebugLoc(I.getDebugLoc());
     }
+  } else {
+    errs() << "Warning: no consistency check added for instruction: " << I << "\n";
   }
 
   if (VerificationBB->size() == 0) {
@@ -1765,33 +1777,8 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       // Create alloca and memcpy only if ptr since if it is a value, we can just pass two times the same value
       if(Arg->getType()->isPointerTy() && !CInstr->isByValArgument(i) && isa<Instruction>(Arg) && !isa<CallInst>(Arg))
       {
-        const llvm::DataLayout &DL = Md.getDataLayout();
-        Type *ArgType;
-        
-        Align ArgAlign;
-        ArgType = getValueType(Arg, &ArgAlign);
-
-        // If can't find type, do not duplicate argument
-        if(ArgType->isVoidTy()) {
-          continue;
-        }
-
-        uint64_t SizeInBytes = DL.getTypeAllocSize(ArgType);
-        Value *Size = llvm::ConstantInt::get(B.getInt64Ty(), SizeInBytes);
-        
-        // Alignment (assuming alignment of 1 here; adjust as necessary)
-        llvm::ConstantInt *Align = B.getInt32(ArgAlign.value());
-
-        // Volatility (non-volatile in this example)
-        llvm::ConstantInt *IsVolatile = B.getInt1(false);
-
-        // Create the memcpy call
-        auto CopyArg = B.CreateAlloca(ArgType);
-
-        llvm::CallInst *memcpy_call = B.CreateMemCpy(CopyArg, Arg->getPointerAlignment(DL), Arg, Arg->getPointerAlignment(DL), Size);
-
-        TmpDuplicatedInstructionMap.insert(std::pair<Value *, Value *>(CopyArg, Arg));
-        TmpDuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Arg, CopyArg));
+        // If cannot perform TAD, do not duplicate Arg
+        temporaryArgumentDuplication(Md, Arg, B, TmpDuplicatedInstructionMap);
       } else {
         // Otherwise pass two times the same arg
         TmpDuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Arg, Arg));
@@ -1866,6 +1853,40 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   }
  */
   return PreservedAnalyses::none();
+}
+
+bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B, std::map<llvm::Value *, llvm::Value *> &InstructionMap) {
+  errs() << "Performing temporary argument duplication for value: " << *value << " in function: " << B.GetInsertBlock()->getParent()->getName() << "\n";
+  const llvm::DataLayout &DL = Md.getDataLayout();
+  Type *valueType;
+  
+  Align valueAlign;
+  valueType = getValueType(value, &valueAlign);
+
+  // If can't find type, do not duplicate value
+  if(valueType->isVoidTy()) {
+    errs() << "Error: Cannot find type of value: " << *value << "\n";
+    return false;
+  }
+
+  uint64_t SizeInBytes = DL.getTypeAllocSize(valueType);
+  Value *Size = llvm::ConstantInt::get(B.getInt64Ty(), SizeInBytes);
+  
+  // Alignment (assuming alignment of 1 here; adjust as necessary)
+  llvm::ConstantInt *Align = B.getInt32(valueAlign.value());
+
+  // Volatility (non-volatile in this example)
+  llvm::ConstantInt *IsVolatile = B.getInt1(false);
+
+  // Create the memcpy call
+  auto Copyvalue = B.CreateAlloca(valueType);
+
+  llvm::CallInst *memcpy_call = B.CreateMemCpy(Copyvalue, value->getPointerAlignment(DL), value, value->getPointerAlignment(DL), Size);
+
+  InstructionMap.insert(std::pair<Value *, Value *>(Copyvalue, value));
+  InstructionMap.insert(std::pair<Value *, Value *>(value, Copyvalue));
+
+  return true;
 }
 
 Instruction *getSingleReturnInst(Function &F) {
@@ -1990,7 +2011,6 @@ void EDDI::fixGlobalCtors(Module &M) {
   // Retrieve the existing @llvm.global_ctors.
   GlobalVariable *GlobalCtors = M.getGlobalVariable("llvm.global_ctors");
   if (!GlobalCtors) {
-    errs() << "Error: @llvm.global_ctors not found in the module.\n";
     return;
   }
 
