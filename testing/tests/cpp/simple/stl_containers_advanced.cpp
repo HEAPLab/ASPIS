@@ -15,9 +15,11 @@ extern "C" {
     }
 }
 
+__attribute__((annotate("to_harden")))
+std::vector<int*> ptrVector;
+
 int main() {
     // Example of advanced container usage with dynamic memory
-    std::vector<int*> ptrVector;
     ptrVector.reserve(5);  // reserve capacity for efficiency
 
     // Allocate integers on the heap and store pointers in the vector

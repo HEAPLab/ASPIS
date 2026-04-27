@@ -24,6 +24,7 @@ void fNonDup() {
     std::cout << "Function fNonDup called (g incremented to " << g << ")" << std::endl;
 }
 
+__attribute__((annotate("to_harden")))
 void f() {
     g++;
     std::cout << "Function f called (g incremented to " << g << ")" << std::endl;

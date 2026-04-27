@@ -16,6 +16,7 @@ extern "C" {
 }
 
 // Helper to print two pointer values (non-duplicated)
+__attribute__((annotate("to_harden")))
 void printPointers(int *p1, int *p2) {
     std::cout << "Value pointed by p1: " << *p1;
     if (p2) {

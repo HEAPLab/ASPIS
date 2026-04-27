@@ -4,9 +4,11 @@
 
 #include <stdio.h>
 
+__attribute__((annotate("to_harden")))
+int y = 0;
+
 int main() {
     int x = 5;
-    int y = 0;
 
     if (x > 3) {
         y = 7;
