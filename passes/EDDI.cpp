@@ -974,6 +974,11 @@ void EDDI::duplicateGlobals(
   }
   for (auto GV : GVars) {
     auto GVAnnotation = FuncAnnotations.find(GV);
+
+    if (GV->getName().empty()) {
+      GV->setName("global_" + std::to_string(rand()));
+    }
+
     if (!isa<Function>(GV) &&
         GVAnnotation != FuncAnnotations.end()) {
       // What does these annotations do?
