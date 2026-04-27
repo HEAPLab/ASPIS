@@ -491,21 +491,37 @@ Instruction *RACFED::checkOnReturn(BasicBlock &BB,
 }
 
 PreservedAnalyses RACFED::run(Module &Md, ModuleAnalysisManager &AM) {
-  auto *I64 = llvm::Type::getInt64Ty(Md.getContext());
-
-  // Runtime signature defined as a global variable
-  GlobalVariable *RuntimeSig = new GlobalVariable(
-    Md, I64,
-    /*isConstant=*/false,
-    GlobalValue::ExternalLinkage,
-    ConstantInt::get(I64, 0),
-    "signature"
-  );
-
   createFtFuncs(Md);
   getFuncAnnotations(Md, FuncAnnotations);
   LinkageMap linkageMap = mapFunctionLinkageNames((Md));
-  
+
+  auto *I64 = llvm::Type::getInt64Ty(Md.getContext());
+
+  // Runtime signature defined as a global variable
+  GlobalVariable *RuntimeSig;
+
+  {
+    bool initialized_runtimesig = false;
+
+    for (GlobalVariable &GV : Md.globals()) {
+      if (!isa<Function>(GV) && FuncAnnotations.find(&GV) != FuncAnnotations.end()) {
+        if ((FuncAnnotations.find(&GV))->second.starts_with("runtime_sig")) {
+          RuntimeSig = &GV;
+          initialized_runtimesig = true;
+        }
+      }
+    }
+
+    if (!initialized_runtimesig)
+      RuntimeSig = new GlobalVariable(
+        Md, I64,
+        /*isConstant=*/false,
+        GlobalValue::ExternalLinkage,
+        ConstantInt::get(I64, 0),
+        "runtime_sig"
+      );
+  }
+
   for (Function &Fn: Md) {
     if (!shouldCompile(Fn, FuncAnnotations)) continue;
 
@@ -517,8 +533,8 @@ PreservedAnalyses RACFED::run(Module &Md, ModuleAnalysisManager &AM) {
     DebugLoc debugLoc;
     for (auto &I : Fn.front()) {
       if (I.getDebugLoc()) {
-	      debugLoc = I.getDebugLoc();
-	      break;
+              debugLoc = I.getDebugLoc();
+              break;
       } 
     }
  
@@ -527,7 +543,7 @@ PreservedAnalyses RACFED::run(Module &Md, ModuleAnalysisManager &AM) {
     #endif
 
     assert(!getLinkageName(linkageMap,"SigMismatch_Handler").empty() 
-	   && "Function SigMismatch_Handler is missing!");
+           && "Function SigMismatch_Handler is missing!");
 
     // Create error basic block
     BasicBlock *ErrBB = BasicBlock::Create(Fn.getContext(), "ErrBB", &Fn);
@@ -552,14 +568,14 @@ PreservedAnalyses RACFED::run(Module &Md, ModuleAnalysisManager &AM) {
       // Backup of compile time sign when entering a function
       if ( BB.isEntryBlock() ) {
         IRBuilder<> InstrIR(&*BB.getFirstInsertionPt());
-	if ( Fn.getName() != "main" ) {
-	  runtime_sign_bkup =
-	    InstrIR.CreateLoad(I64, RuntimeSig, "backup_run_sig");
-	}
-	// Set runtime signature to compile time signature 
-	// of the function's entry block.
-	InstrIR.CreateStore(llvm::ConstantInt::get(I64, compileTimeSig[&BB]),
-	  RuntimeSig);
+        if ( Fn.getName() != "main" ) {
+          runtime_sign_bkup =
+            InstrIR.CreateLoad(I64, RuntimeSig, "backup_run_sig");
+        }
+        // Set runtime signature to compile time signature 
+        // of the function's entry block.
+        InstrIR.CreateStore(llvm::ConstantInt::get(I64, compileTimeSig[&BB]),
+          RuntimeSig);
       }
 
       checkJumpSignature(BB, RuntimeSig, I64, *ErrBB);
@@ -568,8 +584,8 @@ PreservedAnalyses RACFED::run(Module &Md, ModuleAnalysisManager &AM) {
 
       // Restore signature on return
       if ( ret_inst != nullptr && Fn.getName() != "main") {
-	      IRBuilder<> RetInstIR(ret_inst);
-	      RetInstIR.CreateStore(runtime_sign_bkup, RuntimeSig);
+              IRBuilder<> RetInstIR(ret_inst);
+              RetInstIR.CreateStore(runtime_sign_bkup, RuntimeSig);
       }
     }
   }
