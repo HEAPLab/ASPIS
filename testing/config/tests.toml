@@ -6,102 +6,105 @@ black_list = ["--inter-rasm"]
 [[tests]]
 test_name = "c_loop_exit"
 source_file = "c/control_flow/loop_exit.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_nested-branch"
 source_file = "c/control_flow/nested-branch.c"
-black_list = ["--inter-rasm"]
+
+[[tests]]
+test_name = "c_nested-branch_var-decl-sign"
+source_file = "c/declared_signatures/nested-branch.c"
 
 [[tests]]
 test_name = "c_simple-branch"
 source_file = "c/control_flow/simple-branch.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_switch-case"
 source_file = "c/control_flow/switch-case.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_data_dep_branches"
 source_file = "c/data_duplication_integrity/data_dep_branches.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_global_var_across_functions"
 source_file = "c/data_duplication_integrity/global_var_across_functions.c"
-black_list = ["--inter-rasm"]
+
+[[tests]]
+test_name = "c_global_var_across_functions_var-decl-sign"
+source_file = "c/declared_signatures/global_var_across_functions.c"
 
 [[tests]]
 test_name = "c_misc_data_dup"
 source_file = "c/data_duplication_integrity/misc_data_dup.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_printf_to_duplicate"
 source_file = "c/data_duplication_integrity/printf_to_duplicate.c"
-black_list = ["--inter-rasm", "--eddi", "--seddi", "--fdsc"]
+black_list = ["--eddi", "--seddi", "--fdsc"]
 
 [[tests]]
 test_name = "c_volatile_io"
 source_file = "c/data_duplication_integrity/volatile_io.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_arit_pipeline"
 source_file = "c/misc_math/arit_pipeline.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_mixed_ops"
 source_file = "c/misc_math/mixed_ops.c"
-black_list = ["--inter-rasm"]
+
+[[tests]]
+test_name = "c_mixed_ops_var-decl-sign"
+source_file = "c/declared_signatures/mixed_ops.c"
 
 [[tests]]
 test_name = "c_xor_cypher"
 source_file = "c/misc_math/xor_cypher.c"
-black_list = ["--inter-rasm", "--eddi", "--seddi", "--fdsc"]
+black_list = ["--eddi", "--seddi", "--fdsc"]
 
 [[tests]]
 test_name = "c_add"
 source_file = "c/multi_instruction/add.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_call_less_two"
 source_file = "c/multi_instruction/call_less_two.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_function"
 source_file = "c/multi_instruction/function.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_if_then_else"
 source_file = "c/multi_instruction/if_then_else.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "c_multi_if_then_else"
 source_file = "c/multi_instruction/multi_if_then_else.c"
-black_list = ["--inter-rasm"]
+
+[[tests]]
+test_name = "c_multi_if_then_else_var-decl-sign"
+source_file = "c/declared_signatures/multi_if_then_else.c"
+
 
 [[tests]]
 test_name = "c_phi"
 source_file = "c/multi_instruction/phi.c"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_add"
 source_file = "cpp/simple/add.cpp"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_class"
 source_file = "cpp/simple/class.cpp"
-black_list = ["--inter-rasm"]
+
+[[tests]]
+test_name = "cpp_class_var-decl-sign"
+source_file = "cpp/declared_signatures/class.cpp"
 
 [[tests]]
 test_name = "cpp_exceptions"
@@ -111,27 +114,27 @@ black_list = ["--inter-rasm", "--racfed"]
 [[tests]]
 test_name = "cpp_fact"
 source_file = "cpp/simple/fact.cpp"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_file_handler"
 source_file = "cpp/simple/file_handler.cpp"
-black_list = ["--inter-rasm", "--racfed"]
+black_list = ["--racfed"]
 
 [[tests]]
 test_name = "cpp_func"
 source_file = "cpp/simple/func.cpp"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_heap"
 source_file = "cpp/simple/heap.cpp"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_inline_constexpr"
 source_file = "cpp/simple/inline_constexpr.cpp"
-black_list = ["--inter-rasm"]
+
+[[tests]]
+test_name = "cpp_inline_constexpr_var-decl-glob"
+source_file = "cpp/declared_signatures/inline_constexpr.cpp"
 
 [[tests]]
 test_name = "cpp_lambda_captures"
@@ -141,12 +144,10 @@ black_list = ["--inter-rasm"]
 [[tests]]
 test_name = "cpp_mul"
 source_file = "cpp/simple/mul.cpp"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_ptr"
 source_file = "cpp/simple/ptr.cpp"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_stl_containers_advanced"
@@ -156,7 +157,6 @@ black_list = ["--inter-rasm", "--racfed"]
 [[tests]]
 test_name = "cpp_template"
 source_file = "cpp/simple/template.cpp"
-black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_threads"
@@ -166,4 +166,3 @@ black_list = ["--inter-rasm", "--racfed", "--eddi", "--seddi", "--fdsc"]
 [[tests]]
 test_name = "cpp_volatile_memory_order"
 source_file = "cpp/simple/volatile_memory_order.cpp"
-black_list = ["--inter-rasm"]
