@@ -990,7 +990,11 @@ void EDDI::repairBasicBlock(
     // AllocaInsts are kept in the entry block's alloca region.
     // Terminators (br, ret, switch, …) must remain last.
     // None of these should be relocated
-    if (isa<PHINode>(&I) || isa<AllocaInst>(&I) || I.isTerminator())
+  
+    // if (isa<PHINode>(&I) || /*isa<AllocaInst>(&I) || */ I.isTerminator())
+    //   continue;
+
+    if (I.isTerminator())
       continue;
 
     // If this instruction belongs to the cloned set, it is a duplicate
@@ -1007,7 +1011,12 @@ void EDDI::repairBasicBlock(
   // original relative order
   Instruction *InsertPt = BB.getTerminator();
   for (Instruction *Dup : DupsInOrder) {
-    Dup->moveBefore(InsertPt);
+    if(isa<PHINode>(Dup)){
+      Dup->moveBefore(BB.getFirstNonPHI());
+    }
+    else{
+      Dup->moveBefore(InsertPt);
+    }
   }
 }
 
@@ -1175,8 +1184,8 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         }
       }
       for (BasicBlock &BB : Fn) {
-  repairBasicBlock(BB, ClonedInstructions);
-}
+        repairBasicBlock(BB, ClonedInstructions);
+      }
 
       // insert the code for calling the error basic block in case of a mismatch
       IRBuilder<> ErrB(ErrBB);
