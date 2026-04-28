@@ -182,6 +182,7 @@ source_file = "c/malardalen/matmult.c"
 [[tests]]
 test_name = "c_basicmath"
 source_file = "c/mibench/basicmath.c"
+add_compiler_flags = "-lm"
 
 [[tests]]
 test_name = "c_crc32_mibench"
