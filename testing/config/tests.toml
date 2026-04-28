@@ -166,3 +166,32 @@ black_list = ["--inter-rasm", "--racfed", "--eddi", "--seddi", "--fdsc"]
 [[tests]]
 test_name = "cpp_volatile_memory_order"
 source_file = "cpp/simple/volatile_memory_order.cpp"
+
+[[tests]]
+test_name = "c_bsort100"
+source_file = "c/malardalen/bsort100.c"
+
+[[tests]]
+test_name = "c_insertsort"
+source_file = "c/malardalen/insertsort.c"
+
+[[tests]]
+test_name = "c_matmult"
+source_file = "c/malardalen/matmult.c"
+
+[[tests]]
+test_name = "c_basicmath"
+source_file = "c/mibench/basicmath.c"
+
+[[tests]]
+test_name = "c_crc32_mibench"
+source_file = "c/mibench/crc32_mibench.c"
+
+[[tests]]
+test_name = "c_dijkstra_small_mibench"
+source_file = "c/mibench/dijkstra_small_mibench.c"
+
+[[tests]]
+test_name = "c_multiple_functions"
+source_file = "c/autonomous_bench/multiple_functions.c"
+
