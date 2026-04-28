@@ -86,6 +86,9 @@ def test_aspis(test_data, use_container, aspis_addopt, data_technique, cfc_techn
   test_name = test_data["test_name"]
   source_file = test_data["source_file"]
 
+  if("add_compiler_flags" in test_data):
+    aspis_addopt += " " + test_data["add_compiler_flags"]
+
   if("black_list" in test_data):
     black_list = test_data["black_list"]
     if(data_technique in black_list or cfc_technique in black_list):
