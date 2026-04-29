@@ -6,6 +6,7 @@
 #include "llvm/Pass.h"
 #include <llvm/IR/Instructions.h>
 #include "Utils/Utils.h"
+#include "TypeDeductionAnalysis.hpp"
 #include <map>
 #include <set>
 
@@ -40,7 +41,8 @@ class EDDI : public PassInfoMixin<EDDI> {
         std::set<Function*> toHardenFunctions;
         std::set<Value*> toHardenVariables;
         std::set<Value*> DuplicatedCalls;
-
+        tda::TypeDeductionAnalysis tda;
+        tda::TypeDeductionAnalysis::Result deducedTypes;
         std::string entryPoint;
         
         LinkageMap linkageMap;

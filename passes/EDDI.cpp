@@ -37,11 +37,11 @@
 #include <map>
 #include <queue>
 #include <unordered_set>
-// #include "../TypeDeductionAnalysis/TypeDeductionAnalysis.hpp"
 
 #include "Utils/Utils.h"
 
 using namespace llvm;
+using namespace tda;
 
 #define DEBUG_TYPE "eddi_verification"
 
@@ -1564,6 +1564,15 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   // Fixing the duplicated constructors
   fixDuplicatedConstructors(Md);
+
+  deducedTypes = tda.run(Md, AM);
+
+  // Save deduced transparent types
+  for (auto& [value, deducedTypes] : deducedTypes.transparentTypes) {
+    if (!deducedTypes.empty()) {
+      errs() << "Deduced transparent type for " << *value << ": " << (*deducedTypes.begin()).get()->toString() << "\n";
+    }
+  }
 
   // list of duplicated instructions to remove since they are equal to the original
   std::set<CallBase *> GrayAreaCallsToFix;
