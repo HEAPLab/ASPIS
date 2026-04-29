@@ -14,6 +14,7 @@ extern "C" {
     }
 }
 
+__attribute__((annotate("to_harden")))
 void printResult(int value) {
     std::cout << value << std::endl;
 }

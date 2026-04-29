@@ -17,6 +17,7 @@ extern "C" {
 }
 
 // A leaf that always throws
+__attribute__((annotate("to_harden")))
 int nested_thrower() {
     throw std::runtime_error("Test exception");
 }

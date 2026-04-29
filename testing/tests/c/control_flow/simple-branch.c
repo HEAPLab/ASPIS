@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+__attribute__((annotate("to_harden")))
+int a = 10;
 
 int main() {
-    int a = 10, b = 20;
+    int b = 20;
     if (a < b) {
         printf("OK");
     } else {

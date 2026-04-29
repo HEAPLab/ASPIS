@@ -5,6 +5,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Pass.h"
 #include <llvm/IR/Instructions.h>
+#include "Utils/Utils.h"
 #include <map>
 #include <set>
 
@@ -33,10 +34,23 @@ class EDDI : public PassInfoMixin<EDDI> {
         std::set<Function*> CompiledFuncs;
         std::map<Value*, StringRef> FuncAnnotations;
         std::set<Function*> OriginalFunctions;
-        
-        // Map of <original, duplicate> for which we need to always use the duplicate in place of the original
-        std::map<Value*, Value*> ValuesToAlwaysDup;
 
+        std::set<Instruction *> InstructionsToRemove;
+        std::set<Function*> toHardenConstructors;
+        std::set<Function*> toHardenFunctions;
+        std::set<Value*> toHardenVariables;
+        std::set<Value*> DuplicatedCalls;
+
+        std::string entryPoint;
+        
+        LinkageMap linkageMap;
+
+        bool duplicateAll;
+        bool MultipleErrBBEnabled;
+
+        void preprocess(Module &Md);
+        void fixDuplicatedConstructors(Module &Md);
+        std::set<Function *> getVirtualMethodsFromConstructor(Function *Fn);
         int isUsedByStore(Instruction &I, Instruction &Use);
         Instruction* cloneInstr(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap);
         void duplicateOperands (Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
@@ -44,17 +58,21 @@ class EDDI : public PassInfoMixin<EDDI> {
         Value* comparePtrs(Value &V1, Value &V2, IRBuilder<> &B);
         void addConsistencyChecks(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
         void fixFuncValsPassedByReference(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B);
+        int transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B, BasicBlock &ErrBB) ;
         Function *getFunctionDuplicate(Function *Fn);
         Function *getFunctionFromDuplicate(Function *Fn);
-        Constant *duplicateConstant(Constant *C, std::map<Value *, Value *> &DuplicatedInstructionMap);
-        void duplicateGlobals(Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
+        void duplicateGlobals (Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
         bool isAllocaForExceptionHandling(AllocaInst &I);
-        int transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B, BasicBlock &ErrBB);
-        int duplicateInstruction(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
+        int duplicateInstruction (Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
         bool isValueDuplicated(std::map<Value *, Value *> &DuplicatedInstructionMap, Instruction &V);
         Function *duplicateFnArgs(Function &Fn, Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
+        void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
+        bool temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B, std::map<llvm::Value *, llvm::Value *> &InstructionMap);
 
+        void fixGlobalCtors(Module &M);
     public:
+        explicit EDDI(bool duplicateAll, bool MultipleErrBBEnabled = false, std::string entryPoint = "main") : duplicateAll(duplicateAll), MultipleErrBBEnabled(MultipleErrBBEnabled), entryPoint(entryPoint) {}
+
         PreservedAnalyses run(Module &M,
                               ModuleAnalysisManager &);
 
@@ -118,7 +136,7 @@ class CFCSS : public PassInfoMixin<CFCSS> {
                                  const std::map<BasicBlock *, int> &BBSigs,
                                  std::map<int, BasicBlock *> *NewBBs,
                                  BasicBlock &ErrBB,
-                                 Value *G, Value *D);
+                                 Value *G, Value *D, int NeighborSig);
 
     public:
         PreservedAnalyses run(Module &M,

@@ -39,12 +39,14 @@ bool shouldCompile(Function &Fn,
     const std::map<Value*, StringRef> &FuncAnnotations,
     const std::set<Function*> &OriginalFunctions = std::set<Function*>());
 
-DebugLoc findNearestDebugLoc(Instruction *I);
+DebugLoc findNearestDebugLoc(Instruction &I);
 
 LinkageMap mapFunctionLinkageNames(const Module &M);
 void printLinkageMap(const LinkageMap &linkageMap);
 StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functionName);
-bool isIntrinsicToDuplicate(CallBase *CInstr);
+bool isToDuplicateName(StringRef FnMangledName);
+bool isToDuplicate(CallBase *CInstr);
+bool isToExcludeName(StringRef FnMangledName);
 
 void createFtFuncs(Module &Md);
 

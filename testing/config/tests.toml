@@ -42,7 +42,6 @@ source_file = "c/data_duplication_integrity/misc_data_dup.c"
 [[tests]]
 test_name = "c_printf_to_duplicate"
 source_file = "c/data_duplication_integrity/printf_to_duplicate.c"
-black_list = ["--eddi", "--seddi", "--fdsc"]
 
 [[tests]]
 test_name = "c_volatile_io"
@@ -63,7 +62,6 @@ source_file = "c/declared_signatures/mixed_ops.c"
 [[tests]]
 test_name = "c_xor_cypher"
 source_file = "c/misc_math/xor_cypher.c"
-black_list = ["--eddi", "--seddi", "--fdsc"]
 
 [[tests]]
 test_name = "c_add"
@@ -101,6 +99,7 @@ source_file = "cpp/simple/add.cpp"
 [[tests]]
 test_name = "cpp_class"
 source_file = "cpp/simple/class.cpp"
+black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_class_var-decl-sign"
@@ -127,6 +126,7 @@ source_file = "cpp/simple/func.cpp"
 [[tests]]
 test_name = "cpp_heap"
 source_file = "cpp/simple/heap.cpp"
+black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_inline_constexpr"
@@ -157,11 +157,12 @@ black_list = ["--inter-rasm", "--racfed"]
 [[tests]]
 test_name = "cpp_template"
 source_file = "cpp/simple/template.cpp"
+black_list = ["--inter-rasm"]
 
 [[tests]]
 test_name = "cpp_threads"
 source_file = "cpp/simple/threads.cpp"
-black_list = ["--inter-rasm", "--racfed", "--eddi", "--seddi", "--fdsc"]
+black_list = ["--inter-rasm", "--racfed"]
 
 [[tests]]
 test_name = "cpp_volatile_memory_order"
@@ -196,3 +197,8 @@ source_file = "c/mibench/dijkstra_small_mibench.c"
 test_name = "c_multiple_functions"
 source_file = "c/autonomous_bench/multiple_functions.c"
 
+[[tests]]
+test_name = "cpp_complex"
+source_file = "cpp/complex/*.cpp"
+add_compiler_flags = "-lm"
+black_list = ["--inter-rasm", "--racfed"]

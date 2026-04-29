@@ -3,10 +3,11 @@
 //
 #include <stdio.h>
 
+__attribute__((annotate("to_harden")))
+int x = 1000;
 
 int main() {
-    int x = 1000;
-        x = x+1;
+    x = x+1;
     if (x<10) {
         x = x*10;
         printf("%d\n", x);

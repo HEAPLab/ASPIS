@@ -50,6 +50,9 @@ private:
     int c;
 };
 
+__attribute__((annotate("to_harden")))
+DerivedClass derivedObj(3, 6, 9);
+
 int main()
 {
     // Test class and member function
@@ -58,6 +61,5 @@ int main()
     myObj.print();
 
     // Test derived class with overridden virtual function
-    DerivedClass derivedObj(3, 6, 9);
     derivedObj.print();
 }
