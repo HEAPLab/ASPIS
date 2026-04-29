@@ -197,3 +197,8 @@ source_file = "c/mibench/dijkstra_small_mibench.c"
 test_name = "c_multiple_functions"
 source_file = "c/autonomous_bench/multiple_functions.c"
 
+[[tests]]
+test_name = "cpp_complex"
+source_file = "cpp/complex/*.cpp"
+add_compiler_flags = "-lm"
+black_list = ["--inter-rasm", "--racfed"]
