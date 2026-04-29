@@ -193,10 +193,11 @@ void CFCSS::createCFGVerificationBB (BasicBlock &BB,
 
   // if the block has a predecessor we use its signature, otherwise the sig = 0
   if (BBSigs.find(Predecessor) != BBSigs.end()) {
-    // PredSig = getNeighborSig(*Predecessor, BBSigs);
-    // if(PredSig == -1) {
+    if(hasNPredecessorsOrMore(BB, 2, BBSigs)) {
+      PredSig = getNeighborSig(*Predecessor, BBSigs);
+    } else {
       PredSig = BBSigs.find(Predecessor)->second;
-    // }
+    }
   }
 
   if(PredSig == CurSig) {
