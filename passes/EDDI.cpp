@@ -585,6 +585,7 @@ EDDI::cloneInstr(Instruction &I,
   } // else place it right after the instruction we are working on
   else {
     IClone->insertAfter(&I);
+    ClonedInstructions.insert(IClone);
   }
   DuplicatedInstructionMap.insert(
       std::pair<Instruction *, Instruction *>(&I, IClone));
@@ -1567,6 +1568,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   // list of duplicated instructions to remove since they are equal to the original
   std::set<CallBase *> GrayAreaCallsToFix;
+  ClonedInstructions.clear();
   int iFn = 1;
   LLVM_DEBUG(dbgs() << "Iterating over the functions...\n");
 
@@ -2054,6 +2056,63 @@ void EDDI::fixGlobalCtors(Module &M) {
   // Set the section to match the original.
   NewGlobalCtors->setSection(Section);
 }
+
+/**
+ * REPAIR groups all original instructions first, followed by all their
+ * duplicates, producing the coarse-grain order:
+ *     A, B, C, A_dup, B_dup, C_dup
+ *
+ * This layout increases the temporal and spatial distance between a MI/SI
+ * pair. As a result, a single transient fault (SEU) is less likely to
+ * corrupt both the original and its duplicate before a consistency check
+ * can detect the mismatch (improving error-detection coverage for
+ * spatially-correlated faults)
+ *
+ * The function is called after the EDDI duplication phase has already
+ * cloned every eligible instruction and wired up operands. It only moves
+ * instructions;
+ *
+ * @param BB                The basic block whose instructions are to be
+ *                          reordered
+ */
+void EDDI::repairBasicBlock(BasicBlock &BB) {
+
+  // Collect all duplicated instructions in this BB,
+  // preserving their relative order so that data-flow dependencies
+  // among duplicates remain satisfied after the move
+  std::vector<Instruction *> DupsInOrder;
+
+  for (Instruction &I : BB) {
+    // PHINodes must stay at the top of the block (LLVM invariant).
+    // AllocaInsts are kept in the entry block's alloca region.
+    // Terminators (br, ret, switch, …) must remain last.
+    // None of these should be relocated
+
+    if (I.isTerminator() || isa<CallBase>(I)) {
+      // If there are no duplicates in this block, nothing to reorder
+      if (DupsInOrder.empty())
+        return;
+
+      // Move every duplicate just before the terminator, in their
+      // original relative order
+      for (Instruction *Dup : DupsInOrder) {
+        if(isa<PHINode>(Dup)){
+          Dup->moveBefore(BB.getFirstNonPHI());
+        }
+        else{
+          Dup->moveBefore(&I);
+        }
+      }
+      DupsInOrder.clear();
+      continue;
+    } else if (ClonedInstructions.find(&I) != ClonedInstructions.end()) {
+      // If this instruction belongs to the cloned set, it is a duplicate
+      // that needs to be sunk to the bottom of the block
+      DupsInOrder.push_back(&I);
+    }    
+  }
+}
+
 
 //-----------------------------------------------------------------------------
 // New PM Registration

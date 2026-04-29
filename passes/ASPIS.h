@@ -8,6 +8,7 @@
 #include "Utils/Utils.h"
 #include <map>
 #include <set>
+#include <unordered_set>
 
 using namespace llvm;
 
@@ -40,6 +41,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         std::set<Function*> toHardenFunctions;
         std::set<Value*> toHardenVariables;
         std::set<Value*> DuplicatedCalls;
+        std::unordered_set<Instruction *> ClonedInstructions;
 
         std::string entryPoint;
         
@@ -68,8 +70,8 @@ class EDDI : public PassInfoMixin<EDDI> {
         Function *duplicateFnArgs(Function &Fn, Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
         void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
         bool temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B, std::map<llvm::Value *, llvm::Value *> &InstructionMap);
-
         void fixGlobalCtors(Module &M);
+        void repairBasicBlock(BasicBlock &BB);
     public:
         explicit EDDI(bool duplicateAll, bool MultipleErrBBEnabled = false, std::string entryPoint = "main") : duplicateAll(duplicateAll), MultipleErrBBEnabled(MultipleErrBBEnabled), entryPoint(entryPoint) {}
 
