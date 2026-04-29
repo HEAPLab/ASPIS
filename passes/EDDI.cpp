@@ -70,14 +70,12 @@ std::set<InvokeInst *> toFixInvokes;
 GlobalVariable* isVTableStore(StoreInst &SInst) {
   if(isa<GetElementPtrInst>(SInst.getValueOperand())) {
     // TODO: Should see the uses of the valueOperand to find this inst in case it happens
-    errs() << "this is a GEP instruction\n";
     auto *V = cast<GetElementPtrInst>(SInst.getValueOperand())->getOperand(0);
     if(isa<GlobalVariable>(V)) {
       auto *GV = cast<GlobalVariable>(V);
       auto vtableName = demangle(GV->getName().str());
       // Found "vtable" in name
       if(vtableName.find("vtable") != vtableName.npos) {
-        // LLVM_DEBUG(dbgs() << "[REDDI] GEP Vtable name: " << vtableName << " of function " << Fn->getName() << "\n");
         return GV;
       }
     }
@@ -106,7 +104,7 @@ std::set<Function *> EDDI::getVirtualMethodsFromConstructor(Function *Fn) {
   std::set<Function *> virtualMethods;
 
   if(!Fn) {
-    errs() << "Fn is not a valid function.\n";
+    errs() << "Error: Fn is not a valid function.\n";
     return virtualMethods;
   }
 
@@ -131,13 +129,13 @@ std::set<Function *> EDDI::getVirtualMethodsFromConstructor(Function *Fn) {
   if(vtable) {
     // Ensure the vtable global variable has an initializer
     if(!vtable->hasInitializer()) {
-      errs() << "Vtable does not have an initializer.\n";
+      errs() << "Error: Vtable does not have an initializer.\n";
       return virtualMethods;
     }
 
     Constant *Initializer = vtable->getInitializer();
     if (!Initializer || !isa<ConstantStruct>(Initializer)) {
-      errs() << "Vtable initializer is not a ConstantStruct.\n";
+      errs() << "Error: Vtable initializer is not a ConstantStruct.\n";
       return virtualMethods;
     }
 
@@ -147,7 +145,7 @@ std::set<Function *> EDDI::getVirtualMethodsFromConstructor(Function *Fn) {
     for(int i = 0; i < VTableStruct->getNumOperands(); i++) {
       Constant *ArrayField = VTableStruct->getOperand(i);
       if (!isa<ConstantArray>(ArrayField)) {
-        errs() << "Vtable field " << i << " is not a ConstantArray.\n";
+        errs() << "Error: Vtable field " << i << " is not a ConstantArray.\n";
         continue;
       }
 
@@ -155,7 +153,6 @@ std::set<Function *> EDDI::getVirtualMethodsFromConstructor(Function *Fn) {
       for (Value *Elem : cast<ConstantArray>(ArrayField)->operands()) {
         if (isa<Function>(Elem)) {
           virtualMethods.insert(cast<Function>(Elem));
-          // LLVM_DEBUG(dbgs() << "[REDDI] Found virtual method " << cast<Function>(Elem)->getName() <<  " in " << Fn->getName() << "\n");
         }
       }
     }
@@ -182,7 +179,7 @@ void EDDI::fixDuplicatedConstructors(Module &Md) {
     Function *FnDup = getFunctionDuplicate(Fn);
 
     if(!FnDup) {
-      errs() << "Doesn't exist the dup version of " << Fn->getName() << "\n";
+      errs() << "Error: Doesn't exist the dup version of " << Fn->getName() << "\n";
       continue;
     }
 
@@ -208,7 +205,7 @@ void EDDI::fixDuplicatedConstructors(Module &Md) {
       // Ensure the vtable global variable has an initializer
       Constant *Initializer = vtable->getInitializer();
       if (!Initializer || !isa<ConstantStruct>(Initializer)) {
-        errs() << "Vtable initializer is not a ConstantStruct.\n";
+        errs() << "Error: Vtable initializer is not a ConstantStruct.\n";
         return;
       }
 
@@ -220,7 +217,7 @@ void EDDI::fixDuplicatedConstructors(Module &Md) {
       for(int i = 0; i < VTableStruct->getNumOperands(); i++) {
         Constant *ArrayField = VTableStruct->getOperand(i);
         if (!isa<ConstantArray>(ArrayField)) {
-          errs() << "Vtable field " << i << " is not a ConstantArray.\n";
+          errs() << "Error: Vtable field " << i << " is not a ConstantArray.\n";
           continue;
         }
 
@@ -239,7 +236,7 @@ void EDDI::fixDuplicatedConstructors(Module &Md) {
               // LLVM_DEBUG(dbgs() << "Getting _dup function: " << DupFunction->getName() << "\n");
               ModifiedElements.push_back(DupFunction);
             } else {
-              errs() << "Missing _dup function for: " << Func->getName() << "\n";
+              errs() << "Error: Missing _dup function for: " << Func->getName() << "\n";
               ModifiedElements.push_back(cast<Constant>(Elem)); // Keep the original
             }
           } else {
@@ -279,7 +276,7 @@ void EDDI::fixDuplicatedConstructors(Module &Md) {
             if(isVTableStore(SInst)) {
               if(isa<GetElementPtrInst>(SInst.getValueOperand())) {
                 // TODO: Should see the uses of the valueOperand to find this inst in case it happens
-                errs() << "this is a GEP instruction\n";
+                errs() << "Error: GEP instruction not handled\n";
               } else if(isa<ConstantExpr>(SInst.getValueOperand())) {
                 auto *CE = cast<ConstantExpr>(SInst.getValueOperand());
                 if (CE->getOpcode() == Instruction::GetElementPtr) {
@@ -328,7 +325,7 @@ void EDDI::fixDuplicatedConstructors(Module &Md) {
  */
 void EDDI::preprocess(Module &Md) {
   // Replace all uses of alias to aliasee
-  LLVM_DEBUG(dbgs() << "[REDDI] Replacing aliases\n");
+  LLVM_DEBUG(dbgs() << "Replacing aliases\n");
   for (auto &alias : Md.aliases()) {
     auto aliasee = alias.getAliaseeObject();
     if(isa<Function>(aliasee)){
@@ -389,14 +386,14 @@ void EDDI::preprocess(Module &Md) {
 
           if(isa<GlobalVariable>(V) && cast<GlobalVariable>(V)->hasInitializer() && toHardenVariables.find(V) == toHardenVariables.end()) {
             toHardenVariables.insert(V);
-            outs() << "Inserting GV from explicit toHarden: " << *V << "\n";
+            LLVM_DEBUG(dbgs() << "Inserting GV from explicit toHarden: " << *V << "\n");
           } 
           else if(isa<GEPOperator>(V)) {
             for(auto &U : cast<GEPOperator>(V)->operands()) {
               // if(isa<GlobalVariable>(U) && U->hasName() && !isToDuplicateName(U->getName())) {
               if(isa<GlobalVariable>(U) && cast<GlobalVariable>(U)->hasInitializer() && toHardenVariables.find(U) == toHardenVariables.end()) {
                 toHardenVariables.insert(U);
-                outs() << "Inserting GV from explicit toHarden from GEPOp: " << *U << "\n";
+                LLVM_DEBUG(dbgs() << "Inserting GV from explicit toHarden from GEPOp: " << *U << "\n");
               }
             }
           }
@@ -413,7 +410,6 @@ void EDDI::preprocess(Module &Md) {
   while(!toCheckVariables.empty()){
     std::set<Value *> toAddVariables; // support set to contain new to-be-checked values
     for(Value *V : toCheckVariables) {
-      // outs() << "Instruction to check: " << *V << "\n";
       // Just protect the return value of the call, not the operands
       if((isa<Instruction>(V) || isa<GEPOperator>(V)) && !isa<CallBase>(V)) {
         auto Instr = cast<User>(V);
@@ -426,10 +422,8 @@ void EDDI::preprocess(Module &Md) {
           if(isa<PHINode>(Instr)) {
             auto PhiInst = cast<PHINode>(Instr);
             operand = PhiInst->getIncomingValue(i);
-            // outs() << "phi operand: " << *operand << "\n";
           } else if(isa<Instruction>(Instr->getOperand(i)) || isa<GlobalVariable>(Instr->getOperand(i)) || isa<GEPOperator>(Instr->getOperand(i))) {
             operand = Instr->getOperand(i);
-            // outs() << "operand: " << *operand << "\n";
           }
           
           // Check if to add operand to toAddVariables
@@ -440,21 +434,18 @@ void EDDI::preprocess(Module &Md) {
                 (!operand->hasName() || !isToDuplicateName(operand->getName())) && 
                 (!isa<AllocaInst>(operand) || !isAllocaForExceptionHandling(*cast<AllocaInst>(operand)))) {
             toAddVariables.insert(operand);
-            // outs() << "* To be hardened operand: " << *operand << "\n";
           }
         }
       }
 
       for(User *U : V->users()) {
         if(isa<Instruction>(U) || isa<GEPOperator>(U)) {
-        // if(isa<StoreInst>(U) || isa<LoadInst>(U) || isa<GetElementPtrInst>(U) || isa<BinaryOperator>(U) || isa<PHINode>(U) || isa<SelectInst>(U) || isa<CastInst>(U)) {
           if(U != NULL && U != V && 
                 toHardenVariables.find(U) == toHardenVariables.end() && 
                 toCheckVariables.find(U) == toCheckVariables.end() && 
                 (FuncAnnotations.find(U) == FuncAnnotations.end() || !FuncAnnotations.find(U)->second.starts_with("exclude")) && 
                 (!U->hasName() || !isToDuplicateName(U->getName())) && 
                 (!isa<AllocaInst>(U) || !isAllocaForExceptionHandling(*cast<AllocaInst>(U)))) {
-            // outs() << "* To be hardened user: " << *U << "\n";
             // If it is a call, add also the called function in the toHardenFunction set
             if(isa<CallBase>(U)) {
               CallBase *CallI = cast<CallBase>(U);     
@@ -466,9 +457,6 @@ void EDDI::preprocess(Module &Md) {
                 // If it isn't/hasn't a duplicate version already
                 toHardenFunctions.insert(Fn);
                 toAddVariables.insert(U);
-              } else {
-                errs() << "[REDDI] Indirect Function to harden (called by " << V->getName() << ")\n";
-                // continue;
               }
             } else {
               toAddVariables.insert(U);
@@ -847,7 +835,7 @@ void EDDI::addConsistencyChecks(
                   CmpInstructions.push_back(
                       B.CreateCmp(CmpInst::ICMP_EQ, OriginalElem, CopyElem));
                 } else {
-                  errs() << "Didn't create a comparison for ";
+                  errs() << "Warning: Didn't create a comparison for ";
                   OriginalElem->getType()->print(errs());
                   errs() << " type\n";
                 }
@@ -864,7 +852,7 @@ void EDDI::addConsistencyChecks(
             CmpInstructions.push_back(
                 B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
           } else {
-            errs() << "Didn't create a comparison for " << Original->getType() << " type\n";
+            errs() << "Warning: Didn't create a comparison for " << Original->getType() << " type\n";
           }
         }
       }
@@ -1076,7 +1064,7 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
   Function *Fn = getFunctionDuplicate(Callee);
 
   if(Callee != NULL && (Fn == NULL || Fn == Callee)) {
-    errs() << "Doesn't exist or already duplicated function: " << *CInstr << "\n";
+    errs() << "Error: Doesn't exist or already duplicated function: " << *CInstr << "\n";
     return 0;
   }
 
@@ -1339,7 +1327,7 @@ int EDDI::duplicateInstruction(
         B.SetInsertPoint(
             &*cast<InvokeInst>(CInstr)->getNormalDest()->getFirstInsertionPt());
       } else {
-        errs() << "Can't set insert point! " << I << "\n";
+        errs() << "Error: Can't set insert point! " << I << "\n";
         abort();
       }
       // get the function with the duplicated signature, if it exists
@@ -1440,7 +1428,7 @@ Type *getValueType(Value *Arg, Align *ArgAlign) {
         Type *ElementType = Type::getInt8Ty(Ctx); // Byte type
         return ArrayType::get(ElementType, cast<ConstantInt>(Size)->getZExtValue());
       }
-      errs() << "Call not supported" << *Arg << "\n";
+      errs() << "Error: Call not supported" << *Arg << "\n";
       return Type::getVoidTy(Arg->getContext());
     } else if(isa<GlobalValue>(Arg)) {
       Type *ArgType = cast<GlobalValue>(Arg)->getValueType();
@@ -1450,14 +1438,13 @@ Type *getValueType(Value *Arg, Align *ArgAlign) {
           if (isa<StoreInst>(ArgUsers) && cast<StoreInst>(ArgUsers)->getPointerOperand() == Arg) {
             Arg = cast<StoreInst>(ArgUsers)->getValueOperand();
             *ArgAlign = cast<StoreInst>(ArgUsers)->getAlign();
-            errs() << "Store found: " << *ArgUsers << " with align " << ArgAlign->value() << "\n";
             foundNewValue = true;
             break;
           }
         }
 
         if(!foundNewValue) {
-          errs() << "Global Type not supported" << *Arg << "\n";
+          errs() << "Error: Global Type not supported" << *Arg << "\n";
           return Type::getVoidTy(Arg->getContext());
         }
       } else {
@@ -1480,7 +1467,7 @@ Type *getValueType(Value *Arg, Align *ArgAlign) {
       *ArgAlign = cast<StoreInst>(Arg)->getAlign();
       Arg = cast<StoreInst>(Arg)->getValueOperand();
     } else  {
-      errs() << "Type not supported" << *Arg << "\n";
+      errs() << "Error: Type not supported" << *Arg << "\n";
       return Type::getVoidTy(Arg->getContext());
     }
   }
@@ -1617,9 +1604,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
           if (duplicateInstruction(*I, DuplicatedInstructionMap, *ErrBB)) {
             if(InstructionsToRemove.find(I) == InstructionsToRemove.end()) {
               InstructionsToRemove.insert(I);
-              errs() << "Remove instr ( " << *I << " ) from " << *I->getParent()->getParent() << " while duplicating fn args\n";
-            } else {
-              errs() << "Duplicated to remove instr ( " << *I << " ) from " << *I->getParent()->getParent() << " while duplicating fn args\n";
             }
           }
         }
@@ -1664,7 +1648,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   // (already handled in a duplicated function)
   for (Value *V : toHardenVariables) {
     if(V == NULL) {
-      errs() << "To harden a null var\n";
+      errs() << "Error: To harden a null var\n";
       continue;
     }
 
@@ -1718,7 +1702,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     if(annot.second.starts_with("to_harden")) {
       if(isa<Function>(annot.first)) {
         auto Fn = cast<Function>(annot.first);
-        outs() << "Adding to GrayAreaCallsToFix all calls of " << Fn->getName() << "\n";
+        LLVM_DEBUG(dbgs() << "Adding to GrayAreaCallsToFix all calls of " << Fn->getName() << "\n");
         // Get function calls in gray area
         for(auto U : getFunctionFromDuplicate(Fn)->users()) {
           if(isa<CallBase>(U)) {
@@ -1726,7 +1710,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
             // Protect this call if it's not in toHardenFunction and is not marked as `exclude`
             if(toHardenFunctions.find(caller) == toHardenFunctions.end() && 
                   (FuncAnnotations.find(caller) == FuncAnnotations.end() || !FuncAnnotations.find(caller)->second.starts_with("exclude"))) {
-              outs() << "GrayAreaCallsToFix added: " << *U << "\n";
+              LLVM_DEBUG(dbgs() << "GrayAreaCallsToFix added: " << *U << "\n");
               GrayAreaCallsToFix.insert(cast<CallBase>(U));
             }
           }
@@ -1741,7 +1725,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     if(FuncAnnotations.find(CInstr->getCalledFunction()) != FuncAnnotations.end() && 
         FuncAnnotations.find(CInstr->getCalledFunction())->second.starts_with("exclude")) {
       // Maybe check if have to fix operands and return after the call
-      errs() << "About to duplicate a call not to duplciate: " << *CInstr << "\n";
+      errs() << "Error: About to duplicate a call not to duplciate: " << *CInstr << "\n";
       continue;
     }
 
@@ -1805,7 +1789,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   LLVM_DEBUG(dbgs() << "Fixing invokes\n");
   for(InvokeInst *IInstr : toFixInvokes) {
     if(IInstr == NULL) {
-      errs() << "To fix a null invoke\n";
+      errs() << "Error: To fix a null invoke\n";
       continue;
     }
 
@@ -1824,7 +1808,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   // Drop the instructions that have been marked for removal earlier
   for (Instruction *I2rm : InstructionsToRemove) {
     if(I2rm == NULL) {
-      errs() << "To remove a null instruction\n";
+      errs() << "Error: To remove a null instruction\n";
       continue;
     }
 
@@ -1852,17 +1836,10 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   LLVM_DEBUG(dbgs() << "Persisting Compiled Functions...\n");
   persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
 
-/*   if (Function *mainFunc = Md.getFunction("main")) {
-    errs() << *mainFunc;
-  } else {
-    errs() << "Function 'main' not found!\n";
-  }
- */
   return PreservedAnalyses::none();
 }
 
 bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B, std::map<llvm::Value *, llvm::Value *> &InstructionMap) {
-  errs() << "Performing temporary argument duplication for value: " << *value << " in function: " << B.GetInsertBlock()->getParent()->getName() << "\n";
   const llvm::DataLayout &DL = Md.getDataLayout();
   Type *valueType;
   
