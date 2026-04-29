@@ -1003,6 +1003,7 @@ void EDDI::duplicateGlobals(
     bool isArray = GV->getValueType()->isArrayTy();
     bool isPointer = GV->getValueType()->isPointerTy();
     bool ends_withDup = GV->getName().ends_with("_dup");
+    bool isExtern = GV->hasExternalLinkage() && GV->isDeclaration();
     bool hasInternalLinkage = GV->hasInternalLinkage();
     bool isMetadataInfo = GV->getSection() == "llvm.metadata";
     bool isReservedName = GV->getName().starts_with("llvm.");
@@ -1010,7 +1011,7 @@ void EDDI::duplicateGlobals(
                      GVAnnotation != FuncAnnotations.end() &&
                      GVAnnotation->second.starts_with("exclude");
 
-    if (! (isFunction || isConstant || ends_withDup || isMetadataInfo || isReservedName || toExclude) // is not function, constant, struct and does not end with _dup
+    if (! (isFunction || isConstant || isExtern || ends_withDup || isMetadataInfo || isReservedName || toExclude) // is not function, constant, struct and does not end with _dup
         /* && ((hasInternalLinkage && (!isArray || (isArray && !cast<ArrayType>(GV.getValueType())->getArrayElementType()->isAggregateType() ))) // has internal linkage and is not an array, or is an array but the element type is not aggregate
             || !isArray) */ // if it does not have internal linkage, it is not an array or a pointer
         ) {
