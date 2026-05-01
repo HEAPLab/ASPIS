@@ -63,7 +63,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         Instruction* cloneInstr(Instruction &I);
         void duplicateOperands (Instruction &I, BasicBlock &ErrBB);
         Value* getPtrFinalValue(Value &V);
-        Value* comparePtrs(Value &V1, Value &V2, IRBuilder<> &B);
+        void comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B);
         void addConsistencyChecks(Instruction &I, BasicBlock &ErrBB);
         void fixFuncValsPassedByReference(Instruction &I, IRBuilder<> &B);
         int transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &ErrBB) ;
@@ -77,7 +77,8 @@ class EDDI : public PassInfoMixin<EDDI> {
         void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
         bool temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B);
         Value *getDuplicateValue(Value *V, Instruction *I);
-
+        void createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, IRBuilder<> &B);
+        void compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B);
         void fixGlobalCtors(Module &M);
         void repairBasicBlock(BasicBlock &BB);
     public:
