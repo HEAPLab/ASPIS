@@ -49,6 +49,8 @@ class EDDI : public PassInfoMixin<EDDI> {
 
         bool duplicateAll;
         bool MultipleErrBBEnabled;
+        int comparisonCounter = 0;
+        int nonComparisonCounter = 0;
 
         void preprocess(Module &Md);
         void fixDuplicatedConstructors(Module &Md);
@@ -57,7 +59,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         Instruction* cloneInstr(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap);
         void duplicateOperands (Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
         Value* getPtrFinalValue(Value &V);
-        Value* comparePtrs(Value &V1, Value &V2, IRBuilder<> &B);
+        void comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, std::map<Value *, Value *> &DuplicatedInstructionMap);
         void addConsistencyChecks(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
         void fixFuncValsPassedByReference(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B);
         int transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B, BasicBlock &ErrBB) ;
@@ -70,7 +72,8 @@ class EDDI : public PassInfoMixin<EDDI> {
         Function *duplicateFnArgs(Function &Fn, Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
         void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
         bool temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B, std::map<llvm::Value *, llvm::Value *> &InstructionMap);
-
+        void createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B);
+        void compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, std::map<Value *, Value *> &DuplicatedInstructionMap);
         void fixGlobalCtors(Module &M);
     public:
         explicit EDDI(bool duplicateAll, bool MultipleErrBBEnabled = false, std::string entryPoint = "main") : duplicateAll(duplicateAll), MultipleErrBBEnabled(MultipleErrBBEnabled), entryPoint(entryPoint) {}

@@ -695,7 +695,7 @@ void EDDI::duplicateOperands(
 Value *EDDI::getPtrFinalValue(Value &V) {
   Value *res = NULL;
 
-  if (V.getType()->isPointerTy()) {
+  if (V.getType()->isPointerTy() && V.hasUseList()) {
     // find the store using V as ptr
     for (User *U : V.users()) {
       if (isa<StoreInst>(U)) {
@@ -719,7 +719,7 @@ Value *EDDI::getPtrFinalValue(Value &V) {
 
 // Follows the pointers V1 and V2 using getPtrFinalValue() and adds a compare
 // instruction using the IRBuilder B.
-Value *EDDI::comparePtrs(Value &V1, Value &V2, IRBuilder<> &B) {
+void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, std::map<Value *, Value *> &DuplicatedInstructionMap) {
   /**
    * synthax `store val, ptr`
    *
@@ -737,13 +737,8 @@ Value *EDDI::comparePtrs(Value &V1, Value &V2, IRBuilder<> &B) {
   if (F1 != NULL && F2 != NULL && !F1->getType()->isPointerTy()) {
     Instruction *L1 = B.CreateLoad(F1->getType(), F1);
     Instruction *L2 = B.CreateLoad(F2->getType(), F2);
-    if (L1->getType()->isFloatingPointTy()) {
-      return B.CreateCmp(CmpInst::FCMP_UEQ, L1, L2);
-    } else {
-      return B.CreateCmp(CmpInst::ICMP_EQ, L1, L2);
-    }
+    compareValues(CmpInstructions, *L1, *L2, B, DuplicatedInstructionMap);
   }
-  return NULL;
 }
 
 /**
@@ -775,88 +770,14 @@ void EDDI::addConsistencyChecks(
     if (Duplicate != DuplicatedInstructionMap.end()) {
       Value *Original = Duplicate->first;
       Value *Copy = Duplicate->second;
-      if (Original->getType()->isIntOrIntVectorTy() || Original->getType()->isPtrOrPtrVectorTy()) {
-        // DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, &I));
-        CmpInstructions.push_back(B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
-      }
+
+      compareValues(&CmpInstructions, *Original, *Copy, B, DuplicatedInstructionMap);
     }
   }
 
   // add a comparison for each operand
   for (Value *V : I.operand_values()) {
-    // we compare the operands if they are instructions
-    if (isa<Instruction>(V)) {
-      // get the duplicate of the operand
-      Instruction *Operand = cast<Instruction>(V);
-
-      // If the operand is a pointer and is not used by any store, we skip the
-      // operand
-      if (Operand->getType()->isPointerTy() && !isUsedByStore(*Operand, I)) {
-        continue;
-      }
-
-      auto Duplicate = DuplicatedInstructionMap.find(Operand);
-
-      // if the duplicate exists we perform a compare
-      if (Duplicate != DuplicatedInstructionMap.end()) {
-        Value *Original = Duplicate->first;
-        Value *Copy = Duplicate->second;
-
-        // if the operand is a pointer we try to get a compare on pointers
-        if (Original->getType()->isPointerTy()) {
-          Value *CmpInstr = comparePtrs(*Original, *Copy, B);
-          if (CmpInstr != NULL) {
-            CmpInstructions.push_back(CmpInstr);
-          }
-        }
-        // if the operand is an array we have to compare all its elements
-        else if (Original->getType()->isArrayTy()) {
-          if (!Original->getType()->getArrayElementType()->isAggregateType()) {
-            int arraysize = Original->getType()->getArrayNumElements();
-
-            for (int i = 0; i < arraysize; i++) {
-              Value *OriginalElem = B.CreateExtractValue(Original, i);
-              Value *CopyElem = B.CreateExtractValue(Copy, i);
-              DuplicatedInstructionMap.insert(
-                  std::pair<Value *, Value *>(OriginalElem, CopyElem));
-              DuplicatedInstructionMap.insert(
-                  std::pair<Value *, Value *>(CopyElem, OriginalElem));
-
-              if (OriginalElem->getType()->isPointerTy()) {
-                Value *CmpInstr = comparePtrs(*OriginalElem, *CopyElem, B);
-                if (CmpInstr != NULL) {
-                  CmpInstructions.push_back(CmpInstr);
-                }
-              } else {
-                if (OriginalElem->getType()->isFloatingPointTy()) {
-                  CmpInstructions.push_back(
-                      B.CreateCmp(CmpInst::FCMP_UEQ, OriginalElem, CopyElem));
-                } else if (OriginalElem->getType()->isIntOrIntVectorTy() || OriginalElem->getType()->isPtrOrPtrVectorTy()) {
-                  CmpInstructions.push_back(
-                      B.CreateCmp(CmpInst::ICMP_EQ, OriginalElem, CopyElem));
-                } else {
-                  errs() << "Warning: Didn't create a comparison for ";
-                  OriginalElem->getType()->print(errs());
-                  errs() << " type\n";
-                }
-              }
-            }
-          }
-        }
-        // else we just add a compare
-        else {
-          if (Original->getType()->isFloatingPointTy()) {
-            CmpInstructions.push_back(
-                B.CreateCmp(CmpInst::FCMP_UEQ, Original, Copy));
-          } else if (Original->getType()->isIntOrIntVectorTy() || Original->getType()->isPtrOrPtrVectorTy()) {
-            CmpInstructions.push_back(
-                B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
-          } else {
-            errs() << "Warning: Didn't create a comparison for " << Original->getType() << " type\n";
-          }
-        }
-      }
-    }
+    createCompareOnOperand(&CmpInstructions, V, I, DuplicatedInstructionMap, B);
   }
 
   // if in the end we have a set of compare instructions, we check that all of
@@ -869,7 +790,11 @@ void EDDI::addConsistencyChecks(
       CondBrInst->setDebugLoc(I.getDebugLoc());
     }
   } else {
-    errs() << "Warning: no consistency check added for instruction: " << I << "\n";
+    errs() << "Warning: no consistency check added for instruction: " << I;
+    if (I.getFunction()) {
+      errs() << " in function " << I.getFunction()->getName();
+    }
+    errs() << "\n";
   }
 
   if (VerificationBB->size() == 0) {
@@ -879,6 +804,75 @@ void EDDI::addConsistencyChecks(
     }
   }
 }
+
+void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B) {
+  auto Duplicate = DuplicatedInstructionMap.find(V);
+
+  // if the duplicate doesn't exist, we cannot perform a compare
+  if (Duplicate == DuplicatedInstructionMap.end()) {
+    return;
+  }
+
+  Value *Original = Duplicate->first;
+  Value *Copy = Duplicate->second;
+
+  // we compare the operands only if they are found in the TDA transparent types
+  if(deducedTypes.transparentTypes.find(V) == deducedTypes.transparentTypes.end()) {
+    errs() << "Warning: Didn't find transparent type for operand " << V->getName() << " of instruction " << I << "\n";
+    return;
+  }
+
+  compareValues(CmpInstructions, *Original, *Copy, B, DuplicatedInstructionMap);
+}
+
+void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, std::map<Value *, Value *> &DuplicatedInstructionMap) {
+  auto VTy = deducedTypes.transparentTypes.find(&V1)->second.begin()->get();
+  errs() << "Comparing " << V1.getName() << " of type " << VTy->toString() << "\n";
+
+  if(V1.getType() != V2.getType()) {
+    errs() << "Warning: Can't compare values of different types: " << *V1.getType() << " and " << *V2.getType() << "\n";
+    return;
+  }
+
+  if (V1.getType()->isFPOrFPVectorTy()) {
+    CmpInstructions->push_back(B.CreateCmp(CmpInst::FCMP_UEQ, &V1, &V2));
+    comparisonCounter++;
+  } else if (V1.getType()->isIntOrIntVectorTy()) {
+    CmpInstructions->push_back(B.CreateCmp(CmpInst::ICMP_EQ, &V1, &V2));
+    comparisonCounter++;
+  } else if (V1.getType()->isPtrOrPtrVectorTy()) {
+    comparePtrs(CmpInstructions, V1, V2, B, DuplicatedInstructionMap);
+  } else if (V1.getType()->isArrayTy()) {
+    if (!V1.getType()->getArrayElementType()->isAggregateType()) {
+      int arraysize = V1.getType()->getArrayNumElements();
+
+      for (int i = 0; i < arraysize; i++) {
+        Value *OriginalElem = B.CreateExtractValue(&V1, i);
+        Value *CopyElem = B.CreateExtractValue(&V2, i);
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(OriginalElem, CopyElem));
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(CopyElem, OriginalElem));
+
+        compareValues(CmpInstructions,*OriginalElem, *CopyElem, B, DuplicatedInstructionMap);
+      }
+    }
+  } else if (V1.getType()->isStructTy()) {
+    for (unsigned i = 0; i < V1.getType()->getStructNumElements(); i++) {
+      Value *OriginalElem = B.CreateExtractValue(&V1, i);
+      Value *CopyElem = B.CreateExtractValue(&V2, i);
+      DuplicatedInstructionMap.insert(
+          std::pair<Value *, Value *>(OriginalElem, CopyElem));
+      DuplicatedInstructionMap.insert(
+          std::pair<Value *, Value *>(CopyElem, OriginalElem));
+
+      compareValues(CmpInstructions, *OriginalElem, *CopyElem, B, DuplicatedInstructionMap);
+    }
+  } else {
+    errs() << "Warning: Didn't create a comparison for " << *V1.getType() << " type\n";
+  }
+}
+
 
 // Given an instruction, loads and stores the pointers passed to the
 // instruction. This is useful in the case I is a CallBase, since the function
@@ -1567,12 +1561,12 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   deducedTypes = tda.run(Md, AM);
 
-  // Save deduced transparent types
-  for (auto& [value, deducedTypes] : deducedTypes.transparentTypes) {
-    if (!deducedTypes.empty()) {
-      errs() << "Deduced transparent type for " << *value << ": " << (*deducedTypes.begin()).get()->toString() << "\n";
-    }
-  }
+  // // Save deduced transparent types
+  // for (auto& [value, deducedType] : deducedTypes.transparentTypes) {
+  //   if (!deducedType.empty()) {
+  //     errs() << "Deduced transparent type for " << *value << ": " << (*deducedType.begin()).get()->toString() << "\n";
+  //   }
+  // }
 
   // list of duplicated instructions to remove since they are equal to the original
   std::set<CallBase *> GrayAreaCallsToFix;
@@ -1844,6 +1838,9 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   LLVM_DEBUG(dbgs() << "Persisting Compiled Functions...\n");
   persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
+  
+  errs() << "Comparison Counter: " << comparisonCounter << "\n";
+  errs() << "Skipped Comparison Counter: " << nonComparisonCounter << "\n";
 
   return PreservedAnalyses::none();
 }
