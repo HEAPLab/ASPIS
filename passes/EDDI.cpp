@@ -827,37 +827,29 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
 
 void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, std::map<Value *, Value *> &DuplicatedInstructionMap) {
   auto VTy = deducedTypes.transparentTypes.find(&V1)->second.begin()->get();
-  errs() << "Comparing " << V1.getName() << " of type " << VTy->toString() << "\n";
+  LLVM_DEBUG(dbgs() << "Comparing " << V1.getName() << " of type " << VTy->toString() << "\n");
 
   if(V1.getType() != V2.getType()) {
     errs() << "Warning: Can't compare values of different types: " << *V1.getType() << " and " << *V2.getType() << "\n";
+    nonComparisonCounter++;
     return;
   }
 
-  if (V1.getType()->isFPOrFPVectorTy()) {
-    CmpInstructions->push_back(B.CreateCmp(CmpInst::FCMP_UEQ, &V1, &V2));
-    comparisonCounter++;
-  } else if (V1.getType()->isIntOrIntVectorTy()) {
-    CmpInstructions->push_back(B.CreateCmp(CmpInst::ICMP_EQ, &V1, &V2));
-    comparisonCounter++;
-  } else if (V1.getType()->isPtrOrPtrVectorTy()) {
+  if(VTy->isPointerTT()) {
     comparePtrs(CmpInstructions, V1, V2, B, DuplicatedInstructionMap);
-  } else if (V1.getType()->isArrayTy()) {
-    if (!V1.getType()->getArrayElementType()->isAggregateType()) {
-      int arraysize = V1.getType()->getArrayNumElements();
-
-      for (int i = 0; i < arraysize; i++) {
-        Value *OriginalElem = B.CreateExtractValue(&V1, i);
-        Value *CopyElem = B.CreateExtractValue(&V2, i);
-        DuplicatedInstructionMap.insert(
-            std::pair<Value *, Value *>(OriginalElem, CopyElem));
-        DuplicatedInstructionMap.insert(
-            std::pair<Value *, Value *>(CopyElem, OriginalElem));
-
-        compareValues(CmpInstructions,*OriginalElem, *CopyElem, B, DuplicatedInstructionMap);
-      }
+  } else if(VTy->isPrimitiveTT()) {
+    if(VTy->isIntegerTyOrPtrTo()) {
+      CmpInstructions->push_back(B.CreateCmp(CmpInst::ICMP_EQ, &V1, &V2));
+      comparisonCounter++;
+    } else if(VTy->isFloatingPointTyOrPtrTo()) {
+      CmpInstructions->push_back(B.CreateCmp(CmpInst::FCMP_UEQ, &V1, &V2));
+      comparisonCounter++;
+    } else {
+      nonComparisonCounter++;
+      errs() << "Warning: Unsupported primitive type for comparison: " << VTy->toString() << "\n";
+      return;
     }
-  } else if (V1.getType()->isStructTy()) {
+  } else if(VTy->isStructTT()) {
     for (unsigned i = 0; i < V1.getType()->getStructNumElements(); i++) {
       Value *OriginalElem = B.CreateExtractValue(&V1, i);
       Value *CopyElem = B.CreateExtractValue(&V2, i);
@@ -868,8 +860,23 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
 
       compareValues(CmpInstructions, *OriginalElem, *CopyElem, B, DuplicatedInstructionMap);
     }
+  } else if(VTy->isArrayTT()) {
+    int arraysize = V1.getType()->getArrayNumElements();
+
+    for (int i = 0; i < arraysize; i++) {
+      Value *OriginalElem = B.CreateExtractValue(&V1, i);
+      Value *CopyElem = B.CreateExtractValue(&V2, i);
+      DuplicatedInstructionMap.insert(
+          std::pair<Value *, Value *>(OriginalElem, CopyElem));
+      DuplicatedInstructionMap.insert(
+          std::pair<Value *, Value *>(CopyElem, OriginalElem));
+
+      compareValues(CmpInstructions,*OriginalElem, *CopyElem, B, DuplicatedInstructionMap);
+    }
   } else {
-    errs() << "Warning: Didn't create a comparison for " << *V1.getType() << " type\n";
+    errs() << "Warning: Unsupported type for comparison: " << VTy->toString() << "\n";
+    nonComparisonCounter++;
+    return;
   }
 }
 
