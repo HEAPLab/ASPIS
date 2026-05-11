@@ -717,7 +717,7 @@ void EDDI::duplicateOperands(
 // if the value cannot be found (e.g. when the pointer is passed as function
 // argument) we return NULL.
 Value *EDDI::getPtrFinalValue(Value &V) {
-  Value *res = NULL;
+  Value *res = nullptr;
 
   if (V.getType()->isPointerTy() && V.hasUseList()) {
     // find the store using V as ptr
@@ -755,14 +755,153 @@ void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &
    * for finding a _b = load c _a = load _b
    */
 
-  Value *F1 = getPtrFinalValue(V1);
-  Value *F2 = getPtrFinalValue(V2);
-
-  if (F1 != NULL && F2 != NULL && !F1->getType()->isPointerTy()) {
-    Instruction *L1 = B.CreateLoad(F1->getType(), F1);
-    Instruction *L2 = B.CreateLoad(F2->getType(), F2);
-    compareValues(CmpInstructions, *L1, *L2, B);
+  if(isa<Function>(V1) || isa<Function>(V2)) {
+    errs() << "Warning: Comparing functions\n";
+    return;
   }
+
+  Value *F1 = &V1;
+  Value *F2 = &V2;
+
+  if(!deducedTypes.transparentTypes.contains(&V1) || !deducedTypes.transparentTypes.contains(&V2)) {
+    errs() << "Warning: " << V1 << " or " << V2 << " not in deduced types\n";
+    return;
+  }
+
+  if(deducedTypes.transparentTypes.find(&V1)->second.size() != 1) {
+    errs() << "\tMultiple types 1!\n";
+    for(auto el=deducedTypes.transparentTypes.find(&V1)->second.cbegin(); el != deducedTypes.transparentTypes.find(&V1)->second.cend(); el++) {
+      errs() << "\t" << el->get()->toString() << "\n";
+    }
+    return;
+  }
+
+  if(deducedTypes.transparentTypes.find(&V2)->second.size() != 1) {
+    errs() << "\tMultiple types 2!\n";
+    for(auto el=deducedTypes.transparentTypes.find(&V2)->second.cbegin(); el != deducedTypes.transparentTypes.find(&V2)->second.cend(); el++) {
+      errs() << "\t" << el->get()->toString() << "\n";
+    }
+    return;
+  }
+
+  auto V1Ty = deducedTypes.transparentTypes.find(&V1)->second.begin()->get();
+  auto V2Ty = deducedTypes.transparentTypes.find(&V2)->second.begin()->get();
+
+  if(!V1Ty || V1Ty->isOpaquePtr()) {
+    errs() << "Warning 1: Can't find final value for pointer " << V1 << "\n";
+    return;
+  }
+
+  if(!V2Ty || V2Ty->isOpaquePtr()) {
+    errs() << "Warning 2: Can't find final value for pointer " << V1 << "\n";
+    return;
+  }
+    
+  assert(((V1Ty->isPointerTT() && V1.getType()->isPointerTy()) || (V2Ty->isPointerTT() && V2.getType()->isPointerTy())) && "No pointers found");
+
+  while(V1Ty->isPointerTT()) {
+    V1Ty = V1Ty->getPointedType();
+
+    if(V1Ty == nullptr) {
+      errs() << "Warning1: Can't find final value for pointer " << V1 << "\n";
+      return;
+    }
+
+    if(F1->getType()->isPointerTy()) {
+      F1 = B.CreateLoad(V1Ty->getLLVMType(), F1);
+    }
+  }
+
+  while(V2Ty->isPointerTT()) {
+    V2Ty = V2Ty->getPointedType();
+
+    if(V2Ty == nullptr) {
+      errs() << "Warning2: Can't find final value for pointer " << V2 << "\n";
+      return;
+    }
+
+    if(F2->getType()->isPointerTy()) {
+      F2 = B.CreateLoad(V2Ty->getLLVMType(), F2);
+    }
+  }
+
+  if(F1->getType() != F2->getType()) {
+    errs() << "Warning: Can't compare pointers " << V1.getName() << " and " << V2.getName() << " because their final value have incompatible types: " << *F1 << " and " << *F2 << "\n";
+    return;
+  }
+
+  deducedTypes.transparentTypes[F1].insert(V1Ty->clone());
+  deducedTypes.transparentTypes[F2].insert(V2Ty->clone());
+
+  compareValues(CmpInstructions, *F1, *F2, B);
+}
+
+
+bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
+  
+  assert(AI->getParent()->getParent() == At->getParent()->getParent() && "Alloca and Instruction not in the same function!");
+
+  std::unordered_set<StoreInst *> storeInsts;
+
+  // TODO: Check if it is needed to consider other virtual registers that alias that same value
+  for (User *U : AI->users()) {
+    if (auto *SI = dyn_cast<StoreInst>(U)) {
+      if (SI->getPointerOperand() == AI) {
+        storeInsts.insert(SI);
+        errs() << "\t[store] " << *SI << "\n";
+      }
+    }
+  }
+
+  // If no store instructions found with target to that alloca
+  if(storeInsts.empty()) {
+    return false;
+  }
+
+  std::vector<Instruction *> InstToBeCheckedFrom{AI};
+  std::set<Instruction *> InstCheckedFrom;
+  while(!InstToBeCheckedFrom.empty()) {
+    Instruction *I = InstToBeCheckedFrom.back();
+    InstToBeCheckedFrom.pop_back();
+    InstCheckedFrom.insert(I);
+
+    if(I == nullptr) {
+      errs() << "\tCONTINUED!\n";
+      continue;
+    }
+
+    do {
+      if(I == At) {
+        return false;
+      }
+
+      if(isa<BranchInst>(I)) {
+        for(int i = 0; i < cast<BranchInst>(I)->getNumSuccessors(); i++) {
+          auto addInst = cast<BranchInst>(I)->getSuccessor(i)->getFirstNonPHI();
+          // If doesn't exist the first instruction in the BB it will probably be the BB for the check we are building
+          if(addInst == nullptr) {
+            return false;
+          } else if(InstCheckedFrom.find(addInst) == InstCheckedFrom.end()) {
+            InstToBeCheckedFrom.push_back(addInst);
+          }
+        }
+      } else if (isa<InvokeInst>(I)) {
+        auto addInst = cast<InvokeInst>(I)->getNormalDest()->getFirstNonPHI();
+        if(addInst == nullptr) {
+            return false;
+        } else if(InstCheckedFrom.find(addInst) == InstCheckedFrom.end()) {
+          InstToBeCheckedFrom.push_back(addInst);
+        }
+      }
+
+      // If it is a valid store to end, continue to search for another path that does not initialize the alloca variale.
+      if(isa<StoreInst>(I) && storeInsts.find(cast<StoreInst>(I)) != storeInsts.end()) {
+        break;
+      }
+    } while(I = I->getNextNode());
+  }
+
+  return true;
 }
 
 /**
@@ -799,9 +938,15 @@ void EDDI::addConsistencyChecks(
     }
   }
 
-  // add a comparison for each operand
-  for (Value *V : I.operand_values()) {
-    createCompareOnOperand(&CmpInstructions, V, I, B);
+  if(isa<StoreInst>(I)) {
+    IRBuilder<> tmpB(VerificationBB);
+    createCompareOnOperand(&CmpInstructions, cast<StoreInst>(I).getValueOperand(), I, tmpB);
+  } else {
+    // add a comparison for each operand
+    for (Value *V : I.operand_values()) {
+      IRBuilder<> tmpB(VerificationBB);
+      createCompareOnOperand(&CmpInstructions, V, I, tmpB);
+    }
   }
 
   // if in the end we have a set of compare instructions, we check that all of
@@ -813,15 +958,9 @@ void EDDI::addConsistencyChecks(
     if (DebugEnabled) {
       CondBrInst->setDebugLoc(I.getDebugLoc());
     }
-  } else {
-    errs() << "Warning: no consistency check added for instruction: " << I;
-    if (I.getFunction()) {
-      errs() << " in function " << I.getFunction()->getName();
-    }
-    errs() << "\n";
   }
 
-  if (VerificationBB->size() == 0) {
+  if (!VerificationBB->getTerminator()) {
     auto BrInst = B.CreateBr(I.getParent());
     if (DebugEnabled) {
       BrInst->setDebugLoc(I.getDebugLoc());
@@ -837,12 +976,24 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
     return;
   }
 
+  if(isa<AllocaInst>(V)) {
+    if(!isLocalValueInitializedBefore(cast<Instruction>(V), &I)) {
+      return;
+    }
+  } else if(isa<GetElementPtrInst>(V)) {
+    // TODO: What to do here?
+    if(!isLocalValueInitializedBefore(cast<Instruction>(V), &I)) {
+      return;
+    }
+  } else {
+    // TODO: are there other cases to support?
+  }
+
   Value *Original = Duplicate->first;
   Value *Copy = Duplicate->second;
 
   // we compare the operands only if they are found in the TDA transparent types
   if(deducedTypes.transparentTypes.find(V) == deducedTypes.transparentTypes.end()) {
-    errs() << "Warning: Didn't find transparent type for operand " << V->getName() << " of instruction " << I << "\n";
     return;
   }
 
@@ -850,28 +1001,37 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
 }
 
 void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B) {
-  auto VTy = deducedTypes.transparentTypes.find(&V1)->second.begin()->get();
-
-  if(V1.getType() != V2.getType()) {
-    errs() << "Warning: Can't compare values of different types: " << *V1.getType() << " and " << *V2.getType() << "\n";
+  if(isa<Function>(V1) || isa<Function>(V2)) {
+    errs() << "Not comparing functions\n";
+    return;
+  }
+  
+  if(deducedTypes.transparentTypes.find(&V1) == deducedTypes.transparentTypes.end()) {
     return;
   }
 
-  if(VTy->isPointerTT()) {
+  if(deducedTypes.transparentTypes.find(&V2) == deducedTypes.transparentTypes.end()) {
+    return;
+  }
+
+  TransparentType *V1Ty = deducedTypes.transparentTypes.find(&V1)->second.begin()->get();
+  TransparentType *V2Ty = deducedTypes.transparentTypes.find(&V2)->second.begin()->get();
+
+  if(V1Ty->isPointerTT() || V2Ty->isPointerTT()) {
     comparePtrs(CmpInstructions, V1, V2, B);
-  } else if(VTy->isPrimitiveTT()) {
-    if(VTy->isIntegerTyOrPtrTo()) {
+  } else if(V1Ty->isPrimitiveTT()) {
+    if(V1Ty->isIntegerTyOrPtrTo()) {
       CmpInstructions->push_back(B.CreateCmp(CmpInst::ICMP_EQ, &V1, &V2));
       comparisonCounter++;
-    } else if(VTy->isFloatingPointTyOrPtrTo()) {
+    } else if(V1Ty->isFloatingPointTyOrPtrTo()) {
       CmpInstructions->push_back(B.CreateCmp(CmpInst::FCMP_UEQ, &V1, &V2));
       comparisonCounter++;
     } else {
-      errs() << "Warning: Unsupported primitive type for comparison: " << VTy->toString() << "\n";
+      errs() << "Warning: Unsupported primitive type for comparison: " << V1Ty->toString() << "\n";
       return;
     }
-  } else if(VTy->isStructTT()) {
-    for (unsigned i = 0; i < V1.getType()->getStructNumElements(); i++) {
+  } else if(V1Ty->isStructTT()) {
+    for (unsigned i = 0; i < V1Ty->getLLVMType()->getStructNumElements(); i++) {
       Value *OriginalElem = B.CreateExtractValue(&V1, i);
       Value *CopyElem = B.CreateExtractValue(&V2, i);
       DuplicatedInstructionMap.insert(
@@ -881,8 +1041,8 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
 
       compareValues(CmpInstructions, *OriginalElem, *CopyElem, B);
     }
-  } else if(VTy->isArrayTT()) {
-    int arraysize = V1.getType()->getArrayNumElements();
+  } else if(V1Ty->isArrayTT()) {
+    int arraysize = V1Ty->getLLVMType()->getArrayNumElements();
 
     for (int i = 0; i < arraysize; i++) {
       Value *OriginalElem = B.CreateExtractValue(&V1, i);
@@ -895,7 +1055,7 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
       compareValues(CmpInstructions,*OriginalElem, *CopyElem, B);
     }
   } else {
-    errs() << "Warning: Unsupported type for comparison: " << VTy->toString() << "\n";
+    errs() << "Warning: Unsupported type for comparison: " << V1Ty->toString() << "\n";
     return;
   }
 }
@@ -1206,6 +1366,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     return 0;
   }
 
+  Instruction *clonedInst = nullptr;
   int res = 0;
 
   // if the instruction is an alloca instruction we need to duplicate it
@@ -1213,7 +1374,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     
     if (!isAllocaForExceptionHandling(cast<AllocaInst>(I))){
       
-      cloneInstr(I);
+      clonedInst = cloneInstr(I);
 
     };
 
@@ -1225,7 +1386,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
   else if (isa<BinaryOperator, UnaryInstruction, LoadInst, GetElementPtrInst,
                CmpInst, PHINode, SelectInst,InsertValueInst>(I)) {
     // duplicate the instruction
-    cloneInstr(I);
+    clonedInst = cloneInstr(I);
 
     // duplicate the operands
     duplicateOperands(I, ErrBB);
@@ -1300,7 +1461,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     if ((FuncAnnotations.find(Callee) != FuncAnnotations.end() && FuncAnnotations.find(Callee)->second.starts_with("to_duplicate")) ||
         isToDuplicate(CInstr)) {
       // duplicate the instruction
-      cloneInstr(*CInstr);
+      clonedInst = cloneInstr(*CInstr);
 
       // duplicate the operands
       duplicateOperands(I, ErrBB);
@@ -1361,6 +1522,11 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
         fixFuncValsPassedByReference(*CInstr, B);
       }
     }
+  }
+
+  if(clonedInst && deducedTypes.transparentTypes.find(&I) != deducedTypes.transparentTypes.end()) {
+    auto V1Ty = deducedTypes.transparentTypes.find(&I)->second.begin()->get();
+    deducedTypes.transparentTypes[clonedInst].insert(V1Ty->clone());
   }
 
   return res;
@@ -1581,13 +1747,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   fixDuplicatedConstructors(Md);
 
   deducedTypes = tda.run(Md, AM);
-
-  // // Save deduced transparent types
-  // for (auto& [value, deducedType] : deducedTypes.transparentTypes) {
-  //   if (!deducedType.empty()) {
-  //     errs() << "Deduced transparent type for " << *value << ": " << (*deducedType.begin()).get()->toString() << "\n";
-  //   }
-  // }
 
   // list of duplicated instructions to remove since they are equal to the original
   std::set<CallBase *> GrayAreaCallsToFix;
@@ -1874,6 +2033,12 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B) {
   const llvm::DataLayout &DL = Md.getDataLayout();
   Type *valueType;
+
+  tda::TransparentType *VTy = nullptr;
+  
+  if(deducedTypes.transparentTypes.find(value) != deducedTypes.transparentTypes.end()) {
+    VTy = deducedTypes.transparentTypes.find(value)->second.begin()->get();
+  }
   
   Align valueAlign;
   valueType = getValueType(value, &valueAlign);
@@ -1901,6 +2066,15 @@ bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilde
   DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Copyvalue, value));
   DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(value, Copyvalue));
   DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(memcpy_call, memcpy_call));
+
+  if(VTy != nullptr) {
+    deducedTypes.transparentTypes[Copyvalue].insert(VTy->clone());
+  } else {
+    tda::TransparentType *type = new TransparentType();
+    type->setLLVMType(valueType);
+    deducedTypes.transparentTypes[value].insert(type->clone());
+    deducedTypes.transparentTypes[Copyvalue].insert(type->clone());
+  }
 
   return true;
 }
