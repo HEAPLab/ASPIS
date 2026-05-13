@@ -88,3 +88,12 @@ jobs:
           path: ${{ github.workspace }}/ASPIS/testing/build/comparison_counter.csv
           if-no-files-found: warn
 
+      - name: Upload failed test IR artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-out-ll
+          path: |
+            ASPIS/testing/failed-out-ll/**
+          if-no-files-found: warn
+

@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import pytest
 
@@ -46,12 +47,24 @@ def run_command(command, cwd=None):
 
 def compile_with_aspis(source_file, output_file, options, llvm_bin, build_dir):
   """Compile a file using ASPIS with specified options."""
-  command = f"{ASPIS_SCRIPT} --llvm-bin {llvm_bin} {options} {source_file} -o {output_file}.out --build-dir ./{build_dir} --verbose"
+  command = f"{ASPIS_SCRIPT} --llvm-bin {llvm_bin} {options} {source_file} -o {output_file}.out --build-dir ./{build_dir} --no-cleanup --verbose"
   print(command)
   stdout, stderr, exit_code = run_command(command)
   if exit_code != 0:
     raise RuntimeError(f"[{output_file}] Compilation failed: {stderr}")
   return stdout
+
+def preserve_out_ll(build_dir, test_name):
+  out_ll = os.path.join(build_dir, "out.ll")
+  if os.path.exists(out_ll):
+    os.makedirs("failed-out-ll", exist_ok=True)
+    dest = os.path.join("failed-out-ll", f"{test_name}.ll")
+    shutil.copyfile(out_ll, dest)
+
+def cleanup_out_ll(build_dir):
+  out_ll = os.path.join(build_dir, "out.ll")
+  if os.path.exists(out_ll):
+    os.remove(out_ll)
 
 # Compile without ASPIS to get expected output
 def compile_without_aspis(source_file, output_file, llvm_bin, build_dir):
@@ -142,13 +155,19 @@ def test_aspis(test_data, use_container, aspis_addopt, data_technique, cfc_techn
 
   test_name_complete = f"{test_name}_{data_technique}_{cfc_technique}".replace("--", "").replace(" ", "_").replace("=", "")
 
-  # Compile the source file
-  compilation_result = compile_with_aspis(source_path, test_name_complete, aspis_options, llvm_bin, docker_build_dir)
-  record_comparison_counter(test_name_complete, compilation_result)
+  try:
+    # Compile the source file
+    compilation_result = compile_with_aspis(source_path, test_name_complete, aspis_options, llvm_bin, docker_build_dir)
+    record_comparison_counter(test_name_complete, compilation_result)
 
-  # Execute the binary and check output
-  result = execute_binary(local_build_dir, test_name_complete)
-  assert result == expected_output, f"Test {test_name_complete} failed: {result}"
+    # Execute the binary and check output
+    result = execute_binary(local_build_dir, test_name_complete)
+    assert result == expected_output, f"Test {test_name_complete} failed: {result}"
+  except Exception:
+    preserve_out_ll(local_build_dir, test_name_complete)
+    raise
+  else:
+    cleanup_out_ll(local_build_dir)
 
 if __name__ == "__main__":
   pytest.main()
