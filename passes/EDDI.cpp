@@ -2032,49 +2032,66 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
 bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B) {
   const llvm::DataLayout &DL = Md.getDataLayout();
-  Type *valueType;
 
-  tda::TransparentType *VTy = nullptr;
-  
-  if(deducedTypes.transparentTypes.find(value) != deducedTypes.transparentTypes.end()) {
-    VTy = deducedTypes.transparentTypes.find(value)->second.begin()->get();
-  }
-  
-  Align valueAlign;
-  valueType = getValueType(value, &valueAlign);
-
-  // If can't find type, do not duplicate value
-  if(valueType->isVoidTy()) {
-    errs() << "Error: Cannot find type of value: " << *value << "\n";
+  auto TTIter = deducedTypes.transparentTypes.find(value);
+  if (TTIter == deducedTypes.transparentTypes.end()) {
+    errs() << "Warning: Cannot TDA value " << *value << "\n";
     return false;
   }
 
-  uint64_t SizeInBytes = DL.getTypeAllocSize(valueType);
-  Value *Size = llvm::ConstantInt::get(B.getInt64Ty(), SizeInBytes);
-  
-  // Alignment (assuming alignment of 1 here; adjust as necessary)
-  llvm::ConstantInt *Align = B.getInt32(valueAlign.value());
-
-  // Volatility (non-volatile in this example)
-  llvm::ConstantInt *IsVolatile = B.getInt1(false);
-
-  // Create the memcpy call
-  auto Copyvalue = B.CreateAlloca(valueType);
-
-  llvm::CallInst *memcpy_call = B.CreateMemCpy(Copyvalue, value->getPointerAlignment(DL), value, value->getPointerAlignment(DL), Size);
-
-  DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Copyvalue, value));
-  DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(value, Copyvalue));
-  DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(memcpy_call, memcpy_call));
-
-  if(VTy != nullptr) {
-    deducedTypes.transparentTypes[Copyvalue].insert(VTy->clone());
-  } else {
-    tda::TransparentType *type = new TransparentType();
-    type->setLLVMType(valueType);
-    deducedTypes.transparentTypes[value].insert(type->clone());
-    deducedTypes.transparentTypes[Copyvalue].insert(type->clone());
+  tda::TransparentType *VTy = TTIter->second.begin()->get();
+  // Cannot do argument duplication if the type contains opaque pointers since we cannot find the final value to duplicate
+  if (VTy->containsOpaquePtr()) {
+    errs() << "Error! TAD value contains opaque pointer " << *value << "\n";
+    return false;
   }
+
+  int indirections = 0;
+  Value *currentPtr = value;
+
+  // We need to find the final value pointed by the argument in order to duplicate it, 
+  // so we iterate over the pointer types until we find a non-pointer type
+  while (VTy->isPointerTT()) {
+
+    VTy = VTy->getPointedType();
+    if (!VTy) {
+      errs() << "Error! Can't find final value for pointer " << *currentPtr << "\n";
+      return false;
+    }
+
+    if (VTy->isPointerTT()) {
+      indirections++;
+      currentPtr = B.CreateLoad(VTy->getLLVMType(), currentPtr);
+    }
+  }
+
+  // currentPtr is now the pointer to the final value
+
+  auto *allocaPrev = B.CreateAlloca(VTy->getLLVMType());
+  deducedTypes.transparentTypes[allocaPrev].insert(VTy->clone());
+
+  uint64_t Size = DL.getTypeAllocSize(VTy->getLLVMType());
+
+  llvm::CallInst *memcpy_call = B.CreateMemCpy(
+      allocaPrev, allocaPrev->getPointerAlignment(DL),
+      currentPtr, allocaPrev->getPointerAlignment(DL),
+      Size);
+
+  auto VTyPtr = VTy->clone();
+
+  // Now we need to create as many allocas as the number of pointer indirections
+  // in order to duplicate the whole pointer chain
+  for (int i = 0; i < indirections; ++i) {
+    VTyPtr = VTyPtr->getPointerToType();
+    auto *allocaCurr = B.CreateAlloca(VTyPtr->getLLVMType());
+    deducedTypes.transparentTypes[allocaCurr].insert(VTyPtr->getPointerToType()->clone());
+    B.CreateStore(allocaPrev, allocaCurr);
+    allocaPrev = allocaCurr;
+  }
+
+  DuplicatedInstructionMap.emplace(allocaPrev, value);
+  DuplicatedInstructionMap.emplace(value, allocaPrev);
+  DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(memcpy_call, memcpy_call));
 
   return true;
 }
