@@ -2052,7 +2052,6 @@ bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilde
   // We need to find the final value pointed by the argument in order to duplicate it, 
   // so we iterate over the pointer types until we find a non-pointer type
   while (VTy->isPointerTT()) {
-
     VTy = VTy->getPointedType();
     if (!VTy) {
       errs() << "Error! Can't find final value for pointer " << *currentPtr << "\n";
@@ -2067,10 +2066,22 @@ bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilde
 
   // currentPtr is now the pointer to the final value
 
-  auto *allocaPrev = B.CreateAlloca(VTy->getLLVMType());
+  uint64_t SizeInBytes = 0;
+  AllocaInst *allocaPrev = nullptr;
+
+  if(isa<GetElementPtrInst>(currentPtr)) {
+    auto *gepInst = cast<GetElementPtrInst>(currentPtr);
+    SizeInBytes = DL.getTypeAllocSize(gepInst->getSourceElementType());
+    allocaPrev = B.CreateAlloca(VTy->getLLVMType(), ConstantInt::get(VTy->getLLVMType(), SizeInBytes));
+  } else {
+    SizeInBytes = DL.getTypeAllocSize(VTy->getLLVMType());
+    allocaPrev = B.CreateAlloca(VTy->getLLVMType());
+  }
+
   deducedTypes.transparentTypes[allocaPrev].insert(VTy->clone());
 
-  uint64_t Size = DL.getTypeAllocSize(VTy->getLLVMType());
+
+  Value *Size = llvm::ConstantInt::get(B.getInt8Ty(), SizeInBytes);
 
   llvm::CallInst *memcpy_call = B.CreateMemCpy(
       allocaPrev, allocaPrev->getPointerAlignment(DL),
