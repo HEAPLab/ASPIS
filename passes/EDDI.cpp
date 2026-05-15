@@ -1901,6 +1901,11 @@ void EDDI::CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB){
     return;
   }
 
+  if(ErrBB->getTerminator()) {
+    // If the ErrBB already has a terminator, we assume it is correctly set up and we don't modify it
+    return;
+  }
+
   IRBuilder<> ErrB(ErrBB);
 
   assert(!getLinkageName(linkageMap, "DataCorruption_Handler").empty() &&
@@ -2072,6 +2077,11 @@ void EDDI::fixGlobalCtors(Module &M) {
 //-----------------------------------------------------------------------------
 // New PM Registration
 //-----------------------------------------------------------------------------
+static llvm::cl::opt<bool> MultipleErrBB(
+    "multiple-errbb",
+    llvm::cl::desc("Enable multiple error basic blocks in EDDI"),
+    llvm::cl::init(false));
+
 llvm::PassPluginLibraryInfo getEDDIPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "eddi-verify", LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
@@ -2089,9 +2099,9 @@ llvm::PassPluginLibraryInfo getEDDIPluginInfo() {
                    ArrayRef<PassBuilder::PipelineElement>) {
                   if (Name == "eddi-verify") {
 #ifdef DUPLICATE_ALL
-                    FPM.addPass(EDDI(true, true));
+                    FPM.addPass(EDDI(true, MultipleErrBB));
 #else
-                    FPM.addPass(EDDI(false, true));
+                    FPM.addPass(EDDI(false, MultipleErrBB));
 #endif
                     return true;
                   }

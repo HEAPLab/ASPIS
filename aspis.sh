@@ -150,6 +150,8 @@ parse_commands() {
                             at synchonization points, which can be used to trace where
                             consistency checks are executed.
 
+        --multiple-errbb    Enables multiple error basic blocks in EDDI
+
 EOF
                         exit 0
                         ;;
@@ -236,6 +238,9 @@ EOF
                         eddi_options="$eddi_options $opt=true";
                         cfc_options="$cfc_options $opt=true";
                         enable_profiling=true;
+                        ;;                    
+                    --multiple-errbb)
+                        eddi_options="$eddi_options -multiple-errbb=true";
                         ;;
                     -g)
                         debug_enabled=true;
