@@ -13,7 +13,7 @@ DOCKER_SHARED_VOLUME = "/workspace/ASPIS/tmp"
 LOCAL_SHARED_VOLUME = "./tests/"
 DOCKER_COMPOSE_FILE = "../docker/docker-compose.yml"
 
-data_techniques = ["--no-dup", "--eddi", "--eddi --multiple-errbb", "--reddi", "--reddi --multiple-errbb", "--seddi", "--fdsc"]
+data_techniques = ["--no-dup", "--eddi", "--eddi --multiple-errbb", "--eddi --coarse-grained", "--reddi", "--reddi --multiple-errbb", "--reddi --coarse-grained", "--seddi", "--fdsc"]
 cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm", "--racfed", "--inter-rasm"]
 
 # Load the test configuration
