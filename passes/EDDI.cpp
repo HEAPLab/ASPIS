@@ -1654,9 +1654,12 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       }
     }
     
-    // Apply coarse grained duplication
-    for (BasicBlock &BB : *Fn) {
-      repairBasicBlock(BB);
+    if(CoarseGrainedDuplicationEnabled) {
+      LLVM_DEBUG(dbgs() << "Applying coarse grained duplication\n");
+      // Apply coarse grained duplication
+      for (BasicBlock &BB : *Fn) {
+        repairBasicBlock(BB);
+      }
     }
     
     LLVM_DEBUG(dbgs() << " [done]\n");
@@ -2152,6 +2155,11 @@ static llvm::cl::opt<bool> MultipleErrBB(
     llvm::cl::desc("Enable multiple error basic blocks in EDDI"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> CoarseGrained(
+    "coarse-grained",
+    llvm::cl::desc("Enable coarse-grained duplication in EDDI"),
+    llvm::cl::init(false));
+
 llvm::PassPluginLibraryInfo getEDDIPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "eddi-verify", LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
@@ -2169,9 +2177,9 @@ llvm::PassPluginLibraryInfo getEDDIPluginInfo() {
                    ArrayRef<PassBuilder::PipelineElement>) {
                   if (Name == "eddi-verify") {
 #ifdef DUPLICATE_ALL
-                    FPM.addPass(EDDI(true, MultipleErrBB));
+                    FPM.addPass(EDDI(true, MultipleErrBB, CoarseGrained));
 #else
-                    FPM.addPass(EDDI(false, MultipleErrBB));
+                    FPM.addPass(EDDI(false, MultipleErrBB, CoarseGrained));
 #endif
                     return true;
                   }
