@@ -762,8 +762,10 @@ Value *EDDI::comparePtrs(Value &V1, Value &V2, IRBuilder<> &B) {
     Instruction *L1 = B.CreateLoad(F1->getType(), F1);
     Instruction *L2 = B.CreateLoad(F2->getType(), F2);
     if (L1->getType()->isFloatingPointTy()) {
+      comparisonCounter++;
       return B.CreateCmp(CmpInst::FCMP_UEQ, L1, L2);
     } else {
+      comparisonCounter++;
       return B.CreateCmp(CmpInst::ICMP_EQ, L1, L2);
     }
   }
@@ -802,6 +804,7 @@ void EDDI::addConsistencyChecks(
       if (Original->getType()->isIntOrIntVectorTy() || Original->getType()->isPtrOrPtrVectorTy()) {
         // DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, &I));
         CmpInstructions.push_back(B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
+        comparisonCounter++;
       }
     }
   }
@@ -855,9 +858,11 @@ void EDDI::addConsistencyChecks(
                 if (OriginalElem->getType()->isFloatingPointTy()) {
                   CmpInstructions.push_back(
                       B.CreateCmp(CmpInst::FCMP_UEQ, OriginalElem, CopyElem));
+                  comparisonCounter++;
                 } else if (OriginalElem->getType()->isIntOrIntVectorTy() || OriginalElem->getType()->isPtrOrPtrVectorTy()) {
                   CmpInstructions.push_back(
                       B.CreateCmp(CmpInst::ICMP_EQ, OriginalElem, CopyElem));
+                  comparisonCounter++;
                 } else {
                   errs() << "Warning: Didn't create a comparison for ";
                   OriginalElem->getType()->print(errs());
@@ -872,9 +877,11 @@ void EDDI::addConsistencyChecks(
           if (Original->getType()->isFloatingPointTy()) {
             CmpInstructions.push_back(
                 B.CreateCmp(CmpInst::FCMP_UEQ, Original, Copy));
+            comparisonCounter++;
           } else if (Original->getType()->isIntOrIntVectorTy() || Original->getType()->isPtrOrPtrVectorTy()) {
             CmpInstructions.push_back(
                 B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
+            comparisonCounter++;
           } else {
             errs() << "Warning: Didn't create a comparison for " << Original->getType() << " type\n";
           }
@@ -1859,6 +1866,8 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
   LLVM_DEBUG(dbgs() << "Persisting Compiled Functions...\n");
   persistCompiledFunctions(CompiledFuncs, "compiled_eddi_functions.csv");
+
+  std::cout << "Comparison Counter: " << comparisonCounter << "\n";
 
   return PreservedAnalyses::none();
 }

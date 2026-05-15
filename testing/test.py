@@ -4,6 +4,8 @@ import pytest
 
 import pytest_timeout
 import tomllib
+import os
+import re
 
 # Default configurations
 ASPIS_SCRIPT = "../aspis.sh"  # Path to the ASPIS compilation script
@@ -12,9 +14,20 @@ TEST_DIR = "./tests"  # Directory containing the test cases
 DOCKER_SHARED_VOLUME = "/workspace/ASPIS/tmp"
 LOCAL_SHARED_VOLUME = "./tests/"
 DOCKER_COMPOSE_FILE = "../docker/docker-compose.yml"
+COMPARISON_COUNTER_PATH = "./build/comparison_counter.csv"
 
 data_techniques = ["--no-dup", "--eddi", "--eddi --multiple-errbb", "--eddi --coarse-grained", "--reddi", "--reddi --multiple-errbb", "--reddi --coarse-grained", "--seddi", "--fdsc"]
 cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm", "--racfed", "--inter-rasm"]
+
+def record_comparison_counter(test_name: str, output: str):
+  comparison_file = open(COMPARISON_COUNTER_PATH, "a+")
+  m = re.search(r"Comparison Counter:\s*(\d+)", output)
+  if m:
+    counter = m.group(1)
+  else:
+    counter = "NA"
+  comparison_file.write(f"{test_name},{counter}\n")
+  comparison_file.close()
 
 # Load the test configuration
 def load_config():
@@ -61,6 +74,15 @@ def execute_binary(local_build_dir, test_name):
 def pytest_generate_tests(metafunc):
     """Custom hook to parametrize tests based on the CLI --tests-file flag."""
     if "test_data" in metafunc.fixturenames:
+        os.makedirs("./build", exist_ok=True)
+
+        if os.path.exists(COMPARISON_COUNTER_PATH):
+          os.remove(COMPARISON_COUNTER_PATH)
+
+        comparison_file = open(COMPARISON_COUNTER_PATH, "a+")
+        comparison_file.write("test_name,comparison_counter\n")
+        comparison_file.close()
+
         tests_file_paths = metafunc.config.getoption("--tests-file")
         test_list = []
         for file_path in tests_file_paths:
@@ -121,7 +143,8 @@ def test_aspis(test_data, use_container, aspis_addopt, data_technique, cfc_techn
   test_name_complete = f"{test_name}_{data_technique}_{cfc_technique}".replace("--", "").replace(" ", "_").replace("=", "")
 
   # Compile the source file
-  compile_with_aspis(source_path, test_name_complete, aspis_options, llvm_bin, docker_build_dir)
+  compilation_result = compile_with_aspis(source_path, test_name_complete, aspis_options, llvm_bin, docker_build_dir)
+  record_comparison_counter(test_name_complete, compilation_result)
 
   # Execute the binary and check output
   result = execute_binary(local_build_dir, test_name_complete)
