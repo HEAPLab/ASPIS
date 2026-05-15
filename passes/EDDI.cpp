@@ -60,6 +60,8 @@ std::regex ConstructorRegex(R"(.*([\w]+)::\1\((.*?)\))");
 
 std::set<InvokeInst *> toFixInvokes;
 
+static int globalVarCounter = 0;
+
 /**
  * @brief Check if the passed store is the one which saves the vtable in the object.
  * In case it is, return the pointer to the GV of the vtable.
@@ -964,7 +966,7 @@ void EDDI::duplicateGlobals(
     auto GVAnnotation = FuncAnnotations.find(GV);
 
     if (GV->getName().empty()) {
-      GV->setName("global_" + std::to_string(rand()));
+      GV->setName("global_" + std::to_string(globalVarCounter++));
     }
 
     if (!isa<Function>(GV) &&
