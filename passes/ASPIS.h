@@ -40,6 +40,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         std::set<Function*> toHardenFunctions;
         std::set<Value*> toHardenVariables;
         std::set<Value*> DuplicatedCalls;
+        std::unordered_multimap<Value *, Value *> DuplicatedInstructionMap;
 
         std::string entryPoint;
         
@@ -52,22 +53,23 @@ class EDDI : public PassInfoMixin<EDDI> {
         void fixDuplicatedConstructors(Module &Md);
         std::set<Function *> getVirtualMethodsFromConstructor(Function *Fn);
         int isUsedByStore(Instruction &I, Instruction &Use);
-        Instruction* cloneInstr(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap);
-        void duplicateOperands (Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
+        Instruction* cloneInstr(Instruction &I);
+        void duplicateOperands (Instruction &I, BasicBlock &ErrBB);
         Value* getPtrFinalValue(Value &V);
         Value* comparePtrs(Value &V1, Value &V2, IRBuilder<> &B);
-        void addConsistencyChecks(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
-        void fixFuncValsPassedByReference(Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B);
-        int transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &DuplicatedInstructionMap, IRBuilder<> &B, BasicBlock &ErrBB) ;
+        void addConsistencyChecks(Instruction &I, BasicBlock &ErrBB);
+        void fixFuncValsPassedByReference(Instruction &I, IRBuilder<> &B);
+        int transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &ErrBB) ;
         Function *getFunctionDuplicate(Function *Fn);
         Function *getFunctionFromDuplicate(Function *Fn);
-        void duplicateGlobals (Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
+        void duplicateGlobals (Module &Md);
         bool isAllocaForExceptionHandling(AllocaInst &I);
-        int duplicateInstruction (Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap, BasicBlock &ErrBB);
-        bool isValueDuplicated(std::map<Value *, Value *> &DuplicatedInstructionMap, Instruction &V);
-        Function *duplicateFnArgs(Function &Fn, Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap);
+        int duplicateInstruction (Instruction &I, BasicBlock &ErrBB);
+        bool isValueDuplicated(Instruction &V);
+        Function *duplicateFnArgs(Function &Fn, Module &Md);
         void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
-        bool temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B, std::map<llvm::Value *, llvm::Value *> &InstructionMap);
+        bool temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B);
+        Value *getDuplicateValue(Value *V, Instruction *I);
 
         void fixGlobalCtors(Module &M);
     public:
