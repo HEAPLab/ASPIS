@@ -13,7 +13,7 @@ DOCKER_SHARED_VOLUME = "/workspace/ASPIS/tmp"
 LOCAL_SHARED_VOLUME = "./tests/"
 DOCKER_COMPOSE_FILE = "../docker/docker-compose.yml"
 
-data_techniques = ["--no-dup", "--eddi", "--reddi", "--seddi", "--fdsc"]
+data_techniques = ["--no-dup", "--eddi", "--eddi --multiple-errbb", "--reddi", "--reddi --multiple-errbb", "--seddi", "--fdsc"]
 cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm", "--racfed", "--inter-rasm"]
 
 # Load the test configuration
@@ -118,7 +118,7 @@ def test_aspis(test_data, use_container, aspis_addopt, data_technique, cfc_techn
 
   aspis_options = aspis_addopt + " " + data_technique + " " + cfc_technique
 
-  test_name_complete = f"{test_name}_{data_technique}_{cfc_technique}"
+  test_name_complete = f"{test_name}_{data_technique}_{cfc_technique}".replace("--", "").replace(" ", "_").replace("=", "")
 
   # Compile the source file
   compile_with_aspis(source_path, test_name_complete, aspis_options, llvm_bin, docker_build_dir)
