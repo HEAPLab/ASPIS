@@ -572,8 +572,7 @@ int EDDI::isUsedByStore(Instruction &I, Instruction &Use) {
  * DuplicatedInstructionMap, inserting the clone right after the original.
  */
 Instruction *
-EDDI::cloneInstr(Instruction &I,
-                 std::map<Value *, Value *> &DuplicatedInstructionMap) {
+EDDI::cloneInstr(Instruction &I) {
   Instruction *IClone = I.clone();
 
   if (!I.getType()->isVoidTy() && I.hasName()) {
@@ -595,6 +594,38 @@ EDDI::cloneInstr(Instruction &I,
   return IClone;
 }
 
+Value *EDDI::getDuplicateValue(Value *V, Instruction *I) {
+  // Fast path if V is a local variable, it should have only one duplicate
+  if(!isa<GlobalValue>(V) || isa<Argument>(V)) {
+    assert((DuplicatedInstructionMap.count(V) <= 1) && "Local variable has more than one duplicate");
+    
+    Value *duplicate = (DuplicatedInstructionMap.find(V) != DuplicatedInstructionMap.end()) ? 
+      DuplicatedInstructionMap.find(V)->second : 
+      nullptr;
+
+    return duplicate;
+  }
+
+  // Get all the duplicates of V
+  auto [begin, end] = DuplicatedInstructionMap.equal_range(V);
+  // Check which element is the appropriate duplicate, i.e. the one that is in the same Function of I
+  for (auto it = begin; it != end; ++it) {
+    Value *duplicate = it->second;
+
+    if(isa<GlobalValue>(duplicate)) {
+      // If it is a global variable, we can return it directly
+      return duplicate;
+    } else {
+      // If it is an instruction, we need to check if it is in the same function of I
+      if (isa<Instruction>(duplicate) && cast<Instruction>(duplicate)->getParent()->getParent() == I->getParent()->getParent()) {
+        return duplicate;
+      }
+    }
+  }
+  
+  return nullptr;
+}
+
 /**
  * Takes instruction I and duplicates its operands. Then substitutes each
  * duplicated operand in the duplicated instruction IClone.
@@ -605,18 +636,14 @@ EDDI::cloneInstr(Instruction &I,
  * the recursive duplicateInstruction call
  */
 void EDDI::duplicateOperands(
-    Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap,
+    Instruction &I,
     BasicBlock &ErrBB) {
-  Instruction *IClone = NULL;
-
-  std::map<Value *, Value *> tmpDuplicatedInstructionMap{DuplicatedInstructionMap};
 
   // see if I has a clone
-  if (DuplicatedInstructionMap.find(&I) != DuplicatedInstructionMap.end()) {
-    Value *VClone = DuplicatedInstructionMap.find(&I)->second;
-    if (isa<Instruction>(VClone)) {
-      IClone = cast<Instruction>(VClone);
-    }
+  Value *Clone = getDuplicateValue(&I, &I);
+  Instruction *IClone = nullptr;
+  if(Clone != nullptr && isa<Instruction>(Clone)) {
+    IClone = cast<Instruction>(Clone);
   }
 
   int J = 0;
@@ -626,8 +653,8 @@ void EDDI::duplicateOperands(
     // if the operand has not been duplicated we need to duplicate it
     if (isa<Instruction>(V)) {
       Instruction *Operand = cast<Instruction>(V);
-      if (!isValueDuplicated(DuplicatedInstructionMap, *Operand)) {
-        if(duplicateInstruction(*Operand, DuplicatedInstructionMap, ErrBB)) {
+      if (!isValueDuplicated(*Operand)) {
+        if(duplicateInstruction(*Operand, ErrBB)) {
           if(InstructionsToRemove.find(Operand) == InstructionsToRemove.end()) {
             InstructionsToRemove.insert(Operand);
           }
@@ -638,13 +665,13 @@ void EDDI::duplicateOperands(
     // operands of the GEP are not duplicated leading to errors, so we manually
     // clone of the GEP for the clone of the original instruction.
     else if (isa<GEPOperator>(V) && isa<ConstantExpr>(V)) {
-      if (IClone != NULL) {
+      if (IClone != nullptr) {
         GEPOperator *GEPOperand = cast<GEPOperator>(IClone->getOperand(J));
         Value *PtrOperand = GEPOperand->getPointerOperand();
+        Value *ClonePtrOperand = getDuplicateValue(PtrOperand, &I);
         // update the duplicate GEP operator using the duplicate of the pointer
         // operand
-        if (DuplicatedInstructionMap.find(PtrOperand) !=
-            DuplicatedInstructionMap.end()) {
+        if (ClonePtrOperand != nullptr) {
           std::vector<Value *> indices;
           for (auto &Idx : GEPOperand->indices()) {
             indices.push_back(Idx);
@@ -653,8 +680,7 @@ void EDDI::duplicateOperands(
               cast<ConstantExpr>(GEPOperand)
                   ->getInBoundsGetElementPtr(
                       GEPOperand->getSourceElementType(),
-                      cast<Constant>(
-                          DuplicatedInstructionMap.find(PtrOperand)->second),
+                      cast<Constant>(ClonePtrOperand),
                       ArrayRef<Value *>(indices));
           IClone->setOperand(J, CloneGEPOperand);
         }
@@ -666,25 +692,20 @@ void EDDI::duplicateOperands(
       auto DuplicateFn = getFunctionDuplicate(FnOperand);
       if (DuplicateFn != NULL) {
         I.setOperand(J, DuplicateFn);
-        if (IClone != NULL) {
+        if (IClone != nullptr) {
           IClone->setOperand(J, DuplicateFn);
         }
       }
     } else if (isa<StoreInst>(I) && isa<GlobalVariable>(V) && cast<GlobalVariable>(V)->isConstant()) {
       IRBuilder<> B(&I);
-      temporaryArgumentDuplication(*I.getModule(), V, B, tmpDuplicatedInstructionMap);
+      temporaryArgumentDuplication(*I.getModule(), V, B);
     }
 
-    if (IClone != NULL) {
+    if (IClone != nullptr) {
       // use the duplicated instruction as operand of IClone
-      auto Duplicate = tmpDuplicatedInstructionMap.find(V);
-      if (Duplicate != tmpDuplicatedInstructionMap.end()) {
-        IClone->setOperand(J, Duplicate->second); // set the J-th operand with the duplicate value
-      } else {
-        Duplicate = DuplicatedInstructionMap.find(V);
-        if (Duplicate != DuplicatedInstructionMap.end()) {
-          IClone->setOperand(J, Duplicate->second);
-        }
+      Value *CloneOperand = getDuplicateValue(V, &I);
+      if (CloneOperand != nullptr) {
+        IClone->setOperand(J, CloneOperand); // set the J-th operand with the duplicate value
       }
     }
     J++;
@@ -752,7 +773,7 @@ Value *EDDI::comparePtrs(Value &V1, Value &V2, IRBuilder<> &B) {
  * Adds a consistency check on the instruction I
  */
 void EDDI::addConsistencyChecks(
-    Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap,
+    Instruction &I,
     BasicBlock &ErrBB) {
 
   if(InstructionsToRemove.find(&I) != InstructionsToRemove.end()) {
@@ -773,10 +794,10 @@ void EDDI::addConsistencyChecks(
 
   // if the instruction is a call with indirect function, we try to get a compare
   if(isa<CallBase>(I) && cast<CallBase>(I).isIndirectCall()) {
-    auto Duplicate = DuplicatedInstructionMap.find(cast<CallBase>(I).getCalledOperand());
-    if (Duplicate != DuplicatedInstructionMap.end()) {
-      Value *Original = Duplicate->first;
-      Value *Copy = Duplicate->second;
+    Value *Duplicate = getDuplicateValue(cast<CallBase>(I).getCalledOperand(), &I);
+    if (Duplicate != nullptr) {
+      Value *Original = cast<CallBase>(I).getCalledOperand();
+      Value *Copy = Duplicate;
       if (Original->getType()->isIntOrIntVectorTy() || Original->getType()->isPtrOrPtrVectorTy()) {
         // DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, &I));
         CmpInstructions.push_back(B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
@@ -797,12 +818,12 @@ void EDDI::addConsistencyChecks(
         continue;
       }
 
-      auto Duplicate = DuplicatedInstructionMap.find(Operand);
+      Value *Duplicate = getDuplicateValue(Operand, &I);
 
       // if the duplicate exists we perform a compare
-      if (Duplicate != DuplicatedInstructionMap.end()) {
-        Value *Original = Duplicate->first;
-        Value *Copy = Duplicate->second;
+      if (Duplicate != nullptr) {
+        Value *Original = Operand;
+        Value *Copy = Duplicate;
 
         // if the operand is a pointer we try to get a compare on pointers
         if (Original->getType()->isPointerTy()) {
@@ -889,17 +910,18 @@ void EDDI::addConsistencyChecks(
 // objective of synchronize pointers after some non-duplicated instruction
 // execution.
 void EDDI::fixFuncValsPassedByReference(
-    Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap,
+    Instruction &I,
     IRBuilder<> &B) {
   int numOps = I.getNumOperands();
   for (int i = 0; i < numOps; i++) {
     Value *V = I.getOperand(i);
     if (isa<Instruction>(V)) {
       Instruction *Operand = cast<Instruction>(V);
-      auto Duplicate = DuplicatedInstructionMap.find(Operand);
-      if (Duplicate != DuplicatedInstructionMap.end()) {
-        Value *Original = Duplicate->first;
-        Value *Copy = Duplicate->second;
+      Value *Duplicate = getDuplicateValue(Operand, &I);
+
+      if (Duplicate != nullptr) {
+        Value *Original = Operand;
+        Value *Copy = Duplicate;
         if(Original->getType()->isPointerTy() && Copy->getType()->isPointerTy()) {
           Type *OriginalType = Original->getType();
           Instruction *TmpLoad = B.CreateLoad(OriginalType, Original);
@@ -920,7 +942,7 @@ void EDDI::fixFuncValsPassedByReference(
 Function *EDDI::getFunctionDuplicate(Function *Fn) {
   // If Fn ends with "_dup" we have already the duplicated function.
   // If Fn is NULL, it means that we don't have a duplicate
-  if (Fn == NULL || Fn->getName().ends_with("_dup")) {
+  if (Fn == nullptr || Fn->getName().ends_with("_dup")) {
     return Fn;
   }
 
@@ -952,8 +974,7 @@ Function *EDDI::getFunctionFromDuplicate(Function *Fn) {
   return FnDup;
 }
 
-void EDDI::duplicateGlobals(
-    Module &Md, std::map<Value *, Value *> &DuplicatedInstructionMap) {
+void EDDI::duplicateGlobals(Module &Md) {
   Value *RuntimeSig;
   Value *RetSig;
   std::list<GlobalVariable *> GVars;
@@ -1056,8 +1077,7 @@ bool EDDI::isAllocaForExceptionHandling(AllocaInst &I){
   return false;
 }
 
-int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &DuplicatedInstructionMap,
-    IRBuilder<> &B, BasicBlock &ErrBB) {
+int EDDI::transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &ErrBB) {
   int res = 0;
   SmallVector<Value *, 6> args;
   SmallVector<Type *, 6> ParamTypes;
@@ -1073,11 +1093,11 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
   for (unsigned i = 0; i < CInstr->arg_size(); i++) {
     // Populate args and ParamTypes from the original instruction
     Value *Arg = CInstr->getArgOperand(i);
-    Value *Copy = Arg;
 
     // see if Original has a copy
-    if(DuplicatedInstructionMap.find(Arg) != DuplicatedInstructionMap.end()) {
-      Copy = DuplicatedInstructionMap.find(Arg)->second;
+    Value *Copy = getDuplicateValue(Arg, CInstr);
+    if(Copy == nullptr) {
+      Copy = Arg;
     }
 
     // Duplicating only fixed parameters, passing just one time the variadic arguments
@@ -1183,10 +1203,8 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, std::map<Value *, Value *> &Du
  * - Add consistency checks on the operands (if I is a synchronization point).
  * @returns 1 if the cloned instruction has to be removed, 0 otherwise
  */
-int EDDI::duplicateInstruction(
-    Instruction &I, std::map<Value *, Value *> &DuplicatedInstructionMap,
-    BasicBlock &ErrBB) {
-  if (isValueDuplicated(DuplicatedInstructionMap, I)) {
+int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
+  if (isValueDuplicated(I)) {
     return 0;
   }
 
@@ -1197,7 +1215,7 @@ int EDDI::duplicateInstruction(
     
     if (!isAllocaForExceptionHandling(cast<AllocaInst>(I))){
       
-      cloneInstr(I, DuplicatedInstructionMap);
+      cloneInstr(I);
 
     };
 
@@ -1209,19 +1227,19 @@ int EDDI::duplicateInstruction(
   else if (isa<BinaryOperator, UnaryInstruction, LoadInst, GetElementPtrInst,
                CmpInst, PHINode, SelectInst,InsertValueInst>(I)) {
     // duplicate the instruction
-    cloneInstr(I, DuplicatedInstructionMap);
+    cloneInstr(I);
 
     // duplicate the operands
-    duplicateOperands(I, DuplicatedInstructionMap, ErrBB);
+    duplicateOperands(I, ErrBB);
   }
 
   // if the instruction is a store instruction we need to duplicate it and its
   // operands (if not duplicated already) and add consistency checks
   else if (isa<StoreInst, AtomicRMWInst, AtomicCmpXchgInst>(I)) {
-    Instruction *IClone = cloneInstr(I, DuplicatedInstructionMap);
+    Instruction *IClone = cloneInstr(I);
 
     // duplicate the operands
-    duplicateOperands(I, DuplicatedInstructionMap, ErrBB);
+    duplicateOperands(I, ErrBB);
 
     // add consistency checks on I
 
@@ -1233,14 +1251,17 @@ int EDDI::duplicateInstruction(
       errs() << "\n";
     } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
 #endif
-      addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
+      addConsistencyChecks(I, ErrBB);
 #endif
     // it may happen that I duplicate a store but don't change its operands, if
     // that happens I just remove the duplicate
     if (IClone->isIdenticalTo(&I)) {
       IClone->eraseFromParent();
-      if(DuplicatedInstructionMap.find(&I) != DuplicatedInstructionMap.end()) {
-        DuplicatedInstructionMap.erase(DuplicatedInstructionMap.find(&I));
+
+      Value *Copy = getDuplicateValue(&I, &I);
+      if(Copy != nullptr) {
+        DuplicatedInstructionMap.erase(Copy);
+        DuplicatedInstructionMap.erase(&I);
       }
     }
   }
@@ -1250,7 +1271,7 @@ int EDDI::duplicateInstruction(
   // checks
   else if (isa<BranchInst, SwitchInst, ReturnInst, IndirectBrInst>(I)) {
     // duplicate the operands
-    duplicateOperands(I, DuplicatedInstructionMap, ErrBB);
+    duplicateOperands(I, ErrBB);
 
 // add consistency checks on I
 #ifdef CHECK_AT_BRANCH
@@ -1259,7 +1280,7 @@ int EDDI::duplicateInstruction(
       I.getParent()->print(errs());
       errs() << "\n";
     } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-      addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
+      addConsistencyChecks(I, ErrBB);
 #endif
   }
 
@@ -1281,10 +1302,10 @@ int EDDI::duplicateInstruction(
     if ((FuncAnnotations.find(Callee) != FuncAnnotations.end() && FuncAnnotations.find(Callee)->second.starts_with("to_duplicate")) ||
         isToDuplicate(CInstr)) {
       // duplicate the instruction
-      cloneInstr(*CInstr, DuplicatedInstructionMap);
+      cloneInstr(*CInstr);
 
       // duplicate the operands
-      duplicateOperands(I, DuplicatedInstructionMap, ErrBB);
+      duplicateOperands(I, ErrBB);
 
       if(isa<InvokeInst>(I)) {
         // In case of an invoke instruction, we have to fix the first invoke since 
@@ -1302,13 +1323,13 @@ int EDDI::duplicateInstruction(
       errs() << "\n";
     } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
 #endif
-        addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
+        addConsistencyChecks(I, ErrBB);
 #endif
     }
 
     else {
       // duplicate the operands
-      duplicateOperands(I, DuplicatedInstructionMap, ErrBB);
+      duplicateOperands(I, ErrBB);
 
 // add consistency checks on I
 #ifdef CHECK_AT_CALLS
@@ -1319,7 +1340,7 @@ int EDDI::duplicateInstruction(
       errs() << "\n";
     } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
 #endif
-        addConsistencyChecks(I, DuplicatedInstructionMap, ErrBB);
+        addConsistencyChecks(I, ErrBB);
 #endif
 
       IRBuilder<> B(CInstr);
@@ -1337,9 +1358,9 @@ int EDDI::duplicateInstruction(
       // if the _dup function exists (and it is not itself the dup version) or is an indirect call, 
       // we substitute the call instruction with a call to the function with duplicated arguments
       if (CInstr->getCalledFunction() == NULL || (Fn != NULL && Fn != CInstr->getCalledFunction())) {
-        res = transformCallBaseInst(CInstr, DuplicatedInstructionMap, B, ErrBB);
+        res = transformCallBaseInst(CInstr, B, ErrBB);
       } else {
-        fixFuncValsPassedByReference(*CInstr, DuplicatedInstructionMap, B);
+        fixFuncValsPassedByReference(*CInstr, B);
       }
     }
   }
@@ -1351,8 +1372,7 @@ int EDDI::duplicateInstruction(
  * @returns True if the value V is present in the DuplicatedInstructionMap
  * either as a key or as value
  */
-bool EDDI::isValueDuplicated(
-    std::map<Value *, Value *> &DuplicatedInstructionMap, Instruction &V) {
+bool EDDI::isValueDuplicated(Instruction &V) {
   for (auto Elem : DuplicatedInstructionMap) {
     if (Elem.first == &V || Elem.second == &V) {
       return true;
@@ -1362,8 +1382,7 @@ bool EDDI::isValueDuplicated(
 }
 
 Function *
-EDDI::duplicateFnArgs(Function &Fn, Module &Md,
-                      std::map<Value *, Value *> &DuplicatedInstructionMap) {
+EDDI::duplicateFnArgs(Function &Fn, Module &Md) {
   Type *RetType = Fn.getReturnType();
   FunctionType *FnType = Fn.getFunctionType();
 
@@ -1530,12 +1549,8 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     }
   }
 
-  std::map<Value *, Value *>
-      DuplicatedInstructionMap; // is a map containing the instructions
-                                // and their duplicates
-
   LLVM_DEBUG(dbgs() << "Duplicating globals... ");
-  duplicateGlobals(Md, DuplicatedInstructionMap);
+  duplicateGlobals(Md);
   LLVM_DEBUG(dbgs() << "[done]\n");
 
   // store the duplicated functions that are currently in the module
@@ -1558,7 +1573,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     // Create dup functions only if the function is declared in this module
     // and isn't just to be duplicated
     if(!Fn->isDeclaration() && !isToDuplicateName(Fn->getName())) {
-      Function *newFn = duplicateFnArgs(*Fn, Md, DuplicatedInstructionMap);
+      Function *newFn = duplicateFnArgs(*Fn, Md);
       DuplicatedFns.insert(newFn);
     }
   }
@@ -1603,7 +1618,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         if (isa<Instruction>(U)) {
           Instruction *I = cast<Instruction>(U);
           // duplicate the uses of each argument
-          if (duplicateInstruction(*I, DuplicatedInstructionMap, *ErrBB)) {
+          if (duplicateInstruction(*I, *ErrBB)) {
             if(InstructionsToRemove.find(I) == InstructionsToRemove.end()) {
               InstructionsToRemove.insert(I);
             }
@@ -1623,15 +1638,12 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     }
 
     for (Instruction *I : InstToDuplicate) {
-      if (!isValueDuplicated(DuplicatedInstructionMap, *I)) {
+      if (!isValueDuplicated(*I)) {
         // perform the duplication
-        int shouldDelete = 
-              duplicateInstruction(*I, DuplicatedInstructionMap, *ErrBB);
+        int shouldDelete = duplicateInstruction(*I, *ErrBB);
 
         // the instruction duplicated may be equal to the original, so we
         // return shouldDelete in order to drop the duplicates
-
-        // TODO: Why to be done in another phase and not in duplciateInstruction? 
         if (shouldDelete) {
           if(InstructionsToRemove.find(I) == InstructionsToRemove.end()) {
             InstructionsToRemove.insert(I);
@@ -1683,7 +1695,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         }
 
         if(!isa<CallBase>(I)) {
-          if(duplicateInstruction(*I, DuplicatedInstructionMap, *ErrBB)) {
+          if(duplicateInstruction(*I, *ErrBB)) {
             if(InstructionsToRemove.find(I) == InstructionsToRemove.end()) {
               InstructionsToRemove.insert(I);
             }
@@ -1733,7 +1745,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
 
     // Map with the duplicated instructions, including the temporary load ones
-    std::map<Value *, Value *> TmpDuplicatedInstructionMap{DuplicatedInstructionMap};
     Function *Fn = CInstr->getFunction();
     BasicBlock *ErrBB = nullptr;
     bool newErrBB = true;        
@@ -1761,7 +1772,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       Value *Arg = CInstr->getArgOperand(i);
 
       // If argument has already a duplicate, nothing to do
-      if(TmpDuplicatedInstructionMap.find(Arg) != TmpDuplicatedInstructionMap.end() || !isa<Instruction>(Arg)) {
+      if(getDuplicateValue(Arg, CInstr) != nullptr || !isa<Instruction>(Arg)) {
         // If Argument already duplicated continue to next argument
         continue;
       }
@@ -1770,15 +1781,15 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       if(Arg->getType()->isPointerTy() && !CInstr->isByValArgument(i) && isa<Instruction>(Arg) && !isa<CallInst>(Arg))
       {
         // If cannot perform TAD, do not duplicate Arg
-        temporaryArgumentDuplication(Md, Arg, B, TmpDuplicatedInstructionMap);
+        temporaryArgumentDuplication(Md, Arg, B);
       } else {
         // Otherwise pass two times the same arg
-        TmpDuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Arg, Arg));
+        DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Arg, Arg)); // TODO: Check if needed
       }
     }
 
-    // Finally, duplicate the call with the temporary DuplicatedInstructionMap
-    if(duplicateInstruction(*CInstr, TmpDuplicatedInstructionMap, *ErrBB)) {
+    // Finally, duplicate the call
+    if(duplicateInstruction(*CInstr, *ErrBB)) {
       if(InstructionsToRemove.find(CInstr) == InstructionsToRemove.end()) {
         InstructionsToRemove.insert(CInstr);
       }
@@ -1841,7 +1852,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   return PreservedAnalyses::none();
 }
 
-bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B, std::map<llvm::Value *, llvm::Value *> &InstructionMap) {
+bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B) {
   const llvm::DataLayout &DL = Md.getDataLayout();
   Type *valueType;
   
@@ -1868,8 +1879,9 @@ bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilde
 
   llvm::CallInst *memcpy_call = B.CreateMemCpy(Copyvalue, value->getPointerAlignment(DL), value, value->getPointerAlignment(DL), Size);
 
-  InstructionMap.insert(std::pair<Value *, Value *>(Copyvalue, value));
-  InstructionMap.insert(std::pair<Value *, Value *>(value, Copyvalue));
+  DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Copyvalue, value));
+  DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(value, Copyvalue));
+  DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(memcpy_call, memcpy_call));
 
   return true;
 }
