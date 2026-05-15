@@ -6,6 +6,7 @@
 #include "llvm/Pass.h"
 #include <llvm/IR/Instructions.h>
 #include "Utils/Utils.h"
+#include "TypeDeductionAnalysis.hpp"
 #include <map>
 #include <set>
 #include <unordered_set>
@@ -44,6 +45,8 @@ class EDDI : public PassInfoMixin<EDDI> {
         std::unordered_multimap<Value *, Value *> DuplicatedInstructionMap;
         std::unordered_set<Instruction *> ClonedInstructions;
 
+        tda::TypeDeductionAnalysis tda;
+        tda::TypeDeductionAnalysis::Result deducedTypes;
         std::string entryPoint;
         
         LinkageMap linkageMap;
