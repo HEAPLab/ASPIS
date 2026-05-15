@@ -51,6 +51,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         bool duplicateAll;
         bool MultipleErrBBEnabled;
         bool CoarseGrainedDuplicationEnabled;
+        int comparisonCounter = 0;
 
         void preprocess(Module &Md);
         void fixDuplicatedConstructors(Module &Md);
