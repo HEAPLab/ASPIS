@@ -930,7 +930,9 @@ void EDDI::addConsistencyChecks(
       Value *Copy = Duplicate;
 
       // Directly comparing the function pointers
-      CmpInstructions.push_back(B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
+      auto Cmp = B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy);
+      CmpInstructions.push_back(Cmp);
+      DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Cmp, Cmp));
       comparisonCounter++;
     }
   }
@@ -1013,10 +1015,14 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
     comparePtrs(CmpInstructions, V1, V2, B);
   } else if(V1Ty->isPrimitiveTT()) {
     if(V1Ty->isIntegerTyOrPtrTo()) {
-      CmpInstructions->push_back(B.CreateCmp(CmpInst::ICMP_EQ, &V1, &V2));
+      auto Cmp = B.CreateCmp(CmpInst::ICMP_EQ, &V1, &V2);
+      CmpInstructions->push_back(Cmp);
+      DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Cmp, Cmp));
       comparisonCounter++;
     } else if(V1Ty->isFloatingPointTyOrPtrTo()) {
-      CmpInstructions->push_back(B.CreateCmp(CmpInst::FCMP_UEQ, &V1, &V2));
+      auto Cmp = B.CreateCmp(CmpInst::FCMP_UEQ, &V1, &V2);
+      CmpInstructions->push_back(Cmp);
+      DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Cmp, Cmp));
       comparisonCounter++;
     } else {
       errs() << "Warning: Unsupported primitive type for comparison: " << V1Ty->toString() << "\n";
