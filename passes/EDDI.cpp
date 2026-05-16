@@ -755,11 +755,6 @@ void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &
    * for finding a _b = load c _a = load _b
    */
 
-  if(isa<Function>(V1) || isa<Function>(V2)) {
-    errs() << "Warning: Comparing functions\n";
-    return;
-  }
-
   Value *F1 = &V1;
   Value *F2 = &V2;
 
@@ -934,7 +929,9 @@ void EDDI::addConsistencyChecks(
       Value *Original = cast<CallBase>(I).getCalledOperand();
       Value *Copy = Duplicate;
 
-      compareValues(&CmpInstructions, *Original, *Copy, B);
+      // Directly comparing the function pointers
+      CmpInstructions.push_back(B.CreateCmp(CmpInst::ICMP_EQ, Original, Copy));
+      comparisonCounter++;
     }
   }
 
@@ -1001,11 +998,6 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
 }
 
 void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B) {
-  if(isa<Function>(V1) || isa<Function>(V2)) {
-    errs() << "Not comparing functions\n";
-    return;
-  }
-  
   if(deducedTypes.transparentTypes.find(&V1) == deducedTypes.transparentTypes.end()) {
     return;
   }
