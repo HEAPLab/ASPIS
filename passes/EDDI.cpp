@@ -505,8 +505,10 @@ void EDDI::preprocess(Module &Md) {
               if(to_harden && toHardenFunctions.find(CalledFn) == toHardenFunctions.end() && 
                 JustAddedFns.find(CalledFn) == JustAddedFns.end() && 
                 getFunctionDuplicate(CalledFn) == NULL && 
-                (FuncAnnotations.find(CalledFn) == FuncAnnotations.end() || !FuncAnnotations.find(CalledFn)->second.starts_with("exclude")) &&
-                !CalledFn->getName().starts_with("__clang_call_terminate")) {
+                (FuncAnnotations.find(CalledFn) == FuncAnnotations.end() || 
+                  (!FuncAnnotations.find(CalledFn)->second.starts_with("exclude") && 
+                  !FuncAnnotations.find(CalledFn)->second.starts_with("to_duplicate"))) &&
+                  !isToDuplicateName(CalledFn->getName()) && !CalledFn->getName().starts_with("__clang_call_terminate")) {
                 // If is a new function to and it isn't/hasn't a duplicate version
                 toAddFns.insert(CalledFn);
                 // LLVM_DEBUG(dbgs() << "[REDDI] Added: " << CalledFn->getName() << "\n");
