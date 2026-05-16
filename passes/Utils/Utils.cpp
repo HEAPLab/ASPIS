@@ -230,17 +230,18 @@ bool isToDuplicate(CallBase *CInstr) {
 }
 
 bool isToDuplicateName(StringRef FnMangledName) {
+  if(FnMangledName.ends_with("_ret")) {
+    FnMangledName = FnMangledName.substr(0, FnMangledName.size() - 4);
+  }
+
   auto FnName = demangle(FnMangledName.str());
-  // outs() << FnName << " " << FnName.find("std::") << "\n";
+
   if(FnName.find("operator new") == 0 || FnName.find("std::") != FnName.npos || FnName.find("fmt::") != FnName.npos || FnName.find("Eigen::") != FnName.npos) {
-    // outs() << "duplicated\n";
 
-    if(FnName.find("std::ostream") != FnName.npos || FnName.find("std::basic_ostream") != FnName.npos || FnName.find("std::basic_ios") != FnName.npos || FnName.find("std::basic_ios") != FnName.npos) {
-      // outs() << "not duplicated\n";
-      return false;
-    }
-
-    if(FnName.find("std::thread") != FnName.npos) {
+    if(FnName.find("std::ostream") != FnName.npos || 
+        FnName.find("std::basic_ostream") != FnName.npos || 
+        FnName.find("std::basic_ios") != FnName.npos || 
+        FnName.find("std::thread") != FnName.npos) {
       return false;
     }
 
@@ -251,6 +252,10 @@ bool isToDuplicateName(StringRef FnMangledName) {
 }
 
 bool isToExcludeName(StringRef FnMangledName) {
+  if(FnMangledName.ends_with("_ret")) {
+    FnMangledName = FnMangledName.substr(0, FnMangledName.size() - 4);
+  }
+
   auto FnName = demangle(FnMangledName.str());
 
   if(FnName.find("std::thread") != FnName.npos) {
