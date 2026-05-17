@@ -20,6 +20,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "Utils/Utils.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/Passes/PassPlugin.h"
 #include <llvm/IR/Value.h>
 
@@ -243,6 +244,14 @@ PreservedAnalyses FuncRetToRef::run(Module &Md, ModuleAnalysisManager &AM) {
     }
 
     for (Function *Fn : FnList) {
+        // Skip library functions as we don't want to change their signature
+        if(Fn->hasName()) {
+            auto demangledName = demangle(Fn->getName().str());
+            if(demangledName.find("std::") != demangledName.npos) {
+                continue;
+            }
+        }
+
         Function *newFn = updateFnSignature(*Fn, Md);
         if (newFn != NULL) {
             updateFunctionCalls(*Fn, *newFn); 
