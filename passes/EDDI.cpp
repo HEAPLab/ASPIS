@@ -743,6 +743,19 @@ Value *EDDI::getPtrFinalValue(Value &V) {
   return res;
 }
 
+bool EDDI::ptrNotDereferenceable(Value &V) {
+  if(isa<CallInst>(V) && cast<CallInst>(V).getCalledFunction() != nullptr) {
+    auto DemangledName = demangle(cast<CallInst>(V).getCalledFunction()->getName().str());
+
+    if(DemangledName.find("std::") != DemangledName.npos && DemangledName.find("::end()") != DemangledName.npos) {
+      errs() << "Warning: Pointer " << V << " is not dereferenceable because it is the result of an end() function\n";
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Follows the pointers V1 and V2 using getPtrFinalValue() and adds a compare
 // instruction using the IRBuilder B.
 void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B) {
@@ -791,6 +804,11 @@ void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &
 
   if(!V2Ty || V2Ty->isOpaquePtr()) {
     errs() << "Warning 2: Can't find final value for pointer " << V1 << "\n";
+    return;
+  }
+
+  if(ptrNotDereferenceable(V1)) {
+    errs() << "Warning 1: Pointer " << V1 << " is not dereferenceable\n";
     return;
   }
     

@@ -63,6 +63,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         Instruction* cloneInstr(Instruction &I);
         void duplicateOperands (Instruction &I, BasicBlock &ErrBB);
         Value* getPtrFinalValue(Value &V);
+        bool ptrNotDereferenceable(Value &V);
         void comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B);
         void addConsistencyChecks(Instruction &I, BasicBlock &ErrBB);
         void fixFuncValsPassedByReference(Instruction &I, IRBuilder<> &B);
