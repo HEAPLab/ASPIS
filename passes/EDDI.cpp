@@ -2059,9 +2059,15 @@ bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilde
 
   tda::TransparentType *VTy = TTIter->second.begin()->get();
   // Cannot do argument duplication if the type contains opaque pointers since we cannot find the final value to duplicate
-  if (VTy->containsOpaquePtr()) {
-    errs() << "Error! TAD value contains opaque pointer " << *value << "\n";
-    return false;
+  {
+    auto VTyCopy = VTy;
+    while(VTyCopy->isPointerTT()) {
+      if (VTyCopy->isOpaquePtr()) {
+        errs() << "Warning! TAD value contains opaque pointer " << *value << "\n";
+        return false;
+      }
+      VTyCopy = VTyCopy->getPointedType();
+    }
   }
 
   int indirections = 0;
