@@ -16,7 +16,7 @@ LOCAL_SHARED_VOLUME = "./tests/"
 DOCKER_COMPOSE_FILE = "../docker/docker-compose.yml"
 COMPARISON_COUNTER_PATH = "./build/comparison_counter.csv"
 
-data_techniques = ["--no-dup", "--eddi", "--eddi --multiple-errbb", "--eddi --coarse-grained", "--reddi", "--reddi --multiple-errbb", "--reddi --coarse-grained", "--seddi", "--fdsc"]
+data_techniques = ["--no-dup", "--eddi", "--eddi --multiple-errbb", "--eddi --coarse-grained", "--eddi --multiple-errbb --coarse-grained",  "--reddi", "--reddi --multiple-errbb", "--reddi --coarse-grained", "--reddi --multiple-errbb --coarse-grained", "--seddi", "--fdsc"]
 cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm", "--racfed", "--inter-rasm"]
 
 def record_comparison_counter(test_name: str, output: str):
