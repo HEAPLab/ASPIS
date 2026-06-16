@@ -1370,6 +1370,10 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     return 0;
   }
 
+  if(I.isVolatile() || (isa<CallBase>(I) && cast<CallBase>(I).isInlineAsm())) {
+    return 0;
+  }
+
   Instruction *clonedInst = nullptr;
   int res = 0;
 
