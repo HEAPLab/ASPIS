@@ -597,7 +597,7 @@ EDDI::cloneInstr(Instruction &I) {
   return IClone;
 }
 
-Value *EDDI::getDuplicateValue(Value *V, Instruction *I) {
+Value *EDDI::getDuplicateValue(Value *V, Function *Fn) {
   // Fast path if V is a local variable, it should have only one duplicate
   if(!isa<GlobalValue>(V) || isa<Argument>(V)) {
     assert((DuplicatedInstructionMap.count(V) <= 1) && "Local variable has more than one duplicate");
@@ -620,7 +620,7 @@ Value *EDDI::getDuplicateValue(Value *V, Instruction *I) {
       return duplicate;
     } else {
       // If it is an instruction, we need to check if it is in the same function of I
-      if (isa<Instruction>(duplicate) && cast<Instruction>(duplicate)->getParent()->getParent() == I->getParent()->getParent()) {
+      if (isa<Instruction>(duplicate) && cast<Instruction>(duplicate)->getParent()->getParent() == Fn) {
         return duplicate;
       }
     }
@@ -643,7 +643,7 @@ void EDDI::duplicateOperands(
     BasicBlock &ErrBB) {
 
   // see if I has a clone
-  Value *Clone = getDuplicateValue(&I, &I);
+  Value *Clone = getDuplicateValue(&I, I.getFunction());
   Instruction *IClone = nullptr;
   if(Clone != nullptr && isa<Instruction>(Clone)) {
     IClone = cast<Instruction>(Clone);
@@ -671,7 +671,7 @@ void EDDI::duplicateOperands(
       if (IClone != nullptr) {
         GEPOperator *GEPOperand = cast<GEPOperator>(IClone->getOperand(J));
         Value *PtrOperand = GEPOperand->getPointerOperand();
-        Value *ClonePtrOperand = getDuplicateValue(PtrOperand, &I);
+        Value *ClonePtrOperand = getDuplicateValue(PtrOperand, I.getFunction());
         // update the duplicate GEP operator using the duplicate of the pointer
         // operand
         if (ClonePtrOperand != nullptr) {
@@ -701,12 +701,12 @@ void EDDI::duplicateOperands(
       }
     } else if (isa<StoreInst>(I) && isa<GlobalVariable>(V) && cast<GlobalVariable>(V)->isConstant()) {
       IRBuilder<> B(&I);
-      synchronizeFunctionArguments(*I.getModule(), V, B);
+      synchronizeFunctionArguments(*I.getModule(), V, B, &I);
     }
 
     if (IClone != nullptr) {
       // use the duplicated instruction as operand of IClone
-      Value *CloneOperand = getDuplicateValue(V, &I);
+      Value *CloneOperand = getDuplicateValue(V, I.getFunction());
       if (CloneOperand != nullptr) {
         IClone->setOperand(J, CloneOperand); // set the J-th operand with the duplicate value
       }
@@ -938,7 +938,7 @@ void EDDI::addConsistencyChecks(
 
   // if the instruction is a call with indirect function, we try to get a compare
   if(isa<CallBase>(I) && cast<CallBase>(I).isIndirectCall()) {
-    Value *Duplicate = getDuplicateValue(cast<CallBase>(I).getCalledOperand(), &I);
+    Value *Duplicate = getDuplicateValue(cast<CallBase>(I).getCalledOperand(), I.getFunction());
     if (Duplicate != nullptr) {
       Value *Original = cast<CallBase>(I).getCalledOperand();
       Value *Copy = Duplicate;
@@ -1087,11 +1087,11 @@ void EDDI::fixFuncValsPassedByReference(
     Value *V = I.getOperand(i);
     if (isa<Instruction>(V)) {
       Instruction *Operand = cast<Instruction>(V);
-      Value *Duplicate = getDuplicateValue(Operand, &I);
+      Value *Duplicate = getDuplicateValue(Operand, I.getFunction());
 
       if (Duplicate != nullptr) {
         if(Operand->getType()->isPointerTy() && Duplicate->getType()->isPointerTy()) {
-          synchronizeFunctionArguments(*I.getModule(), Operand, B);
+          synchronizeFunctionArguments(*I.getModule(), Operand, B, &I);
         }
       }
     }
@@ -1257,7 +1257,7 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &Er
     Value *Arg = CInstr->getArgOperand(i);
 
     // see if Original has a copy
-    Value *Copy = getDuplicateValue(Arg, CInstr);
+    Value *Copy = getDuplicateValue(Arg, CInstr->getFunction());
     if(Copy == nullptr) {
       Copy = Arg;
     }
@@ -1425,7 +1425,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     if (IClone->isIdenticalTo(&I)) {
       IClone->eraseFromParent();
 
-      Value *Copy = getDuplicateValue(&I, &I);
+      Value *Copy = getDuplicateValue(&I, I.getFunction());
       if(Copy != nullptr) {
         DuplicatedInstructionMap.erase(Copy);
         DuplicatedInstructionMap.erase(&I);
@@ -1956,7 +1956,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       Value *Arg = CInstr->getArgOperand(i);
 
       // If argument has already a duplicate, nothing to do
-      if(getDuplicateValue(Arg, CInstr) != nullptr || !isa<Instruction>(Arg)) {
+      if(getDuplicateValue(Arg, CInstr->getFunction()) != nullptr || !isa<Instruction>(Arg)) {
         // If Argument already duplicated continue to next argument
         continue;
       }
@@ -1965,7 +1965,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       if(Arg->getType()->isPointerTy() && !CInstr->isByValArgument(i) && isa<Instruction>(Arg) && !isa<CallInst>(Arg))
       {
         // If cannot perform TAD, do not duplicate Arg
-        synchronizeFunctionArguments(Md, Arg, B);
+        synchronizeFunctionArguments(Md, Arg, B, CInstr);
       } else {
         // Otherwise pass two times the same arg
         DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Arg, Arg)); // TODO: Check if needed
@@ -2038,7 +2038,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   return PreservedAnalyses::none();
 }
 
-bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B) {
+bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I) {
   const llvm::DataLayout &DL = Md.getDataLayout();
 
   auto TTIter = deducedTypes.transparentTypes.find(value);
@@ -2079,7 +2079,7 @@ bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilde
   }
 
   bool hasPerformedTAD = false;
-  Value *valueDup = nullptr;
+  Value *valueDup = getDuplicateValue(value, I->getFunction());
   uint64_t SizeInBytes = 0;
   if(isa<GetElementPtrInst>(currentPtr)) {
     auto *gepInst = cast<GetElementPtrInst>(currentPtr);
@@ -2088,8 +2088,7 @@ bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilde
     SizeInBytes = DL.getTypeAllocSize(VTy->getLLVMType());
   }
 
-  auto valueDupIt = DuplicatedInstructionMap.find(value);
-  if(valueDupIt == DuplicatedInstructionMap.end()) {
+  if(valueDup == nullptr) {
     hasPerformedTAD = true;
     // currentPtr is now the pointer to the final value
 
@@ -2106,7 +2105,6 @@ bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilde
     valueDup = allocaPrev;
   } else {
     hasPerformedTAD = false;
-    valueDup = valueDupIt->second;
   }
 
   Value *Size = llvm::ConstantInt::get(B.getInt8Ty(), SizeInBytes);
@@ -2130,8 +2128,8 @@ bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilde
       valueDup = allocaCurr;
     }
 
-    DuplicatedInstructionMap.emplace(valueDup, value);
-    DuplicatedInstructionMap.emplace(value, valueDup);
+    DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(valueDup, value));
+    DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(value, valueDup));
   }
 
   DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(memcpy_call, memcpy_call));
