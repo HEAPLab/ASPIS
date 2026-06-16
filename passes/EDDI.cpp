@@ -1461,13 +1461,13 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     Function *Callee = CInstr->getCalledFunction();
     Callee = getFunctionFromDuplicate(Callee);
 
-    if(CInstr->getCalledFunction() != NULL && isToExcludeName(CInstr->getCalledFunction()->getName())) {
+    if((FuncAnnotations.find(Callee) != FuncAnnotations.end() && FuncAnnotations.find(Callee)->second.starts_with("exclude")) || (Callee != NULL && isToExclude(CInstr))) {
       return 0;
     }
 
     // check if the function call has to be duplicated
     if ((FuncAnnotations.find(Callee) != FuncAnnotations.end() && FuncAnnotations.find(Callee)->second.starts_with("to_duplicate")) ||
-        isToDuplicate(CInstr)) {
+        (Callee != NULL && isToDuplicate(CInstr))) {
       // duplicate the instruction
       clonedInst = cloneInstr(*CInstr);
 
