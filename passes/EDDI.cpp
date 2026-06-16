@@ -701,7 +701,7 @@ void EDDI::duplicateOperands(
       }
     } else if (isa<StoreInst>(I) && isa<GlobalVariable>(V) && cast<GlobalVariable>(V)->isConstant()) {
       IRBuilder<> B(&I);
-      temporaryArgumentDuplication(*I.getModule(), V, B);
+      synchronizeFunctionArguments(*I.getModule(), V, B);
     }
 
     if (IClone != nullptr) {
@@ -780,17 +780,11 @@ void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &
 
   if(deducedTypes.transparentTypes.find(&V1)->second.size() != 1) {
     errs() << "\tMultiple types 1!\n";
-    for(auto el=deducedTypes.transparentTypes.find(&V1)->second.cbegin(); el != deducedTypes.transparentTypes.find(&V1)->second.cend(); el++) {
-      errs() << "\t" << el->get()->toString() << "\n";
-    }
     return;
   }
 
   if(deducedTypes.transparentTypes.find(&V2)->second.size() != 1) {
     errs() << "\tMultiple types 2!\n";
-    for(auto el=deducedTypes.transparentTypes.find(&V2)->second.cbegin(); el != deducedTypes.transparentTypes.find(&V2)->second.cend(); el++) {
-      errs() << "\t" << el->get()->toString() << "\n";
-    }
     return;
   }
 
@@ -1096,16 +1090,8 @@ void EDDI::fixFuncValsPassedByReference(
       Value *Duplicate = getDuplicateValue(Operand, &I);
 
       if (Duplicate != nullptr) {
-        Value *Original = Operand;
-        Value *Copy = Duplicate;
-        if(Original->getType()->isPointerTy() && Copy->getType()->isPointerTy()) {
-          Type *OriginalType = Original->getType();
-          Instruction *TmpLoad = B.CreateLoad(OriginalType, Original);
-          Instruction *TmpStore = B.CreateStore(TmpLoad, Copy);
-          DuplicatedInstructionMap.insert(
-              std::pair<Instruction *, Instruction *>(TmpLoad, TmpLoad));
-          DuplicatedInstructionMap.insert(
-              std::pair<Instruction *, Instruction *>(TmpStore, TmpStore));
+        if(Operand->getType()->isPointerTy() && Duplicate->getType()->isPointerTy()) {
+          synchronizeFunctionArguments(*I.getModule(), Operand, B);
         }
       }
     }
@@ -1975,7 +1961,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       if(Arg->getType()->isPointerTy() && !CInstr->isByValArgument(i) && isa<Instruction>(Arg) && !isa<CallInst>(Arg))
       {
         // If cannot perform TAD, do not duplicate Arg
-        temporaryArgumentDuplication(Md, Arg, B);
+        synchronizeFunctionArguments(Md, Arg, B);
       } else {
         // Otherwise pass two times the same arg
         DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Arg, Arg)); // TODO: Check if needed
@@ -2048,7 +2034,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   return PreservedAnalyses::none();
 }
 
-bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B) {
+bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B) {
   const llvm::DataLayout &DL = Md.getDataLayout();
 
   auto TTIter = deducedTypes.transparentTypes.find(value);
@@ -2088,44 +2074,62 @@ bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilde
     }
   }
 
-  // currentPtr is now the pointer to the final value
-
+  bool hasPerformedTAD = false;
+  Value *valueDup = nullptr;
   uint64_t SizeInBytes = 0;
-  AllocaInst *allocaPrev = nullptr;
-
   if(isa<GetElementPtrInst>(currentPtr)) {
     auto *gepInst = cast<GetElementPtrInst>(currentPtr);
     SizeInBytes = DL.getTypeAllocSize(gepInst->getSourceElementType());
-    allocaPrev = B.CreateAlloca(VTy->getLLVMType(), ConstantInt::get(VTy->getLLVMType(), SizeInBytes));
   } else {
     SizeInBytes = DL.getTypeAllocSize(VTy->getLLVMType());
-    allocaPrev = B.CreateAlloca(VTy->getLLVMType());
   }
 
-  deducedTypes.transparentTypes[allocaPrev].insert(VTy->clone());
+  auto valueDupIt = DuplicatedInstructionMap.find(value);
+  if(valueDupIt == DuplicatedInstructionMap.end()) {
+    hasPerformedTAD = true;
+    // currentPtr is now the pointer to the final value
 
+    AllocaInst *allocaPrev = nullptr;
+
+    if(isa<GetElementPtrInst>(currentPtr)) {
+      allocaPrev = B.CreateAlloca(VTy->getLLVMType(), ConstantInt::get(B.getInt8Ty(), SizeInBytes));
+    } else {
+      allocaPrev = B.CreateAlloca(VTy->getLLVMType());
+    }
+    allocaPrev->moveAfter(allocaPrev->getParent()->getParent()->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
+
+    deducedTypes.transparentTypes[allocaPrev].insert(VTy->clone());
+    valueDup = allocaPrev;
+  } else {
+    hasPerformedTAD = false;
+    valueDup = valueDupIt->second;
+  }
 
   Value *Size = llvm::ConstantInt::get(B.getInt8Ty(), SizeInBytes);
 
   llvm::CallInst *memcpy_call = B.CreateMemCpy(
-      allocaPrev, allocaPrev->getPointerAlignment(DL),
-      currentPtr, allocaPrev->getPointerAlignment(DL),
+      valueDup, valueDup->getPointerAlignment(DL),
+      currentPtr, valueDup->getPointerAlignment(DL),
       Size);
 
   auto VTyPtr = VTy->clone();
 
   // Now we need to create as many allocas as the number of pointer indirections
   // in order to duplicate the whole pointer chain
-  for (int i = 0; i < indirections; ++i) {
-    VTyPtr = VTyPtr->getPointerToType();
-    auto *allocaCurr = B.CreateAlloca(VTyPtr->getLLVMType());
-    deducedTypes.transparentTypes[allocaCurr].insert(VTyPtr->getPointerToType()->clone());
-    B.CreateStore(allocaPrev, allocaCurr);
-    allocaPrev = allocaCurr;
+  if(hasPerformedTAD) {
+    for (int i = 0; i < indirections; ++i) {
+      VTyPtr = VTyPtr->getPointerToType();
+      auto *allocaCurr = B.CreateAlloca(VTyPtr->getLLVMType());
+      allocaCurr->moveAfter(allocaCurr->getParent()->getParent()->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
+      deducedTypes.transparentTypes[allocaCurr].insert(VTyPtr->getPointerToType()->clone());
+      B.CreateStore(valueDup, allocaCurr);
+      valueDup = allocaCurr;
+    }
+
+    DuplicatedInstructionMap.emplace(valueDup, value);
+    DuplicatedInstructionMap.emplace(value, valueDup);
   }
 
-  DuplicatedInstructionMap.emplace(allocaPrev, value);
-  DuplicatedInstructionMap.emplace(value, allocaPrev);
   DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(memcpy_call, memcpy_call));
 
   return true;
