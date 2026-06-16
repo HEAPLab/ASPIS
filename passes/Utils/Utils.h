@@ -45,8 +45,9 @@ LinkageMap mapFunctionLinkageNames(const Module &M);
 void printLinkageMap(const LinkageMap &linkageMap);
 StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functionName);
 bool isToDuplicateName(StringRef FnMangledName);
-bool isToDuplicate(CallBase *CInstr);
+bool isToDuplicate(Value *CInstr);
 bool isToExcludeName(StringRef FnMangledName);
+bool isToExclude(Value *V);
 
 void createFtFuncs(Module &Md);
 

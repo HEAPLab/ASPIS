@@ -218,12 +218,15 @@ StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functi
     }
 }
 
-bool isToDuplicate(CallBase *CInstr) {
-  Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
-  if (intrinsicID != Intrinsic::not_intrinsic) {
-    return true; 
-  } else if(CInstr->getCalledFunction() != NULL && isToDuplicateName(CInstr->getCalledFunction()->getName())) {
-    return true;
+bool isToDuplicate(Value *V) {
+  if(isa<CallBase>(V)) {
+    CallBase *CInstr = cast<CallBase>(V);
+    Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
+    if (intrinsicID != Intrinsic::not_intrinsic) {
+      return true; 
+    } else if(CInstr->getCalledFunction() != NULL && isToDuplicateName(CInstr->getCalledFunction()->getName())) {
+      return true;
+    }
   }
   
   return false;
@@ -246,6 +249,24 @@ bool isToDuplicateName(StringRef FnMangledName) {
     }
 
     return true;
+  }
+
+  return false; 
+}
+
+bool isToExclude(Value *V) {
+  if(isa<Instruction>(V)) {
+    Instruction *Inst = cast<Instruction>(V);
+    if (Inst->isVolatile()) {
+      return true;
+    }
+  }
+
+  if(isa<CallBase>(V)) {
+    CallBase *CInstr = cast<CallBase>(V);
+    if(CInstr->getCalledFunction() != NULL && isToExcludeName(CInstr->getCalledFunction()->getName())) {
+      return true;
+    }
   }
 
   return false; 
