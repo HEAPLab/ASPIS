@@ -701,7 +701,7 @@ void EDDI::duplicateOperands(
       }
     } else if (isa<StoreInst>(I) && isa<GlobalVariable>(V) && cast<GlobalVariable>(V)->isConstant()) {
       IRBuilder<> B(&I);
-      synchronizeFunctionArguments(*I.getModule(), V, B, &I);
+      synchronizeFunctionArguments(*I.getModule(), V, B, &I, true);
     }
 
     if (IClone != nullptr) {
@@ -1091,7 +1091,7 @@ void EDDI::fixFuncValsPassedByReference(
 
       if (Duplicate != nullptr) {
         if(Operand->getType()->isPointerTy() && Duplicate->getType()->isPointerTy()) {
-          synchronizeFunctionArguments(*I.getModule(), Operand, B, &I);
+          synchronizeFunctionArguments(*I.getModule(), Operand, B, &I, false);
         }
       }
     }
@@ -1462,6 +1462,19 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     Callee = getFunctionFromDuplicate(Callee);
 
     if((FuncAnnotations.find(Callee) != FuncAnnotations.end() && FuncAnnotations.find(Callee)->second.starts_with("exclude")) || (Callee != NULL && isToExclude(CInstr))) {
+      IRBuilder<> B(CInstr);
+      fixFuncValsPassedByReference(*CInstr, B);
+
+#ifdef CHECK_AT_CALLS
+#if (SELECTIVE_CHECKING == 1)
+      if(I.getParent()->getTerminator() == NULL) {
+        errs() << "Malformed block!\n";
+        I.getParent()->print(errs());
+        errs() << "\n";
+      } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
+#endif
+        addConsistencyChecks(I, ErrBB);
+#endif
       return 0;
     }
 
@@ -1965,7 +1978,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       if(Arg->getType()->isPointerTy() && !CInstr->isByValArgument(i) && isa<Instruction>(Arg) && !isa<CallInst>(Arg))
       {
         // If cannot perform TAD, do not duplicate Arg
-        synchronizeFunctionArguments(Md, Arg, B, CInstr);
+        synchronizeFunctionArguments(Md, Arg, B, CInstr, true);
       } else {
         // Otherwise pass two times the same arg
         DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Arg, Arg)); // TODO: Check if needed
@@ -2038,7 +2051,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   return PreservedAnalyses::none();
 }
 
-bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I) {
+bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I, bool before) {
   const llvm::DataLayout &DL = Md.getDataLayout();
 
   auto TTIter = deducedTypes.transparentTypes.find(value);
@@ -2090,6 +2103,7 @@ bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilde
 
   if(valueDup == nullptr) {
     hasPerformedTAD = true;
+    assert(hasPerformedTAD && before && "TAD shall be performed only for syncrhonization before the instruction");
     // currentPtr is now the pointer to the final value
 
     AllocaInst *allocaPrev = nullptr;
@@ -2113,7 +2127,19 @@ bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilde
       valueDup, valueDup->getPointerAlignment(DL),
       currentPtr, valueDup->getPointerAlignment(DL),
       Size);
-
+  if(!before) {
+    if(!I->isTerminator()) {
+      memcpy_call->moveAfter(I);
+    } else {
+      if(isa<InvokeInst>(I)) {
+        memcpy_call->moveBefore(cast<InvokeInst>(I)->getNormalDest()->getFirstNonPHIOrDbgOrAlloca());
+      } else {
+        errs() << "Error: not handled instruction for synchronize function arguments\n";
+        abort();
+      }
+    }
+  }
+  
   auto VTyPtr = VTy->clone();
 
   // Now we need to create as many allocas as the number of pointer indirections

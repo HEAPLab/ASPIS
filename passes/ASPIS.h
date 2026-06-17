@@ -76,7 +76,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         bool isValueDuplicated(Instruction &V);
         Function *duplicateFnArgs(Function &Fn, Module &Md);
         void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
-        bool synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I);
+        bool synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I, bool before);
         Value *getDuplicateValue(Value *V, Function *I);
         void createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, IRBuilder<> &B);
         void compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B);
