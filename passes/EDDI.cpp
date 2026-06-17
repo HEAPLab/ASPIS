@@ -1371,25 +1371,43 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
   }
 
   if(I.isVolatile()) {
-    if(isa<LoadInst>(I) && I.getType()->isIntegerTy()) {
-      IRBuilder<> B(&I);
-      auto Idup = B.CreateAdd(&I, llvm::ConstantInt::get(I.getType(), 0));
-      cast<Instruction>(Idup)->moveAfter(&I);
-      DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, Idup));
-      DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Idup, &I));
+    bool shouldDuplicateAnyway = false;
+    if(isa<LoadInst>(I)) {
+      if(FuncAnnotations.find(cast<LoadInst>(I).getPointerOperand()) != FuncAnnotations.end() && 
+          (FuncAnnotations.find(cast<LoadInst>(I).getPointerOperand())->second.starts_with("to_duplicate") || FuncAnnotations.find(cast<LoadInst>(I).getPointerOperand())->second.starts_with("to_harden"))) {
+        shouldDuplicateAnyway = true;
+      } else if(I.getType()->isIntegerTy()) {
+        IRBuilder<> B(&I);
+        auto Idup = B.CreateAdd(&I, llvm::ConstantInt::get(I.getType(), 0));
+        cast<Instruction>(Idup)->moveAfter(&I);
+        DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, Idup));
+        DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Idup, &I));
+      } else if(I.getType()->isFloatingPointTy()) {
+        IRBuilder<> B(&I);
+        auto Idup = B.CreateAdd(&I, llvm::ConstantFP::get(I.getType(), 0));
+        cast<Instruction>(Idup)->moveAfter(&I);
+        DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, Idup));
+        DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Idup, &I));
+      }
     } else if(isa<StoreInst>(I)) {
+      if(getDuplicateValue(cast<StoreInst>(I).getPointerOperand(), I.getFunction()) != nullptr) {
+        shouldDuplicateAnyway = true;
+      } else {
 #ifdef CHECK_AT_STORES
 #if (SELECTIVE_CHECKING == 1)
-    if(I.getParent()->getTerminator() == NULL) {
-      errs() << "Malformed block!\n";
-      I.getParent()->print(errs());
-      errs() << "\n";
-    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
+        if(I.getParent()->getTerminator() == NULL) {
+          errs() << "Malformed block!\n";
+          I.getParent()->print(errs());
+          errs() << "\n";
+        } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
 #endif
-      addConsistencyChecks(I, ErrBB);
+          addConsistencyChecks(I, ErrBB);
 #endif
+      }
     }
-    return 0;
+    if(!shouldDuplicateAnyway) {
+      return 0;
+    }
   } else if (isa<CallBase>(I) && cast<CallBase>(I).isInlineAsm()) {
     return 0;
   }
