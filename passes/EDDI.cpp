@@ -982,10 +982,10 @@ void EDDI::addConsistencyChecks(
 }
 
 void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, IRBuilder<> &B) {
-  auto Duplicate = DuplicatedInstructionMap.find(V);
+  auto Duplicate = getDuplicateValue(V, I.getFunction());
 
   // if the duplicate doesn't exist, we cannot perform a compare
-  if (Duplicate == DuplicatedInstructionMap.end()) {
+  if (Duplicate == nullptr) {
     return;
   }
 
@@ -1002,8 +1002,8 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
     // TODO: are there other cases to support?
   }
 
-  Value *Original = Duplicate->first;
-  Value *Copy = Duplicate->second;
+  Value *Original = V;
+  Value *Copy = Duplicate;
 
   // we compare the operands only if they are found in the TDA transparent types
   if(deducedTypes.transparentTypes.find(V) == deducedTypes.transparentTypes.end()) {
@@ -1056,6 +1056,7 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
   } else if(V1Ty->isArrayTT()) {
     int arraysize = V1Ty->getLLVMType()->getArrayNumElements();
 
+    // TODO: understand if is possible to remove the extracted values when no check is performed
     for (int i = 0; i < arraysize; i++) {
       Value *OriginalElem = B.CreateExtractValue(&V1, i);
       Value *CopyElem = B.CreateExtractValue(&V2, i);
