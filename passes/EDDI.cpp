@@ -1370,7 +1370,27 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     return 0;
   }
 
-  if(I.isVolatile() || (isa<CallBase>(I) && cast<CallBase>(I).isInlineAsm())) {
+  if(I.isVolatile()) {
+    if(isa<LoadInst>(I) && I.getType()->isIntegerTy()) {
+      IRBuilder<> B(&I);
+      auto Idup = B.CreateAdd(&I, llvm::ConstantInt::get(I.getType(), 0));
+      cast<Instruction>(Idup)->moveAfter(&I);
+      DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, Idup));
+      DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Idup, &I));
+    } else if(isa<StoreInst>(I)) {
+#ifdef CHECK_AT_STORES
+#if (SELECTIVE_CHECKING == 1)
+    if(I.getParent()->getTerminator() == NULL) {
+      errs() << "Malformed block!\n";
+      I.getParent()->print(errs());
+      errs() << "\n";
+    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
+#endif
+      addConsistencyChecks(I, ErrBB);
+#endif
+    }
+    return 0;
+  } else if (isa<CallBase>(I) && cast<CallBase>(I).isInlineAsm()) {
     return 0;
   }
 
