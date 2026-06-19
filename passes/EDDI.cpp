@@ -847,7 +847,7 @@ void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &
 
 
 bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
-  
+
   assert(AI->getParent()->getParent() == At->getParent()->getParent() && "Alloca and Instruction not in the same function!");
 
   std::unordered_set<StoreInst *> storeInsts;
@@ -906,6 +906,11 @@ bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
       // If it is a valid store to end, continue to search for another path that does not initialize the alloca variale.
       if(isa<StoreInst>(I) && storeInsts.find(cast<StoreInst>(I)) != storeInsts.end()) {
         break;
+      }
+      
+      // return false if we don't have a next node before encountering a store
+      if(I->getNextNode() == nullptr) {
+        return false;
       }
     } while(I = I->getNextNode());
   }
