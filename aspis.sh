@@ -123,7 +123,7 @@ parse_commands() {
         --asmfiles  <file>  Defines the set of assembly files required for the
                             compilation. The content of <file> is the list of 
                             assembly files to pass to the linker at compilation 
-                            termination, one for each line (wildcard * allowed).
+                            termination, one for each line (wildcard * allowed).   
         --no-cleanup        Does not remove the intermediate .ll files generated,
                             which might be useful for debug purposes.
 
@@ -152,7 +152,7 @@ parse_commands() {
 
         --multiple-errbb    Enables multiple error basic blocks in EDDI
 
-        --coarse-grained     Enables coarse-grained duplication in EDDI
+        --coarse-grained    Enables coarse-grained duplication in EDDI
 
 EOF
                         exit 0
@@ -463,7 +463,14 @@ run_aspis() {
         exit
     fi;
 
-    exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
+    case $output_file in 
+        *.ll)
+            exe cp $build_dir/out.ll $build_dir/$output_file.bak
+            ;;
+        *)
+            exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
+            ;;
+    esac
     success_msg "Binary emitted."
 
     #Cleanup
@@ -471,6 +478,12 @@ run_aspis() {
         rm -f $build_dir/*.ll
         success_msg "Cleaned cached files."
     fi
+
+    case $output_file in 
+        *.ll)
+            exe mv $build_dir/$output_file.bak $build_dir/$output_file
+            ;;
+    esac
 
     success_msg "Done!"
 }
