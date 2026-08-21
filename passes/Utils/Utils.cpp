@@ -224,7 +224,7 @@ bool isToDuplicate(Value *V) {
     Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
     if (intrinsicID != Intrinsic::not_intrinsic) {
       return true; 
-    } else if(CInstr->getCalledFunction() != NULL && isToDuplicateName(CInstr->getCalledFunction()->getName())) {
+    } else if(CInstr->getCalledFunction() != NULL && (isToDuplicateName(CInstr->getCalledFunction()->getName()) || (CInstr->getCalledFunction()->hasExternalLinkage() && CInstr->getCalledFunction()->isDeclaration()))) {
       return true;
     }
   }
@@ -279,12 +279,14 @@ bool isToExcludeName(StringRef FnMangledName) {
   }
 
   auto FnName = demangle(FnMangledName.str());
+  auto FnNameStrRef = StringRef(FnName);
 
   if(FnName.find("std::ostream") != FnName.npos || 
       FnName.find("std::basic_ostream") != FnName.npos || 
       FnName.find("std::basic_ios") != FnName.npos || 
       FnName.find("std::thread") != FnName.npos || 
-      FnName.find("printf") != FnName.npos) {
+      FnName.find("printf") != FnName.npos ||
+      FnNameStrRef.equals_insensitive("rand")) {
     return true;
   }
 
