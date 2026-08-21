@@ -2104,7 +2104,35 @@ bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilde
     return false;
   }
 
-  tda::TransparentType *VTy = TTIter->second.begin()->get();
+  tda::TransparentType *VTy = nullptr;
+  TransparentTypeFactory ttf;
+
+  // TODO: fix this in TDA!
+  if (value->getType()->isPointerTy()) {
+    if (isa<AllocaInst>(value) &&
+        cast<AllocaInst>(value)->getAllocatedType() &&
+        !cast<AllocaInst>(value)->getAllocatedType()->isPointerTy()) {
+
+      auto newTy = ttf.createFromType(cast<AllocaInst>(value)->getAllocatedType(), 1);
+      VTy = newTy.get();                                  // grab the raw pointer while we still own it
+      deducedTypes.transparentTypes[value].insert(std::move(newTy)); // then transfer ownership into the map
+
+    } else {
+      auto TTIter = deducedTypes.transparentTypes.find(value);
+      if (TTIter == deducedTypes.transparentTypes.end() || TTIter->second.empty()) {
+        errs() << "Warning: Cannot TDA value " << *value << "\n";
+        return false;
+      }
+      // WARNING: THIS IS JUST BEST EFFORT, COULD MESS THINGS UP!
+      VTy = TTIter->second.begin()->get();
+      errs() << "ERROR: Best effort inference of type. could be wrong! value: " << *value << " type " << VTy->toString() << "\n";
+    }
+  } else {
+    auto newTy = ttf.createFromType(value->getType());
+    VTy = newTy.get();
+    deducedTypes.transparentTypes[value].insert(std::move(newTy));
+  }
+
   // Cannot do argument duplication if the type contains opaque pointers since we cannot find the final value to duplicate
   {
     auto VTyCopy = VTy;
