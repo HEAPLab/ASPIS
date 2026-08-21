@@ -1096,7 +1096,7 @@ void EDDI::fixFuncValsPassedByReference(
       Value *Duplicate = getDuplicateValue(Operand, I.getFunction());
 
       if (Duplicate != nullptr) {
-        if(Operand->getType()->isPointerTy() && Duplicate->getType()->isPointerTy()) {
+        if((Operand->getType()->isPointerTy() && Duplicate->getType()->isPointerTy()) || (isa<GlobalVariable>(Operand) && isa<GlobalVariable>(Duplicate))) {
           synchronizeFunctionArguments(*I.getModule(), Operand, B, &I, false);
         }
       }
