@@ -573,8 +573,7 @@ int EDDI::isUsedByStore(Instruction &I, Instruction &Use) {
  * Clones instruction `I` and adds the pair <I, IClone> to
  * DuplicatedInstructionMap, inserting the clone right after the original.
  */
-Instruction *
-EDDI::cloneInstr(Instruction &I) {
+Instruction *EDDI::cloneInstr(Instruction &I) {
   Instruction *IClone = I.clone();
 
   if (!I.getType()->isVoidTy() && I.hasName()) {
@@ -632,16 +631,8 @@ Value *EDDI::getDuplicateValue(Value *V, Function *Fn) {
 /**
  * Takes instruction I and duplicates its operands. Then substitutes each
  * duplicated operand in the duplicated instruction IClone.
- *
- * @param DuplicatedInstructionMap is the map of duplicated instructions, needed
- * for the recursive duplicateInstruction call
- * @param ErrBB is the error basic block to jump to in case of error needed for
- * the recursive duplicateInstruction call
  */
-void EDDI::duplicateOperands(
-    Instruction &I,
-    BasicBlock &ErrBB) {
-
+void EDDI::duplicateOperands(Instruction &I) {
   // see if I has a clone
   Value *Clone = getDuplicateValue(&I, I.getFunction());
   Instruction *IClone = nullptr;
@@ -657,7 +648,7 @@ void EDDI::duplicateOperands(
     if (isa<Instruction>(V)) {
       Instruction *Operand = cast<Instruction>(V);
       if (!isValueDuplicated(*Operand)) {
-        if(duplicateInstruction(*Operand, ErrBB)) {
+        if(duplicateInstruction(*Operand)) {
           if(InstructionsToRemove.find(Operand) == InstructionsToRemove.end()) {
             InstructionsToRemove.insert(Operand);
           }
@@ -921,10 +912,7 @@ bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
 /**
  * Adds a consistency check on the instruction I
  */
-void EDDI::addConsistencyChecks(
-    Instruction &I,
-    BasicBlock &ErrBB) {
-
+void EDDI::addConsistencyChecks(Instruction &I, BasicBlock &ErrBB) {
   if(InstructionsToRemove.find(&I) != InstructionsToRemove.end()) {
     return ;
   }
@@ -1245,7 +1233,7 @@ bool EDDI::isAllocaForExceptionHandling(AllocaInst &I){
   return false;
 }
 
-int EDDI::transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &ErrBB) {
+int EDDI::transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B) {
   int res = 0;
   SmallVector<Value *, 6> args;
   SmallVector<Type *, 6> ParamTypes;
@@ -1368,10 +1356,9 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &Er
  * operations depending on the class of I:
  * - Clone the instruction;
  * - Duplicate the instruction operands;
- * - Add consistency checks on the operands (if I is a synchronization point).
  * @returns 1 if the cloned instruction has to be removed, 0 otherwise
  */
-int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
+int EDDI::duplicateInstruction(Instruction &I) {
   if (isValueDuplicated(I)) {
     return 0;
   }
@@ -1398,17 +1385,6 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     } else if(isa<StoreInst>(I)) {
       if(getDuplicateValue(cast<StoreInst>(I).getPointerOperand(), I.getFunction()) != nullptr) {
         shouldDuplicateAnyway = true;
-      } else {
-#ifdef CHECK_AT_STORES
-#if (SELECTIVE_CHECKING == 1)
-        if(I.getParent()->getTerminator() == NULL) {
-          errs() << "Malformed block!\n";
-          I.getParent()->print(errs());
-          errs() << "\n";
-        } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-#endif
-          addConsistencyChecks(I, ErrBB);
-#endif
       }
     }
     if(!shouldDuplicateAnyway) {
@@ -1441,7 +1417,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     clonedInst = cloneInstr(I);
 
     // duplicate the operands
-    duplicateOperands(I, ErrBB);
+    duplicateOperands(I);
   }
 
   // if the instruction is a store instruction we need to duplicate it and its
@@ -1450,20 +1426,8 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     Instruction *IClone = cloneInstr(I);
 
     // duplicate the operands
-    duplicateOperands(I, ErrBB);
+    duplicateOperands(I);
 
-    // add consistency checks on I
-
-#ifdef CHECK_AT_STORES
-#if (SELECTIVE_CHECKING == 1)
-    if(I.getParent()->getTerminator() == NULL) {
-      errs() << "Malformed block!\n";
-      I.getParent()->print(errs());
-      errs() << "\n";
-    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-#endif
-      addConsistencyChecks(I, ErrBB);
-#endif
     // it may happen that I duplicate a store but don't change its operands, if
     // that happens I just remove the duplicate
     if (IClone->isIdenticalTo(&I)) {
@@ -1482,17 +1446,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
   // checks
   else if (isa<BranchInst, SwitchInst, ReturnInst, IndirectBrInst>(I)) {
     // duplicate the operands
-    duplicateOperands(I, ErrBB);
-
-// add consistency checks on I
-#ifdef CHECK_AT_BRANCH
-    if(I.getParent()->getTerminator() == NULL) {
-      errs() << "Malformed block!\n";
-      I.getParent()->print(errs());
-      errs() << "\n";
-    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-      addConsistencyChecks(I, ErrBB);
-#endif
+    duplicateOperands(I);
   }
 
   // if the istruction is a non-already-duplicated call, we duplicate the operands and add consistency
@@ -1509,16 +1463,6 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
       IRBuilder<> B(CInstr);
       fixFuncValsPassedByReference(*CInstr, B);
 
-#ifdef CHECK_AT_CALLS
-#if (SELECTIVE_CHECKING == 1)
-      if(I.getParent()->getTerminator() == NULL) {
-        errs() << "Malformed block!\n";
-        I.getParent()->print(errs());
-        errs() << "\n";
-      } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-#endif
-        addConsistencyChecks(I, ErrBB);
-#endif
       return 0;
     }
 
@@ -1529,7 +1473,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
       clonedInst = cloneInstr(*CInstr);
 
       // duplicate the operands
-      duplicateOperands(I, ErrBB);
+      duplicateOperands(I);
 
       if(isa<InvokeInst>(I)) {
         // In case of an invoke instruction, we have to fix the first invoke since 
@@ -1537,35 +1481,11 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
         auto *IInstr = &cast<InvokeInst>(I);
         toFixInvokes.insert(IInstr);
       }
-
-// add consistency checks on I
-#ifdef CHECK_AT_CALLS
-#if (SELECTIVE_CHECKING == 1)
-    if(I.getParent()->getTerminator() == NULL) {
-      errs() << "Malformed block!\n";
-      I.getParent()->print(errs());
-      errs() << "\n";
-    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-#endif
-        addConsistencyChecks(I, ErrBB);
-#endif
     }
 
     else {
       // duplicate the operands
-      duplicateOperands(I, ErrBB);
-
-// add consistency checks on I
-#ifdef CHECK_AT_CALLS
-#if (SELECTIVE_CHECKING == 1)
-    if(I.getParent()->getTerminator() == NULL) {
-      errs() << "Malformed block!\n";
-      I.getParent()->print(errs());
-      errs() << "\n";
-    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-#endif
-        addConsistencyChecks(I, ErrBB);
-#endif
+      duplicateOperands(I);
 
       IRBuilder<> B(CInstr);
       if (!isa<InvokeInst>(CInstr) && I.getNextNonDebugInstruction()) {
@@ -1582,7 +1502,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
       // if the _dup function exists (and it is not itself the dup version) or is an indirect call, 
       // we substitute the call instruction with a call to the function with duplicated arguments
       if (CInstr->getCalledFunction() == NULL || (Fn != NULL && Fn != CInstr->getCalledFunction())) {
-        res = transformCallBaseInst(CInstr, B, ErrBB);
+        res = transformCallBaseInst(CInstr, B);
       } else {
         fixFuncValsPassedByReference(*CInstr, B);
       }
@@ -1793,6 +1713,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     DuplicatedFns.insert(entryPointFn);
   } else {
     errs() << "[EDDI] Entry point function not found: " << entryPoint << "\n";
+    exit(1);
   }
 #endif
 
@@ -1824,8 +1745,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
                       << Fn->getName() << "\n");
     CompiledFuncs.insert(Fn);
 
-    BasicBlock *ErrBB = BasicBlock::Create(Fn->getContext(), "ErrBB", Fn);
-
     LLVM_DEBUG(dbgs() << "function arguments");
     // save the function arguments and their duplicates
     for (int i = 0; i < Fn->arg_size(); i++) {
@@ -1850,7 +1769,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         if (isa<Instruction>(U)) {
           Instruction *I = cast<Instruction>(U);
           // duplicate the uses of each argument
-          if (duplicateInstruction(*I, *ErrBB)) {
+          if (duplicateInstruction(*I)) {
             if(InstructionsToRemove.find(I) == InstructionsToRemove.end()) {
               InstructionsToRemove.insert(I);
             }
@@ -1872,7 +1791,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     for (Instruction *I : InstToDuplicate) {
       if (!isValueDuplicated(*I)) {
         // perform the duplication
-        int shouldDelete = duplicateInstruction(*I, *ErrBB);
+        int shouldDelete = duplicateInstruction(*I);
 
         // the instruction duplicated may be equal to the original, so we
         // return shouldDelete in order to drop the duplicates
@@ -1884,18 +1803,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       }
     }
     
-    if(CoarseGrainedDuplicationEnabled) {
-      LLVM_DEBUG(dbgs() << "Applying coarse grained duplication\n");
-      // Apply coarse grained duplication
-      for (BasicBlock &BB : *Fn) {
-        repairBasicBlock(BB);
-      }
-    }
-    
     LLVM_DEBUG(dbgs() << " [done]\n");
-
-    // insert the code for calling the error basic block in case of a mismatch
-    CreateErrBB(Md, *Fn, ErrBB);
   }
   
   LLVM_DEBUG(dbgs() << "Iterating over variables...\n");
@@ -1918,25 +1826,8 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       
       // Duplicate instruction only if this isn't an already duplicated function
       if(!Fn->getName().ends_with("_dup")) {
-        BasicBlock *ErrBB = nullptr;
-        bool newErrBB = true;
-
-        // Search pre-existant ErrBB if single basic block error handling is enabled
-        if(!MultipleErrBBEnabled) {
-          for(BasicBlock &BB : *Fn) {
-            if(BB.getName().starts_with("ErrBB")) {
-              ErrBB = &BB;
-              newErrBB = false; // ErrBB already present
-            }
-          }
-        }
-
-        if(newErrBB) {
-          ErrBB = BasicBlock::Create(Fn->getContext(), "ErrBB", Fn);
-        }
-
         if(!isa<CallBase>(I)) {
-          if(duplicateInstruction(*I, *ErrBB)) {
+          if(duplicateInstruction(*I)) {
             if(InstructionsToRemove.find(I) == InstructionsToRemove.end()) {
               InstructionsToRemove.insert(I);
             }
@@ -1944,9 +1835,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         } else {
           GrayAreaCallsToFix.insert(cast<CallBase>(I));
         }
-
-        // insert the code for calling the error basic block in case of a mismatch
-        CreateErrBB(Md, *Fn, ErrBB);
       }
     }
   }
@@ -1987,22 +1875,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
     // Map with the duplicated instructions, including the temporary load ones
     Function *Fn = CInstr->getFunction();
-    BasicBlock *ErrBB = nullptr;
-    bool newErrBB = true;        
-
-    // Search pre-existant ErrBB if single basic block error handling is enabled
-    if(!MultipleErrBBEnabled) {
-      for(BasicBlock &BB : *Fn) {
-        if(BB.getName().starts_with("ErrBB")) {
-          ErrBB = &BB;
-          newErrBB = false; // ErrBB already present
-        }
-      }
-    }
-
-    if(newErrBB) {
-      ErrBB = BasicBlock::Create(Fn->getContext(), "ErrBB", Fn);
-    }
 
     // Set insertion point for the load instructions
     IRBuilder<> B(CInstr);
@@ -2030,14 +1902,11 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     }
 
     // Finally, duplicate the call
-    if(duplicateInstruction(*CInstr, *ErrBB)) {
+    if(duplicateInstruction(*CInstr)) {
       if(InstructionsToRemove.find(CInstr) == InstructionsToRemove.end()) {
         InstructionsToRemove.insert(CInstr);
       }
     }
-
-    // insert the code for calling the error basic block in case of a mismatch
-    CreateErrBB(Md, *Fn, ErrBB);
   }
 
   LLVM_DEBUG(dbgs() << "Fixing invokes\n");
@@ -2056,6 +1925,57 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
     // Update the first invoke's normal destination
     IInstr->setNormalDest(NewBB->getNextNode());
+  }
+
+  // Add consistency checks and, if needed, transform in coarse-grained duplication
+  for(auto &Fn : Md) {
+    for(auto &BB : Fn) {
+      BasicBlock *ErrBB = BasicBlock::Create(Fn.getContext(), "ErrBB", &Fn);
+      for(auto &I : BB) {
+        Value *valueDup = getDuplicateValue(&I, &Fn);
+
+        if(valueDup && (!isa<Instruction>(valueDup) || (cast<Instruction>(valueDup)->getParent() == &BB && I.comesBefore(cast<Instruction>(valueDup))))) {
+          if(isa<CallBase>(I)) {
+            #ifdef CHECK_AT_CALLS
+            #if (SELECTIVE_CHECKING == 1)
+              if(I.getParent()->getTerminator() == NULL) {
+                errs() << "Malformed block!\n";
+                I.getParent()->print(errs());
+                errs() << "\n";
+              } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
+            #endif
+                addConsistencyChecks(I, *ErrBB);
+            #endif
+          } else if (isa<BranchInst, SwitchInst, ReturnInst, IndirectBrInst>(I)) {
+            #ifdef CHECK_AT_BRANCH
+              if(I.getParent()->getTerminator() == NULL) {
+                errs() << "Malformed block!\n";
+                I.getParent()->print(errs());
+                errs() << "\n";
+              } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
+                addConsistencyChecks(I, *ErrBB);
+            #endif
+          } else if (isa<StoreInst, AtomicRMWInst, AtomicCmpXchgInst>(I)) {
+            #ifdef CHECK_AT_STORES
+            #if (SELECTIVE_CHECKING == 1)
+              if(I.getParent()->getTerminator() == NULL) {
+                errs() << "Malformed block!\n";
+                I.getParent()->print(errs());
+                errs() << "\n";
+              } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
+            #endif
+                addConsistencyChecks(I, *ErrBB);
+            #endif
+          }
+        }
+      }
+      // insert the code for calling the error basic block in case of a mismatch
+      CreateErrBB(Md, Fn, ErrBB);
+
+      if(CoarseGrainedDuplicationEnabled) {
+        repairBasicBlock(BB);
+      }
+    }
   }
   
   LLVM_DEBUG(dbgs() << "Remove instructions\n");
