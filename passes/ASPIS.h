@@ -54,6 +54,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         bool duplicateAll;
         bool MultipleErrBBEnabled;
         bool CoarseGrainedDuplicationEnabled;
+        bool vEDDIEnabled;
         int comparisonCounter = 0;
 
         void preprocess(Module &Md);
@@ -83,7 +84,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         void fixGlobalCtors(Module &M);
         void repairBasicBlock(BasicBlock &BB);
     public:
-        explicit EDDI(bool duplicateAll, bool MultipleErrBBEnabled = false, bool CoarseGrainedDuplicationEnabled = true, std::string entryPoint = "main") : duplicateAll(duplicateAll), MultipleErrBBEnabled(MultipleErrBBEnabled), CoarseGrainedDuplicationEnabled(CoarseGrainedDuplicationEnabled), entryPoint(entryPoint) {}
+        explicit EDDI(bool duplicateAll, bool MultipleErrBBEnabled = false, bool CoarseGrainedDuplicationEnabled = true, bool vEDDIEnabled = false, std::string entryPoint = "main") : duplicateAll(duplicateAll), MultipleErrBBEnabled(MultipleErrBBEnabled), CoarseGrainedDuplicationEnabled(CoarseGrainedDuplicationEnabled), vEDDIEnabled(vEDDIEnabled), entryPoint(entryPoint) {}
 
         PreservedAnalyses run(Module &M,
                               ModuleAnalysisManager &);

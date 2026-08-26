@@ -153,6 +153,7 @@ parse_commands() {
         --multiple-errbb    Enables multiple error basic blocks in EDDI
 
         --coarse-grained    Enables coarse-grained duplication in EDDI
+        --veddi    Enable volatile/exclude only checking in EDDI
 
 EOF
                         exit 0
@@ -246,6 +247,9 @@ EOF
                         ;;
                     --coarse-grained)
                         eddi_options="$eddi_options -coarse-grained=true";
+                        ;;
+                    --veddi)
+                        eddi_options="$eddi_options -veddi=true";
                         ;;
                     -g)
                         debug_enabled=true;

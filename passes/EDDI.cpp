@@ -913,6 +913,12 @@ bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
  * Adds a consistency check on the instruction I
  */
 void EDDI::addConsistencyChecks(Instruction &I, BasicBlock &ErrBB) {
+  if(vEDDIEnabled) {
+    if(!((isa<StoreInst>(I) && cast<StoreInst>(I).isVolatile()) || (isa<CallBase>(I) && cast<CallBase>(I).getCalledFunction() != NULL && isToExclude(&I)))) {
+      return ;
+    }
+  }
+
   if(InstructionsToRemove.find(&I) != InstructionsToRemove.end()) {
     return ;
   }
@@ -2414,6 +2420,11 @@ static llvm::cl::opt<bool> CoarseGrained(
     llvm::cl::desc("Enable coarse-grained duplication in EDDI"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> vEDDI(
+    "veddi",
+    llvm::cl::desc("Enable volatile/exclude only checking in EDDI"),
+    llvm::cl::init(false));
+
 llvm::PassPluginLibraryInfo getEDDIPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "eddi-verify", LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
@@ -2431,9 +2442,9 @@ llvm::PassPluginLibraryInfo getEDDIPluginInfo() {
                    ArrayRef<PassBuilder::PipelineElement>) {
                   if (Name == "eddi-verify") {
 #ifdef DUPLICATE_ALL
-                    FPM.addPass(EDDI(true, MultipleErrBB, CoarseGrained));
+                    FPM.addPass(EDDI(true, MultipleErrBB, CoarseGrained, vEDDI));
 #else
-                    FPM.addPass(EDDI(false, MultipleErrBB, CoarseGrained));
+                    FPM.addPass(EDDI(false, MultipleErrBB, CoarseGrained, vEDDI));
 #endif
                     return true;
                   }
