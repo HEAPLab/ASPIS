@@ -239,7 +239,7 @@ bool isToDuplicateName(StringRef FnMangledName) {
 
   auto FnName = demangle(FnMangledName.str());
 
-  if(FnName.find("operator new") == 0 || FnName.find("std::") != FnName.npos || FnName.find("fmt::") != FnName.npos || FnName.find("Eigen::") != FnName.npos) {
+  if(isHeapFunction(FnMangledName) || FnName.find("std::") != FnName.npos || FnName.find("fmt::") != FnName.npos || FnName.find("Eigen::") != FnName.npos) {
 
     if(FnName.find("std::ostream") != FnName.npos || 
         FnName.find("std::basic_ostream") != FnName.npos || 
@@ -254,6 +254,26 @@ bool isToDuplicateName(StringRef FnMangledName) {
 
   return false; 
 }
+
+bool isHeapFunction(StringRef FnMangledName) {
+  if(FnMangledName.ends_with("_ret")) {
+    FnMangledName = FnMangledName.substr(0, FnMangledName.size() - 4);
+  }
+
+  auto FnName = demangle(FnMangledName.str());
+
+  if(FnName.find("malloc") != FnName.npos || 
+      FnName.find("free") != FnName.npos || 
+      FnName.find("operator new") != FnName.npos || 
+      FnName.find("operator delete") != FnName.npos || 
+      FnName.find("calloc") != FnName.npos || 
+      FnName.find("memset") != FnName.npos) {
+    return true;
+  }
+
+  return false;
+}
+
 
 bool isToExclude(Value *V) {
   if(isa<Instruction>(V)) {

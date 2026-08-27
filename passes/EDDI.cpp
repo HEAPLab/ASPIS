@@ -1011,7 +1011,7 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
   compareValues(CmpInstructions, *Original, *Copy, B);
 }
 
-void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B) {
+void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, bool checkCompositeTypes) {
   if(deducedTypes.transparentTypes.find(&V1) == deducedTypes.transparentTypes.end()) {
     return;
   }
@@ -1040,46 +1040,48 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
       errs() << "Warning: Unsupported primitive type for comparison: " << V1Ty->toString() << "\n";
       return;
     }
-  } else if(V1Ty->isStructTT()) {
-    TransparentTypeFactory ttf;
-    for (unsigned i = 0; i < V1Ty->getLLVMType()->getStructNumElements(); i++) {
-      Value *OriginalElem = B.CreateExtractValue(&V1, i);
-      Value *CopyElem = B.CreateExtractValue(&V2, i);
-      DuplicatedInstructionMap.insert(
-          std::pair<Value *, Value *>(OriginalElem, CopyElem));
-      DuplicatedInstructionMap.insert(
-          std::pair<Value *, Value *>(CopyElem, OriginalElem));
+  } else if(checkCompositeTypes) {
+    if(V1Ty->isStructTT()) {
+      TransparentTypeFactory ttf;
+      for (unsigned i = 0; i < V1Ty->getLLVMType()->getStructNumElements(); i++) {
+        Value *OriginalElem = B.CreateExtractValue(&V1, i);
+        Value *CopyElem = B.CreateExtractValue(&V2, i);
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(OriginalElem, CopyElem));
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(CopyElem, OriginalElem));
 
-      auto newTy = ttf.createFromType(cast<ExtractValueInst>(OriginalElem)->getIndexedType(V1Ty->getLLVMType(), i), 0);
-      auto ElTy = newTy.get();
-      deducedTypes.transparentTypes[OriginalElem].insert(ElTy->clone());
-      deducedTypes.transparentTypes[CopyElem].insert(ElTy->clone());
+        auto newTy = ttf.createFromType(cast<ExtractValueInst>(OriginalElem)->getIndexedType(V1Ty->getLLVMType(), i), 0);
+        auto ElTy = newTy.get();
+        deducedTypes.transparentTypes[OriginalElem].insert(ElTy->clone());
+        deducedTypes.transparentTypes[CopyElem].insert(ElTy->clone());
 
-      compareValues(CmpInstructions, *OriginalElem, *CopyElem, B);
+        compareValues(CmpInstructions, *OriginalElem, *CopyElem, B, false);
+      }
+    } else if(V1Ty->isArrayTT()) {
+      int arraysize = V1Ty->getLLVMType()->getArrayNumElements();
+
+      // TODO: understand if is possible to remove the extracted values when no check is performed
+      TransparentTypeFactory ttf;
+      for (int i = 0; i < arraysize; i++) {
+        Value *OriginalElem = B.CreateExtractValue(&V1, i);
+        Value *CopyElem = B.CreateExtractValue(&V2, i);
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(OriginalElem, CopyElem));
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(CopyElem, OriginalElem));
+
+        auto newTy = ttf.createFromType(cast<ExtractValueInst>(OriginalElem)->getIndexedType(V1Ty->getLLVMType(), i), 0);
+        auto ElTy = newTy.get();
+        deducedTypes.transparentTypes[OriginalElem].insert(ElTy->clone());
+        deducedTypes.transparentTypes[CopyElem].insert(ElTy->clone());
+
+        compareValues(CmpInstructions,*OriginalElem, *CopyElem, B, false);
+      }
+    } else {
+      errs() << "Warning: Unsupported type for comparison: " << V1Ty->toString() << "\n";
+      return;
     }
-  } else if(V1Ty->isArrayTT()) {
-    int arraysize = V1Ty->getLLVMType()->getArrayNumElements();
-
-    // TODO: understand if is possible to remove the extracted values when no check is performed
-    TransparentTypeFactory ttf;
-    for (int i = 0; i < arraysize; i++) {
-      Value *OriginalElem = B.CreateExtractValue(&V1, i);
-      Value *CopyElem = B.CreateExtractValue(&V2, i);
-      DuplicatedInstructionMap.insert(
-          std::pair<Value *, Value *>(OriginalElem, CopyElem));
-      DuplicatedInstructionMap.insert(
-          std::pair<Value *, Value *>(CopyElem, OriginalElem));
-
-      auto newTy = ttf.createFromType(cast<ExtractValueInst>(OriginalElem)->getIndexedType(V1Ty->getLLVMType(), i), 0);
-      auto ElTy = newTy.get();
-      deducedTypes.transparentTypes[OriginalElem].insert(ElTy->clone());
-      deducedTypes.transparentTypes[CopyElem].insert(ElTy->clone());
-
-      compareValues(CmpInstructions,*OriginalElem, *CopyElem, B);
-    }
-  } else {
-    errs() << "Warning: Unsupported type for comparison: " << V1Ty->toString() << "\n";
-    return;
   }
 }
 
@@ -2033,8 +2035,151 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   return PreservedAnalyses::none();
 }
 
+bool EDDI::isHeapOriginatedThroughAlloca(llvm::AllocaInst *AI, unsigned depth) {
+  static constexpr unsigned MaxHeapOriginSearchDepth = 8;
+  if (depth > MaxHeapOriginSearchDepth)
+    return false;
+
+  for (User *U : AI->users()) {
+    auto *SI = dyn_cast<StoreInst>(U);
+    if (SI && SI->getPointerOperand() == AI &&
+        isHeapOriginated(SI->getValueOperand(), depth + 1))
+      return true;
+  }
+  return false;
+}
+
+// Walks back through simple pointer-forwarding instructions to determine
+// whether `V` ultimately comes from a heap-allocation call (malloc/new/...).
+bool EDDI::isHeapOriginated(llvm::Value *V, unsigned depth) {
+  static constexpr unsigned MaxHeapOriginSearchDepth = 8; // guard against pathological/cyclic chains
+  errs() << "isHeapOriginated " << depth << ": " << *V << "\n";
+  if (depth > MaxHeapOriginSearchDepth) {
+    errs() << "MaxHeapOriginSearchDepth\n";
+    return false;
+  }
+
+  if (auto *CI = dyn_cast<CallInst>(V)) {
+    if (Function *callee = CI->getCalledFunction()) {
+      if(isHeapFunction(callee->getName())) {
+        errs() << "isHeapFunction!\n";
+        synchronizeHeapValue(V, cast<Instruction>(V), true);
+        return true;
+      }
+    }
+    errs() << "isn't HeapFunction\n";
+    return false;
+  }
+
+  if (auto *AI = dyn_cast<AllocaInst>(V))
+      return isHeapOriginatedThroughAlloca(AI, depth + 1);
+
+  if (auto *GEP = dyn_cast<GetElementPtrInst>(V))
+    return isHeapOriginated(GEP->getPointerOperand(), depth + 1);
+
+  if (auto *LI = dyn_cast<LoadInst>(V))
+    return isHeapOriginated(LI->getPointerOperand(), depth + 1);
+
+  if (auto *PN = dyn_cast<PHINode>(V)) {
+    for (Value *incoming : PN->incoming_values())
+      if (isHeapOriginated(incoming, depth + 1)) {
+        errs() << "isHeapOriginated phi\n";
+        return true;
+      }
+  }
+
+  errs() << "false\n";
+  return false;
+}
+
+// Instead of TAD (alloca + memcpy snapshot), make sure the instruction that
+// produced this heap value has itself been duplicated, and reuse that real
+// duplicate as the synchronized value.
+bool EDDI::synchronizeHeapValue(llvm::Value *value, Instruction *I, bool before) {
+  Instruction *defInst = cast<Instruction>(value);
+  duplicateInstruction(*defInst);
+
+  std::set<Value *> toHardenHeapVariables{value};
+  std::set<Value *> toCheckVariables{toHardenHeapVariables};
+  while(!toCheckVariables.empty()) {
+    std::set<Value *> toAddVariables; // support set to contain new to-be-checked values
+    for(Value *V : toCheckVariables) {
+      // Just protect the return value of the call, not the operands
+      if((isa<Instruction>(V) || isa<GEPOperator>(V)) && !isa<CallBase>(V)) {
+        auto Instr = cast<User>(V);
+
+        // Check parameters of function
+        for(int i = 0; i < Instr->getNumOperands(); i++) {
+          Value *operand = nullptr;
+
+          // Get operand
+          if(isa<PHINode>(Instr)) {
+            auto PhiInst = cast<PHINode>(Instr);
+            operand = PhiInst->getIncomingValue(i);
+          } else if(isa<Instruction>(Instr->getOperand(i)) || isa<GlobalVariable>(Instr->getOperand(i)) || isa<GEPOperator>(Instr->getOperand(i))) {
+            operand = Instr->getOperand(i);
+          }
+          
+          // Check if to add operand to toAddVariables
+          if(operand != NULL && operand != V && isa<Instruction>(operand) &&
+                toHardenHeapVariables.find(operand) == toHardenHeapVariables.end() && 
+                toCheckVariables.find(operand) == toCheckVariables.end() && 
+                (FuncAnnotations.find(operand) == FuncAnnotations.end() || !FuncAnnotations.find(operand)->second.starts_with("exclude")) && 
+                (!operand->hasName() || !isToDuplicateName(operand->getName())) && 
+                (!isa<AllocaInst>(operand) || !isAllocaForExceptionHandling(*cast<AllocaInst>(operand)))) {
+            toAddVariables.insert(operand);
+          }
+        }
+      }
+
+      for(User *U : V->users()) {
+        if(isa<Instruction>(U) || isa<GEPOperator>(U)) {
+          if(U != NULL && U != V && 
+                toHardenHeapVariables.find(U) == toHardenHeapVariables.end() && 
+                toCheckVariables.find(U) == toCheckVariables.end() && 
+                (FuncAnnotations.find(U) == FuncAnnotations.end() || !FuncAnnotations.find(U)->second.starts_with("exclude")) && 
+                (!U->hasName() || !isToDuplicateName(U->getName())) && 
+                (!isa<AllocaInst>(U) || !isAllocaForExceptionHandling(*cast<AllocaInst>(U)))) {
+            // If it is a call, add also the called function in the toHardenFunction set
+            if(isa<CallBase>(U)) {
+              CallBase *CallI = cast<CallBase>(U);     
+              Function *Fn = CallI->getCalledFunction();  
+              if (Fn != NULL && getFunctionDuplicate(Fn) == NULL && 
+                    (FuncAnnotations.find(Fn) == FuncAnnotations.end() || 
+                      (!FuncAnnotations.find(Fn)->second.starts_with("exclude") && !FuncAnnotations.find(Fn)->second.starts_with("to_duplicate"))) && 
+                    !isToDuplicateName(Fn->getName()) && !Fn->getName().starts_with("__clang_call_terminate")) {
+                // If it isn't/hasn't a duplicate version already
+                // toHardenFunctions.insert(Fn);
+                toAddVariables.insert(U);
+              }
+            } else {
+              toAddVariables.insert(U);
+            }
+          }
+        }
+      }
+    }
+    toHardenHeapVariables.merge(toCheckVariables);
+    toCheckVariables = toAddVariables;
+  }
+
+  for(auto &V : toHardenHeapVariables) {
+    if(isa<Instruction>(V)) {
+      duplicateInstruction(*cast<Instruction>(V));
+    }
+  }
+
+  return true;
+}
+
+
 bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I, bool before) {
   const llvm::DataLayout &DL = Md.getDataLayout();
+
+  if (isHeapOriginated(value)) {
+    errs() << *value << " isHeapOriginated\n";
+    return synchronizeHeapValue(value, I, before);
+  }
 
   auto TTIter = deducedTypes.transparentTypes.find(value);
   if (TTIter == deducedTypes.transparentTypes.end()) {

@@ -79,9 +79,12 @@ class EDDI : public PassInfoMixin<EDDI> {
         bool synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I, bool before);
         Value *getDuplicateValue(Value *V, Function *I);
         void createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, IRBuilder<> &B);
-        void compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B);
+        void compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, bool checkCompositeTypes = true);
         void fixGlobalCtors(Module &M);
         void repairBasicBlock(BasicBlock &BB);
+        bool isHeapOriginated(llvm::Value *V, unsigned depth = 0);
+        bool isHeapOriginatedThroughAlloca(llvm::AllocaInst *AI, unsigned depth = 0);
+        bool synchronizeHeapValue(llvm::Value *value, Instruction *I, bool before);
     public:
         explicit EDDI(bool duplicateAll, bool MultipleErrBBEnabled = false, bool CoarseGrainedDuplicationEnabled = true, std::string entryPoint = "main") : duplicateAll(duplicateAll), MultipleErrBBEnabled(MultipleErrBBEnabled), CoarseGrainedDuplicationEnabled(CoarseGrainedDuplicationEnabled), entryPoint(entryPoint) {}
 

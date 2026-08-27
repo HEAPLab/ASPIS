@@ -48,6 +48,7 @@ bool isToDuplicateName(StringRef FnMangledName);
 bool isToDuplicate(Value *CInstr);
 bool isToExcludeName(StringRef FnMangledName);
 bool isToExclude(Value *V);
+bool isHeapFunction(StringRef FnMangledName);
 
 void createFtFuncs(Module &Md);
 
