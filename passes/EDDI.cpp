@@ -913,10 +913,6 @@ bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
  * Adds a consistency check on the instruction I
  */
 void EDDI::addConsistencyChecks(Instruction &I, BasicBlock &ErrBB) {
-  if(InstructionsToRemove.find(&I) != InstructionsToRemove.end()) {
-    return ;
-  }
-
   std::vector<Value *> CmpInstructions;
 
   // split and add the verification BB
@@ -949,9 +945,18 @@ void EDDI::addConsistencyChecks(Instruction &I, BasicBlock &ErrBB) {
     createCompareOnOperand(&CmpInstructions, cast<StoreInst>(I).getValueOperand(), I, tmpB);
   } else {
     // add a comparison for each operand
+    std::set<Value *> checked;
     for (Value *V : I.operand_values()) {
-      IRBuilder<> tmpB(VerificationBB);
-      createCompareOnOperand(&CmpInstructions, V, I, tmpB);
+      if(checked.find(V) == checked.end()) {
+        IRBuilder<> tmpB(VerificationBB);
+        createCompareOnOperand(&CmpInstructions, V, I, tmpB);
+        
+        auto dupV = getDuplicateValue(V, I.getFunction());
+        checked.insert(V);
+        if(dupV) {
+          checked.insert(dupV);
+        }
+      }
     }
   }
 
@@ -1036,6 +1041,7 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
       return;
     }
   } else if(V1Ty->isStructTT()) {
+    TransparentTypeFactory ttf;
     for (unsigned i = 0; i < V1Ty->getLLVMType()->getStructNumElements(); i++) {
       Value *OriginalElem = B.CreateExtractValue(&V1, i);
       Value *CopyElem = B.CreateExtractValue(&V2, i);
@@ -1044,12 +1050,18 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
       DuplicatedInstructionMap.insert(
           std::pair<Value *, Value *>(CopyElem, OriginalElem));
 
+      auto newTy = ttf.createFromType(cast<ExtractValueInst>(OriginalElem)->getIndexedType(V1Ty->getLLVMType(), i), 0);
+      auto ElTy = newTy.get();
+      deducedTypes.transparentTypes[OriginalElem].insert(ElTy->clone());
+      deducedTypes.transparentTypes[CopyElem].insert(ElTy->clone());
+
       compareValues(CmpInstructions, *OriginalElem, *CopyElem, B);
     }
   } else if(V1Ty->isArrayTT()) {
     int arraysize = V1Ty->getLLVMType()->getArrayNumElements();
 
     // TODO: understand if is possible to remove the extracted values when no check is performed
+    TransparentTypeFactory ttf;
     for (int i = 0; i < arraysize; i++) {
       Value *OriginalElem = B.CreateExtractValue(&V1, i);
       Value *CopyElem = B.CreateExtractValue(&V2, i);
@@ -1057,6 +1069,11 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
           std::pair<Value *, Value *>(OriginalElem, CopyElem));
       DuplicatedInstructionMap.insert(
           std::pair<Value *, Value *>(CopyElem, OriginalElem));
+
+      auto newTy = ttf.createFromType(cast<ExtractValueInst>(OriginalElem)->getIndexedType(V1Ty->getLLVMType(), i), 0);
+      auto ElTy = newTy.get();
+      deducedTypes.transparentTypes[OriginalElem].insert(ElTy->clone());
+      deducedTypes.transparentTypes[CopyElem].insert(ElTy->clone());
 
       compareValues(CmpInstructions,*OriginalElem, *CopyElem, B);
     }
@@ -1927,6 +1944,17 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     IInstr->setNormalDest(NewBB->getNextNode());
   }
 
+  LLVM_DEBUG(dbgs() << "Remove instructions\n");
+  // Drop the instructions that have been marked for removal earlier
+  for (Instruction *I2rm : InstructionsToRemove) {
+    if(I2rm == NULL) {
+      errs() << "Error: To remove a null instruction\n";
+      continue;
+    }
+
+    I2rm->eraseFromParent();
+  }
+
   // Add consistency checks and, if needed, transform in coarse-grained duplication
   for(auto &Fn : Md) {
     for(auto &BB : Fn) {
@@ -1934,7 +1962,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       for(auto &I : BB) {
         Value *valueDup = getDuplicateValue(&I, &Fn);
 
-        if(valueDup && (!isa<Instruction>(valueDup) || (cast<Instruction>(valueDup)->getParent() == &BB && I.comesBefore(cast<Instruction>(valueDup))))) {
+        if(!valueDup || !isa<Instruction>(valueDup) || cast<Instruction>(valueDup)->getParent() != &BB || I.comesBefore(cast<Instruction>(valueDup))) {
           if(isa<CallBase>(I)) {
             #ifdef CHECK_AT_CALLS
             #if (SELECTIVE_CHECKING == 1)
@@ -1978,16 +2006,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     }
   }
   
-  LLVM_DEBUG(dbgs() << "Remove instructions\n");
-  // Drop the instructions that have been marked for removal earlier
-  for (Instruction *I2rm : InstructionsToRemove) {
-    if(I2rm == NULL) {
-      errs() << "Error: To remove a null instruction\n";
-      continue;
-    }
-
-    I2rm->eraseFromParent();
-  }
 
   LLVM_DEBUG(dbgs() << "Fixing global ctors\n");
   fixGlobalCtors(Md);
