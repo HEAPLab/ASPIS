@@ -118,7 +118,7 @@ void FuncRetToRef::updateRetInstructions(Function &Fn) {
             Value *ReturnPtr = Fn.getArg(Fn.arg_size()-1); // the last argument is the return ptr
 
             // Store the returnvalue in the returnptr
-            B.CreateStore(ReturnValue, ReturnPtr, true);
+            B.CreateStore(ReturnValue, ReturnPtr);
 
             // create a ret instruction
             B.CreateRetVoid();
@@ -208,7 +208,7 @@ void FuncRetToRef::updateFunctionCalls(Function &Fn, Function &NewFn) {
                 abort();
             } 
             // use the load on the return value instead of the previous function output
-            Instruction *TmpLoad = B.CreateLoad(CInstr->getType(), TmpAlloca, true);
+            Instruction *TmpLoad = B.CreateLoad(CInstr->getType(), TmpAlloca);
             createdNewCall = true;
             CInstr->replaceNonMetadataUsesWith(TmpLoad);
         }

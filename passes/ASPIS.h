@@ -61,27 +61,30 @@ class EDDI : public PassInfoMixin<EDDI> {
         std::set<Function *> getVirtualMethodsFromConstructor(Function *Fn);
         int isUsedByStore(Instruction &I, Instruction &Use);
         Instruction* cloneInstr(Instruction &I);
-        void duplicateOperands (Instruction &I, BasicBlock &ErrBB);
-        Value* getPtrFinalValue(Value &V);
+        void duplicateOperands (Instruction &I);
         bool ptrNotDereferenceable(Value &V);
         void comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B);
         void addConsistencyChecks(Instruction &I, BasicBlock &ErrBB);
         void fixFuncValsPassedByReference(Instruction &I, IRBuilder<> &B);
-        int transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &ErrBB) ;
+        int transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B) ;
         Function *getFunctionDuplicate(Function *Fn);
         Function *getFunctionFromDuplicate(Function *Fn);
         void duplicateGlobals (Module &Md);
         bool isAllocaForExceptionHandling(AllocaInst &I);
-        int duplicateInstruction (Instruction &I, BasicBlock &ErrBB);
+        int duplicateInstruction (Instruction &I);
         bool isValueDuplicated(Instruction &V);
         Function *duplicateFnArgs(Function &Fn, Module &Md);
         void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
-        bool temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B);
-        Value *getDuplicateValue(Value *V, Instruction *I);
+        bool synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I, bool before);
+        Value *getDuplicateValue(Value *V, Function *Fn);
+        tda::TransparentType *getBestType(Value *V);
         void createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, IRBuilder<> &B);
-        void compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B);
+        void compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, bool checkCompositeTypes = true);
         void fixGlobalCtors(Module &M);
         void repairBasicBlock(BasicBlock &BB);
+        bool isHeapOriginated(llvm::Value *V, unsigned depth = 0);
+        bool isHeapOriginatedThroughAlloca(llvm::AllocaInst *AI, unsigned depth = 0);
+        bool synchronizeHeapValue(llvm::Value *value, Instruction *I, bool before);
     public:
         explicit EDDI(bool duplicateAll, bool MultipleErrBBEnabled = false, bool CoarseGrainedDuplicationEnabled = true, std::string entryPoint = "main") : duplicateAll(duplicateAll), MultipleErrBBEnabled(MultipleErrBBEnabled), CoarseGrainedDuplicationEnabled(CoarseGrainedDuplicationEnabled), entryPoint(entryPoint) {}
 

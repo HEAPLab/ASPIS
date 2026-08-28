@@ -218,12 +218,15 @@ StringRef getLinkageName(const LinkageMap &linkageMap, const std::string &functi
     }
 }
 
-bool isToDuplicate(CallBase *CInstr) {
-  Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
-  if (intrinsicID != Intrinsic::not_intrinsic) {
-    return true; 
-  } else if(CInstr->getCalledFunction() != NULL && isToDuplicateName(CInstr->getCalledFunction()->getName())) {
-    return true;
+bool isToDuplicate(Value *V) {
+  if(isa<CallBase>(V)) {
+    CallBase *CInstr = cast<CallBase>(V);
+    Intrinsic::ID intrinsicID = CInstr->getIntrinsicID();
+    if (intrinsicID != Intrinsic::not_intrinsic) {
+      return true; 
+    } else if(CInstr->getCalledFunction() != NULL && (isToDuplicateName(CInstr->getCalledFunction()->getName()) || (CInstr->getCalledFunction()->hasExternalLinkage() && CInstr->getCalledFunction()->isDeclaration()))) {
+      return true;
+    }
   }
   
   return false;
@@ -236,16 +239,55 @@ bool isToDuplicateName(StringRef FnMangledName) {
 
   auto FnName = demangle(FnMangledName.str());
 
-  if(FnName.find("operator new") == 0 || FnName.find("std::") != FnName.npos || FnName.find("fmt::") != FnName.npos || FnName.find("Eigen::") != FnName.npos) {
+  if(isHeapFunction(FnMangledName) || FnName.find("std::") != FnName.npos || FnName.find("fmt::") != FnName.npos || FnName.find("Eigen::") != FnName.npos) {
 
     if(FnName.find("std::ostream") != FnName.npos || 
         FnName.find("std::basic_ostream") != FnName.npos || 
         FnName.find("std::basic_ios") != FnName.npos || 
-        FnName.find("std::thread") != FnName.npos) {
+        FnName.find("std::thread") != FnName.npos || 
+        FnName.find("printf") != FnName.npos) {
       return false;
     }
 
     return true;
+  }
+
+  return false; 
+}
+
+bool isHeapFunction(StringRef FnMangledName) {
+  if(FnMangledName.ends_with("_ret")) {
+    FnMangledName = FnMangledName.substr(0, FnMangledName.size() - 4);
+  }
+
+  auto FnName = demangle(FnMangledName.str());
+
+  if(FnName.find("malloc") != FnName.npos || 
+      FnName.find("free") != FnName.npos || 
+      FnName.find("operator new") != FnName.npos || 
+      FnName.find("operator delete") != FnName.npos || 
+      FnName.find("calloc") != FnName.npos || 
+      FnName.find("memset") != FnName.npos) {
+    return true;
+  }
+
+  return false;
+}
+
+
+bool isToExclude(Value *V) {
+  if(isa<Instruction>(V)) {
+    Instruction *Inst = cast<Instruction>(V);
+    if (Inst->isVolatile()) {
+      return true;
+    }
+  }
+
+  if(isa<CallBase>(V)) {
+    CallBase *CInstr = cast<CallBase>(V);
+    if(CInstr->getCalledFunction() != NULL && isToExcludeName(CInstr->getCalledFunction()->getName())) {
+      return true;
+    }
   }
 
   return false; 
@@ -257,8 +299,14 @@ bool isToExcludeName(StringRef FnMangledName) {
   }
 
   auto FnName = demangle(FnMangledName.str());
+  auto FnNameStrRef = StringRef(FnName);
 
-  if(FnName.find("std::thread") != FnName.npos) {
+  if(FnName.find("std::ostream") != FnName.npos || 
+      FnName.find("std::basic_ostream") != FnName.npos || 
+      FnName.find("std::basic_ios") != FnName.npos || 
+      FnName.find("std::thread") != FnName.npos || 
+      FnName.find("printf") != FnName.npos ||
+      FnNameStrRef.equals_insensitive("rand")) {
     return true;
   }
 

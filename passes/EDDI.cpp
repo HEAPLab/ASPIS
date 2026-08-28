@@ -185,6 +185,24 @@ void EDDI::fixDuplicatedConstructors(Module &Md) {
       continue;
     }
 
+    // Handle the case where the class has no attribute: zero the padding byte
+    auto zeroThisPointee = [&](Function *F) {
+      if (F->arg_empty())
+        return;
+
+      Argument *ThisArg = F->getArg(0);
+      if (!ThisArg->getType()->isPointerTy())
+        return;
+
+      BasicBlock &Entry = F->getEntryBlock();
+      IRBuilder<> B(&Entry, Entry.getFirstNonPHIOrDbgOrAlloca());
+
+      B.CreateStore(B.getInt8(0), ThisArg);
+    };
+
+    zeroThisPointee(Fn);
+    zeroThisPointee(FnDup);
+
     // Find vtable
     LLVM_DEBUG(dbgs() << "[REDDI] Finding vtable for " << Fn->getName() << "\n");
     for(auto &BB : *Fn) {
@@ -573,8 +591,7 @@ int EDDI::isUsedByStore(Instruction &I, Instruction &Use) {
  * Clones instruction `I` and adds the pair <I, IClone> to
  * DuplicatedInstructionMap, inserting the clone right after the original.
  */
-Instruction *
-EDDI::cloneInstr(Instruction &I) {
+Instruction *EDDI::cloneInstr(Instruction &I) {
   Instruction *IClone = I.clone();
 
   if (!I.getType()->isVoidTy() && I.hasName()) {
@@ -597,7 +614,7 @@ EDDI::cloneInstr(Instruction &I) {
   return IClone;
 }
 
-Value *EDDI::getDuplicateValue(Value *V, Instruction *I) {
+Value *EDDI::getDuplicateValue(Value *V, Function *Fn) {
   // Fast path if V is a local variable, it should have only one duplicate
   if(!isa<GlobalValue>(V) || isa<Argument>(V)) {
     assert((DuplicatedInstructionMap.count(V) <= 1) && "Local variable has more than one duplicate");
@@ -620,7 +637,7 @@ Value *EDDI::getDuplicateValue(Value *V, Instruction *I) {
       return duplicate;
     } else {
       // If it is an instruction, we need to check if it is in the same function of I
-      if (isa<Instruction>(duplicate) && cast<Instruction>(duplicate)->getParent()->getParent() == I->getParent()->getParent()) {
+      if (isa<Instruction>(duplicate) && cast<Instruction>(duplicate)->getParent()->getParent() == Fn) {
         return duplicate;
       }
     }
@@ -632,18 +649,10 @@ Value *EDDI::getDuplicateValue(Value *V, Instruction *I) {
 /**
  * Takes instruction I and duplicates its operands. Then substitutes each
  * duplicated operand in the duplicated instruction IClone.
- *
- * @param DuplicatedInstructionMap is the map of duplicated instructions, needed
- * for the recursive duplicateInstruction call
- * @param ErrBB is the error basic block to jump to in case of error needed for
- * the recursive duplicateInstruction call
  */
-void EDDI::duplicateOperands(
-    Instruction &I,
-    BasicBlock &ErrBB) {
-
+void EDDI::duplicateOperands(Instruction &I) {
   // see if I has a clone
-  Value *Clone = getDuplicateValue(&I, &I);
+  Value *Clone = getDuplicateValue(&I, I.getFunction());
   Instruction *IClone = nullptr;
   if(Clone != nullptr && isa<Instruction>(Clone)) {
     IClone = cast<Instruction>(Clone);
@@ -657,7 +666,7 @@ void EDDI::duplicateOperands(
     if (isa<Instruction>(V)) {
       Instruction *Operand = cast<Instruction>(V);
       if (!isValueDuplicated(*Operand)) {
-        if(duplicateInstruction(*Operand, ErrBB)) {
+        if(duplicateInstruction(*Operand)) {
           if(InstructionsToRemove.find(Operand) == InstructionsToRemove.end()) {
             InstructionsToRemove.insert(Operand);
           }
@@ -671,7 +680,7 @@ void EDDI::duplicateOperands(
       if (IClone != nullptr) {
         GEPOperator *GEPOperand = cast<GEPOperator>(IClone->getOperand(J));
         Value *PtrOperand = GEPOperand->getPointerOperand();
-        Value *ClonePtrOperand = getDuplicateValue(PtrOperand, &I);
+        Value *ClonePtrOperand = getDuplicateValue(PtrOperand, I.getFunction());
         // update the duplicate GEP operator using the duplicate of the pointer
         // operand
         if (ClonePtrOperand != nullptr) {
@@ -701,12 +710,12 @@ void EDDI::duplicateOperands(
       }
     } else if (isa<StoreInst>(I) && isa<GlobalVariable>(V) && cast<GlobalVariable>(V)->isConstant()) {
       IRBuilder<> B(&I);
-      temporaryArgumentDuplication(*I.getModule(), V, B);
+      synchronizeFunctionArguments(*I.getModule(), V, B, &I, true);
     }
 
     if (IClone != nullptr) {
       // use the duplicated instruction as operand of IClone
-      Value *CloneOperand = getDuplicateValue(V, &I);
+      Value *CloneOperand = getDuplicateValue(V, I.getFunction());
       if (CloneOperand != nullptr) {
         IClone->setOperand(J, CloneOperand); // set the J-th operand with the duplicate value
       }
@@ -715,32 +724,27 @@ void EDDI::duplicateOperands(
   }
 }
 
-// recursively follow store instructions to find the pointer final value,
-// if the value cannot be found (e.g. when the pointer is passed as function
-// argument) we return NULL.
-Value *EDDI::getPtrFinalValue(Value &V) {
-  Value *res = nullptr;
+tda::TransparentType *EDDI::getBestType(Value *V) {
+  TransparentTypeFactory ttf;
+  tda::TransparentType *VTy = nullptr;
 
-  if (V.getType()->isPointerTy() && V.hasUseList()) {
-    // find the store using V as ptr
-    for (User *U : V.users()) {
-      if (isa<StoreInst>(U)) {
-        StoreInst *SI = cast<StoreInst>(U);
-        if (SI->getPointerOperand() == &V) { // we found the store
+  auto TTIter = deducedTypes.transparentTypes.find(V);
 
-          // if the store saves a pointer we work recursively to find the
-          // original value
-          if (SI->getValueOperand()->getType()->isPointerTy()) {
-            return getPtrFinalValue(*(SI->getValueOperand()));
-          } else {
-            return &V;
-          }
-        }
-      }
-    }
+  if (TTIter != deducedTypes.transparentTypes.end() && TTIter->second.size() == 1) {
+    VTy = TTIter->second.begin()->get();
+    return VTy;
   }
 
-  return res;
+  if (isa<AllocaInst>(V) &&
+      cast<AllocaInst>(V)->getAllocatedType() &&
+      !cast<AllocaInst>(V)->getAllocatedType()->isPointerTy()) {
+
+    auto newTy = ttf.createFromType(cast<AllocaInst>(V)->getAllocatedType(), 1);
+    VTy = newTy.get();                                  // grab the raw pointer while we still own it
+    deducedTypes.transparentTypes[V].insert(std::move(newTy)); // then transfer ownership into the map
+  }
+
+  return VTy;
 }
 
 bool EDDI::ptrNotDereferenceable(Value &V) {
@@ -756,7 +760,7 @@ bool EDDI::ptrNotDereferenceable(Value &V) {
   return false;
 }
 
-// Follows the pointers V1 and V2 using getPtrFinalValue() and adds a compare
+// Follows the pointers V1 and V2 and adds a compare
 // instruction using the IRBuilder B.
 void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B) {
   /**
@@ -778,31 +782,15 @@ void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &
     return;
   }
 
-  if(deducedTypes.transparentTypes.find(&V1)->second.size() != 1) {
-    errs() << "\tMultiple types 1!\n";
-    for(auto el=deducedTypes.transparentTypes.find(&V1)->second.cbegin(); el != deducedTypes.transparentTypes.find(&V1)->second.cend(); el++) {
-      errs() << "\t" << el->get()->toString() << "\n";
-    }
-    return;
-  }
+  tda::TransparentType *V1Ty = getBestType(F1);
+  tda::TransparentType *V2Ty = getBestType(F2);
 
-  if(deducedTypes.transparentTypes.find(&V2)->second.size() != 1) {
-    errs() << "\tMultiple types 2!\n";
-    for(auto el=deducedTypes.transparentTypes.find(&V2)->second.cbegin(); el != deducedTypes.transparentTypes.find(&V2)->second.cend(); el++) {
-      errs() << "\t" << el->get()->toString() << "\n";
-    }
-    return;
-  }
-
-  auto V1Ty = deducedTypes.transparentTypes.find(&V1)->second.begin()->get();
-  auto V2Ty = deducedTypes.transparentTypes.find(&V2)->second.begin()->get();
-
-  if(!V1Ty || V1Ty->isOpaquePtr()) {
+  if(V1Ty == nullptr || V1Ty->isOpaquePtr()) {
     errs() << "Warning 1: Can't find final value for pointer " << V1 << "\n";
     return;
   }
 
-  if(!V2Ty || V2Ty->isOpaquePtr()) {
+  if(V2Ty == nullptr || V2Ty->isOpaquePtr()) {
     errs() << "Warning 2: Can't find final value for pointer " << V1 << "\n";
     return;
   }
@@ -853,7 +841,7 @@ void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &
 
 
 bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
-  
+
   assert(AI->getParent()->getParent() == At->getParent()->getParent() && "Alloca and Instruction not in the same function!");
 
   std::unordered_set<StoreInst *> storeInsts;
@@ -913,6 +901,11 @@ bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
       if(isa<StoreInst>(I) && storeInsts.find(cast<StoreInst>(I)) != storeInsts.end()) {
         break;
       }
+      
+      // return false if we don't have a next node before encountering a store
+      if(I->getNextNode() == nullptr) {
+        return false;
+      }
     } while(I = I->getNextNode());
   }
 
@@ -922,14 +915,7 @@ bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
 /**
  * Adds a consistency check on the instruction I
  */
-void EDDI::addConsistencyChecks(
-    Instruction &I,
-    BasicBlock &ErrBB) {
-
-  if(InstructionsToRemove.find(&I) != InstructionsToRemove.end()) {
-    return ;
-  }
-
+void EDDI::addConsistencyChecks(Instruction &I, BasicBlock &ErrBB) {
   std::vector<Value *> CmpInstructions;
 
   // split and add the verification BB
@@ -944,7 +930,7 @@ void EDDI::addConsistencyChecks(
 
   // if the instruction is a call with indirect function, we try to get a compare
   if(isa<CallBase>(I) && cast<CallBase>(I).isIndirectCall()) {
-    Value *Duplicate = getDuplicateValue(cast<CallBase>(I).getCalledOperand(), &I);
+    Value *Duplicate = getDuplicateValue(cast<CallBase>(I).getCalledOperand(), I.getFunction());
     if (Duplicate != nullptr) {
       Value *Original = cast<CallBase>(I).getCalledOperand();
       Value *Copy = Duplicate;
@@ -962,9 +948,18 @@ void EDDI::addConsistencyChecks(
     createCompareOnOperand(&CmpInstructions, cast<StoreInst>(I).getValueOperand(), I, tmpB);
   } else {
     // add a comparison for each operand
+    std::set<Value *> checked;
     for (Value *V : I.operand_values()) {
-      IRBuilder<> tmpB(VerificationBB);
-      createCompareOnOperand(&CmpInstructions, V, I, tmpB);
+      if(checked.find(V) == checked.end()) {
+        IRBuilder<> tmpB(VerificationBB);
+        createCompareOnOperand(&CmpInstructions, V, I, tmpB);
+        
+        auto dupV = getDuplicateValue(V, I.getFunction());
+        checked.insert(V);
+        if(dupV) {
+          checked.insert(dupV);
+        }
+      }
     }
   }
 
@@ -988,10 +983,10 @@ void EDDI::addConsistencyChecks(
 }
 
 void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, IRBuilder<> &B) {
-  auto Duplicate = DuplicatedInstructionMap.find(V);
+  auto Duplicate = getDuplicateValue(V, I.getFunction());
 
   // if the duplicate doesn't exist, we cannot perform a compare
-  if (Duplicate == DuplicatedInstructionMap.end()) {
+  if (Duplicate == nullptr) {
     return;
   }
 
@@ -1008,28 +1003,19 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
     // TODO: are there other cases to support?
   }
 
-  Value *Original = Duplicate->first;
-  Value *Copy = Duplicate->second;
-
-  // we compare the operands only if they are found in the TDA transparent types
-  if(deducedTypes.transparentTypes.find(V) == deducedTypes.transparentTypes.end()) {
-    return;
-  }
+  Value *Original = V;
+  Value *Copy = Duplicate;
 
   compareValues(CmpInstructions, *Original, *Copy, B);
 }
 
-void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B) {
-  if(deducedTypes.transparentTypes.find(&V1) == deducedTypes.transparentTypes.end()) {
+void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, bool checkCompositeTypes) {
+  TransparentType *V1Ty = getBestType(&V1);
+  TransparentType *V2Ty = getBestType(&V2);
+
+  if(V1Ty == nullptr || V1Ty->containsOpaquePtr() || V2Ty == nullptr || V2Ty->containsOpaquePtr() ) {
     return;
   }
-
-  if(deducedTypes.transparentTypes.find(&V2) == deducedTypes.transparentTypes.end()) {
-    return;
-  }
-
-  TransparentType *V1Ty = deducedTypes.transparentTypes.find(&V1)->second.begin()->get();
-  TransparentType *V2Ty = deducedTypes.transparentTypes.find(&V2)->second.begin()->get();
 
   if(V1Ty->isPointerTT() || V2Ty->isPointerTT()) {
     comparePtrs(CmpInstructions, V1, V2, B);
@@ -1048,33 +1034,48 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
       errs() << "Warning: Unsupported primitive type for comparison: " << V1Ty->toString() << "\n";
       return;
     }
-  } else if(V1Ty->isStructTT()) {
-    for (unsigned i = 0; i < V1Ty->getLLVMType()->getStructNumElements(); i++) {
-      Value *OriginalElem = B.CreateExtractValue(&V1, i);
-      Value *CopyElem = B.CreateExtractValue(&V2, i);
-      DuplicatedInstructionMap.insert(
-          std::pair<Value *, Value *>(OriginalElem, CopyElem));
-      DuplicatedInstructionMap.insert(
-          std::pair<Value *, Value *>(CopyElem, OriginalElem));
+  } else if(checkCompositeTypes) {
+    if(V1Ty->isStructTT()) {
+      TransparentTypeFactory ttf;
+      for (unsigned i = 0; i < V1Ty->getLLVMType()->getStructNumElements(); i++) {
+        Value *OriginalElem = B.CreateExtractValue(&V1, i);
+        Value *CopyElem = B.CreateExtractValue(&V2, i);
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(OriginalElem, CopyElem));
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(CopyElem, OriginalElem));
 
-      compareValues(CmpInstructions, *OriginalElem, *CopyElem, B);
+        auto newTy = ttf.createFromType(cast<ExtractValueInst>(OriginalElem)->getIndexedType(V1Ty->getLLVMType(), i), 0);
+        auto ElTy = newTy.get();
+        deducedTypes.transparentTypes[OriginalElem].insert(ElTy->clone());
+        deducedTypes.transparentTypes[CopyElem].insert(ElTy->clone());
+
+        compareValues(CmpInstructions, *OriginalElem, *CopyElem, B, false);
+      }
+    } else if(V1Ty->isArrayTT()) {
+      int arraysize = V1Ty->getLLVMType()->getArrayNumElements();
+
+      // TODO: understand if is possible to remove the extracted values when no check is performed
+      TransparentTypeFactory ttf;
+      for (int i = 0; i < arraysize; i++) {
+        Value *OriginalElem = B.CreateExtractValue(&V1, i);
+        Value *CopyElem = B.CreateExtractValue(&V2, i);
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(OriginalElem, CopyElem));
+        DuplicatedInstructionMap.insert(
+            std::pair<Value *, Value *>(CopyElem, OriginalElem));
+
+        auto newTy = ttf.createFromType(cast<ExtractValueInst>(OriginalElem)->getIndexedType(V1Ty->getLLVMType(), i), 0);
+        auto ElTy = newTy.get();
+        deducedTypes.transparentTypes[OriginalElem].insert(ElTy->clone());
+        deducedTypes.transparentTypes[CopyElem].insert(ElTy->clone());
+
+        compareValues(CmpInstructions,*OriginalElem, *CopyElem, B, false);
+      }
+    } else {
+      errs() << "Warning: Unsupported type for comparison: " << V1Ty->toString() << "\n";
+      return;
     }
-  } else if(V1Ty->isArrayTT()) {
-    int arraysize = V1Ty->getLLVMType()->getArrayNumElements();
-
-    for (int i = 0; i < arraysize; i++) {
-      Value *OriginalElem = B.CreateExtractValue(&V1, i);
-      Value *CopyElem = B.CreateExtractValue(&V2, i);
-      DuplicatedInstructionMap.insert(
-          std::pair<Value *, Value *>(OriginalElem, CopyElem));
-      DuplicatedInstructionMap.insert(
-          std::pair<Value *, Value *>(CopyElem, OriginalElem));
-
-      compareValues(CmpInstructions,*OriginalElem, *CopyElem, B);
-    }
-  } else {
-    errs() << "Warning: Unsupported type for comparison: " << V1Ty->toString() << "\n";
-    return;
   }
 }
 
@@ -1093,19 +1094,11 @@ void EDDI::fixFuncValsPassedByReference(
     Value *V = I.getOperand(i);
     if (isa<Instruction>(V)) {
       Instruction *Operand = cast<Instruction>(V);
-      Value *Duplicate = getDuplicateValue(Operand, &I);
+      Value *Duplicate = getDuplicateValue(Operand, I.getFunction());
 
       if (Duplicate != nullptr) {
-        Value *Original = Operand;
-        Value *Copy = Duplicate;
-        if(Original->getType()->isPointerTy() && Copy->getType()->isPointerTy()) {
-          Type *OriginalType = Original->getType();
-          Instruction *TmpLoad = B.CreateLoad(OriginalType, Original);
-          Instruction *TmpStore = B.CreateStore(TmpLoad, Copy);
-          DuplicatedInstructionMap.insert(
-              std::pair<Instruction *, Instruction *>(TmpLoad, TmpLoad));
-          DuplicatedInstructionMap.insert(
-              std::pair<Instruction *, Instruction *>(TmpStore, TmpStore));
+        if((Operand->getType()->isPointerTy() && Duplicate->getType()->isPointerTy()) || (isa<GlobalVariable>(Operand) && isa<GlobalVariable>(Duplicate))) {
+          synchronizeFunctionArguments(*I.getModule(), Operand, B, &I, false);
         }
       }
     }
@@ -1253,7 +1246,7 @@ bool EDDI::isAllocaForExceptionHandling(AllocaInst &I){
   return false;
 }
 
-int EDDI::transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &ErrBB) {
+int EDDI::transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B) {
   int res = 0;
   SmallVector<Value *, 6> args;
   SmallVector<Type *, 6> ParamTypes;
@@ -1271,7 +1264,7 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &Er
     Value *Arg = CInstr->getArgOperand(i);
 
     // see if Original has a copy
-    Value *Copy = getDuplicateValue(Arg, CInstr);
+    Value *Copy = getDuplicateValue(Arg, CInstr->getFunction());
     if(Copy == nullptr) {
       Copy = Arg;
     }
@@ -1376,11 +1369,41 @@ int EDDI::transformCallBaseInst(CallBase *CInstr, IRBuilder<> &B, BasicBlock &Er
  * operations depending on the class of I:
  * - Clone the instruction;
  * - Duplicate the instruction operands;
- * - Add consistency checks on the operands (if I is a synchronization point).
  * @returns 1 if the cloned instruction has to be removed, 0 otherwise
  */
-int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
+int EDDI::duplicateInstruction(Instruction &I) {
   if (isValueDuplicated(I)) {
+    return 0;
+  }
+
+  if(I.isVolatile()) {
+    bool shouldDuplicateAnyway = false;
+    if(isa<LoadInst>(I)) {
+      if(FuncAnnotations.find(cast<LoadInst>(I).getPointerOperand()) != FuncAnnotations.end() && 
+          (FuncAnnotations.find(cast<LoadInst>(I).getPointerOperand())->second.starts_with("to_duplicate") || FuncAnnotations.find(cast<LoadInst>(I).getPointerOperand())->second.starts_with("to_harden"))) {
+        shouldDuplicateAnyway = true;
+      } else if(I.getType()->isIntegerTy()) {
+        IRBuilder<> B(&I);
+        auto Idup = B.CreateAdd(&I, llvm::ConstantInt::get(I.getType(), 0));
+        cast<Instruction>(Idup)->moveAfter(&I);
+        DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, Idup));
+        DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Idup, &I));
+      } else if(I.getType()->isFloatingPointTy()) {
+        IRBuilder<> B(&I);
+        auto Idup = B.CreateAdd(&I, llvm::ConstantFP::get(I.getType(), 0));
+        cast<Instruction>(Idup)->moveAfter(&I);
+        DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(&I, Idup));
+        DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Idup, &I));
+      }
+    } else if(isa<StoreInst>(I)) {
+      if(getDuplicateValue(cast<StoreInst>(I).getPointerOperand(), I.getFunction()) != nullptr) {
+        shouldDuplicateAnyway = true;
+      }
+    }
+    if(!shouldDuplicateAnyway) {
+      return 0;
+    }
+  } else if (isa<CallBase>(I) && cast<CallBase>(I).isInlineAsm()) {
     return 0;
   }
 
@@ -1407,7 +1430,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     clonedInst = cloneInstr(I);
 
     // duplicate the operands
-    duplicateOperands(I, ErrBB);
+    duplicateOperands(I);
   }
 
   // if the instruction is a store instruction we need to duplicate it and its
@@ -1416,26 +1439,14 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     Instruction *IClone = cloneInstr(I);
 
     // duplicate the operands
-    duplicateOperands(I, ErrBB);
+    duplicateOperands(I);
 
-    // add consistency checks on I
-
-#ifdef CHECK_AT_STORES
-#if (SELECTIVE_CHECKING == 1)
-    if(I.getParent()->getTerminator() == NULL) {
-      errs() << "Malformed block!\n";
-      I.getParent()->print(errs());
-      errs() << "\n";
-    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-#endif
-      addConsistencyChecks(I, ErrBB);
-#endif
     // it may happen that I duplicate a store but don't change its operands, if
     // that happens I just remove the duplicate
     if (IClone->isIdenticalTo(&I)) {
       IClone->eraseFromParent();
 
-      Value *Copy = getDuplicateValue(&I, &I);
+      Value *Copy = getDuplicateValue(&I, I.getFunction());
       if(Copy != nullptr) {
         DuplicatedInstructionMap.erase(Copy);
         DuplicatedInstructionMap.erase(&I);
@@ -1448,17 +1459,7 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
   // checks
   else if (isa<BranchInst, SwitchInst, ReturnInst, IndirectBrInst>(I)) {
     // duplicate the operands
-    duplicateOperands(I, ErrBB);
-
-// add consistency checks on I
-#ifdef CHECK_AT_BRANCH
-    if(I.getParent()->getTerminator() == NULL) {
-      errs() << "Malformed block!\n";
-      I.getParent()->print(errs());
-      errs() << "\n";
-    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-      addConsistencyChecks(I, ErrBB);
-#endif
+    duplicateOperands(I);
   }
 
   // if the istruction is a non-already-duplicated call, we duplicate the operands and add consistency
@@ -1471,18 +1472,21 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
     Function *Callee = CInstr->getCalledFunction();
     Callee = getFunctionFromDuplicate(Callee);
 
-    if(CInstr->getCalledFunction() != NULL && isToExcludeName(CInstr->getCalledFunction()->getName())) {
+    if((FuncAnnotations.find(Callee) != FuncAnnotations.end() && FuncAnnotations.find(Callee)->second.starts_with("exclude")) || (Callee != NULL && isToExclude(CInstr))) {
+      IRBuilder<> B(CInstr);
+      fixFuncValsPassedByReference(*CInstr, B);
+
       return 0;
     }
 
     // check if the function call has to be duplicated
     if ((FuncAnnotations.find(Callee) != FuncAnnotations.end() && FuncAnnotations.find(Callee)->second.starts_with("to_duplicate")) ||
-        isToDuplicate(CInstr)) {
+        (Callee != NULL && isToDuplicate(CInstr))) {
       // duplicate the instruction
       clonedInst = cloneInstr(*CInstr);
 
       // duplicate the operands
-      duplicateOperands(I, ErrBB);
+      duplicateOperands(I);
 
       if(isa<InvokeInst>(I)) {
         // In case of an invoke instruction, we have to fix the first invoke since 
@@ -1490,35 +1494,11 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
         auto *IInstr = &cast<InvokeInst>(I);
         toFixInvokes.insert(IInstr);
       }
-
-// add consistency checks on I
-#ifdef CHECK_AT_CALLS
-#if (SELECTIVE_CHECKING == 1)
-    if(I.getParent()->getTerminator() == NULL) {
-      errs() << "Malformed block!\n";
-      I.getParent()->print(errs());
-      errs() << "\n";
-    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-#endif
-        addConsistencyChecks(I, ErrBB);
-#endif
     }
 
     else {
       // duplicate the operands
-      duplicateOperands(I, ErrBB);
-
-// add consistency checks on I
-#ifdef CHECK_AT_CALLS
-#if (SELECTIVE_CHECKING == 1)
-    if(I.getParent()->getTerminator() == NULL) {
-      errs() << "Malformed block!\n";
-      I.getParent()->print(errs());
-      errs() << "\n";
-    } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
-#endif
-        addConsistencyChecks(I, ErrBB);
-#endif
+      duplicateOperands(I);
 
       IRBuilder<> B(CInstr);
       if (!isa<InvokeInst>(CInstr) && I.getNextNonDebugInstruction()) {
@@ -1535,16 +1515,29 @@ int EDDI::duplicateInstruction(Instruction &I, BasicBlock &ErrBB) {
       // if the _dup function exists (and it is not itself the dup version) or is an indirect call, 
       // we substitute the call instruction with a call to the function with duplicated arguments
       if (CInstr->getCalledFunction() == NULL || (Fn != NULL && Fn != CInstr->getCalledFunction())) {
-        res = transformCallBaseInst(CInstr, B, ErrBB);
+        res = transformCallBaseInst(CInstr, B);
       } else {
         fixFuncValsPassedByReference(*CInstr, B);
       }
     }
   }
 
-  if(clonedInst && deducedTypes.transparentTypes.find(&I) != deducedTypes.transparentTypes.end()) {
-    auto V1Ty = deducedTypes.transparentTypes.find(&I)->second.begin()->get();
-    deducedTypes.transparentTypes[clonedInst].insert(V1Ty->clone());
+
+  if (clonedInst) {
+    auto SrcIt = deducedTypes.transparentTypes.find(&I);
+    if (SrcIt != deducedTypes.transparentTypes.end()) {
+      
+      std::vector<std::unique_ptr<tda::TransparentType>> ClonedTypes;
+      ClonedTypes.reserve(SrcIt->second.size());
+      for (auto &TyPtr : SrcIt->second) {
+        ClonedTypes.push_back(TyPtr->clone());
+      }
+
+      auto &DestSet = deducedTypes.transparentTypes[clonedInst];
+      for (auto &ClonedTy : ClonedTypes) {
+        DestSet.insert(std::move(ClonedTy));
+      }
+    }
   }
 
   return res;
@@ -1746,6 +1739,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     DuplicatedFns.insert(entryPointFn);
   } else {
     errs() << "[EDDI] Entry point function not found: " << entryPoint << "\n";
+    exit(1);
   }
 #endif
 
@@ -1777,8 +1771,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
                       << Fn->getName() << "\n");
     CompiledFuncs.insert(Fn);
 
-    BasicBlock *ErrBB = BasicBlock::Create(Fn->getContext(), "ErrBB", Fn);
-
     LLVM_DEBUG(dbgs() << "function arguments");
     // save the function arguments and their duplicates
     for (int i = 0; i < Fn->arg_size(); i++) {
@@ -1803,7 +1795,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         if (isa<Instruction>(U)) {
           Instruction *I = cast<Instruction>(U);
           // duplicate the uses of each argument
-          if (duplicateInstruction(*I, *ErrBB)) {
+          if (duplicateInstruction(*I)) {
             if(InstructionsToRemove.find(I) == InstructionsToRemove.end()) {
               InstructionsToRemove.insert(I);
             }
@@ -1825,7 +1817,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     for (Instruction *I : InstToDuplicate) {
       if (!isValueDuplicated(*I)) {
         // perform the duplication
-        int shouldDelete = duplicateInstruction(*I, *ErrBB);
+        int shouldDelete = duplicateInstruction(*I);
 
         // the instruction duplicated may be equal to the original, so we
         // return shouldDelete in order to drop the duplicates
@@ -1837,18 +1829,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       }
     }
     
-    if(CoarseGrainedDuplicationEnabled) {
-      LLVM_DEBUG(dbgs() << "Applying coarse grained duplication\n");
-      // Apply coarse grained duplication
-      for (BasicBlock &BB : *Fn) {
-        repairBasicBlock(BB);
-      }
-    }
-    
     LLVM_DEBUG(dbgs() << " [done]\n");
-
-    // insert the code for calling the error basic block in case of a mismatch
-    CreateErrBB(Md, *Fn, ErrBB);
   }
   
   LLVM_DEBUG(dbgs() << "Iterating over variables...\n");
@@ -1871,25 +1852,8 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       
       // Duplicate instruction only if this isn't an already duplicated function
       if(!Fn->getName().ends_with("_dup")) {
-        BasicBlock *ErrBB = nullptr;
-        bool newErrBB = true;
-
-        // Search pre-existant ErrBB if single basic block error handling is enabled
-        if(!MultipleErrBBEnabled) {
-          for(BasicBlock &BB : *Fn) {
-            if(BB.getName().starts_with("ErrBB")) {
-              ErrBB = &BB;
-              newErrBB = false; // ErrBB already present
-            }
-          }
-        }
-
-        if(newErrBB) {
-          ErrBB = BasicBlock::Create(Fn->getContext(), "ErrBB", Fn);
-        }
-
         if(!isa<CallBase>(I)) {
-          if(duplicateInstruction(*I, *ErrBB)) {
+          if(duplicateInstruction(*I)) {
             if(InstructionsToRemove.find(I) == InstructionsToRemove.end()) {
               InstructionsToRemove.insert(I);
             }
@@ -1897,9 +1861,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
         } else {
           GrayAreaCallsToFix.insert(cast<CallBase>(I));
         }
-
-        // insert the code for calling the error basic block in case of a mismatch
-        CreateErrBB(Md, *Fn, ErrBB);
       }
     }
   }
@@ -1940,22 +1901,6 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
     // Map with the duplicated instructions, including the temporary load ones
     Function *Fn = CInstr->getFunction();
-    BasicBlock *ErrBB = nullptr;
-    bool newErrBB = true;        
-
-    // Search pre-existant ErrBB if single basic block error handling is enabled
-    if(!MultipleErrBBEnabled) {
-      for(BasicBlock &BB : *Fn) {
-        if(BB.getName().starts_with("ErrBB")) {
-          ErrBB = &BB;
-          newErrBB = false; // ErrBB already present
-        }
-      }
-    }
-
-    if(newErrBB) {
-      ErrBB = BasicBlock::Create(Fn->getContext(), "ErrBB", Fn);
-    }
 
     // Set insertion point for the load instructions
     IRBuilder<> B(CInstr);
@@ -1966,7 +1911,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       Value *Arg = CInstr->getArgOperand(i);
 
       // If argument has already a duplicate, nothing to do
-      if(getDuplicateValue(Arg, CInstr) != nullptr || !isa<Instruction>(Arg)) {
+      if(getDuplicateValue(Arg, CInstr->getFunction()) != nullptr || !isa<Instruction>(Arg)) {
         // If Argument already duplicated continue to next argument
         continue;
       }
@@ -1975,7 +1920,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
       if(Arg->getType()->isPointerTy() && !CInstr->isByValArgument(i) && isa<Instruction>(Arg) && !isa<CallInst>(Arg))
       {
         // If cannot perform TAD, do not duplicate Arg
-        temporaryArgumentDuplication(Md, Arg, B);
+        synchronizeFunctionArguments(Md, Arg, B, CInstr, true);
       } else {
         // Otherwise pass two times the same arg
         DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(Arg, Arg)); // TODO: Check if needed
@@ -1983,14 +1928,11 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     }
 
     // Finally, duplicate the call
-    if(duplicateInstruction(*CInstr, *ErrBB)) {
+    if(duplicateInstruction(*CInstr)) {
       if(InstructionsToRemove.find(CInstr) == InstructionsToRemove.end()) {
         InstructionsToRemove.insert(CInstr);
       }
     }
-
-    // insert the code for calling the error basic block in case of a mismatch
-    CreateErrBB(Md, *Fn, ErrBB);
   }
 
   LLVM_DEBUG(dbgs() << "Fixing invokes\n");
@@ -2010,7 +1952,7 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
     // Update the first invoke's normal destination
     IInstr->setNormalDest(NewBB->getNextNode());
   }
-  
+
   LLVM_DEBUG(dbgs() << "Remove instructions\n");
   // Drop the instructions that have been marked for removal earlier
   for (Instruction *I2rm : InstructionsToRemove) {
@@ -2021,6 +1963,58 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
 
     I2rm->eraseFromParent();
   }
+
+  // Add consistency checks and, if needed, transform in coarse-grained duplication
+  for(auto &Fn : Md) {
+    for(auto &BB : Fn) {
+      BasicBlock *ErrBB = BasicBlock::Create(Fn.getContext(), "ErrBB", &Fn);
+      for(auto &I : BB) {
+        Value *valueDup = getDuplicateValue(&I, &Fn);
+
+        if(!valueDup || !isa<Instruction>(valueDup) || cast<Instruction>(valueDup)->getParent() != &BB || I.comesBefore(cast<Instruction>(valueDup))) {
+          if(isa<CallBase>(I)) {
+            #ifdef CHECK_AT_CALLS
+            #if (SELECTIVE_CHECKING == 1)
+              if(I.getParent()->getTerminator() == NULL) {
+                errs() << "Malformed block!\n";
+                I.getParent()->print(errs());
+                errs() << "\n";
+              } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
+            #endif
+                addConsistencyChecks(I, *ErrBB);
+            #endif
+          } else if (isa<BranchInst, SwitchInst, ReturnInst, IndirectBrInst>(I)) {
+            #ifdef CHECK_AT_BRANCH
+              if(I.getParent()->getTerminator() == NULL) {
+                errs() << "Malformed block!\n";
+                I.getParent()->print(errs());
+                errs() << "\n";
+              } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
+                addConsistencyChecks(I, *ErrBB);
+            #endif
+          } else if (isa<StoreInst, AtomicRMWInst, AtomicCmpXchgInst>(I)) {
+            #ifdef CHECK_AT_STORES
+            #if (SELECTIVE_CHECKING == 1)
+              if(I.getParent()->getTerminator() == NULL) {
+                errs() << "Malformed block!\n";
+                I.getParent()->print(errs());
+                errs() << "\n";
+              } else if (I.getParent()->getTerminator()->getNumSuccessors() > 1)
+            #endif
+                addConsistencyChecks(I, *ErrBB);
+            #endif
+          }
+        }
+      }
+      // insert the code for calling the error basic block in case of a mismatch
+      CreateErrBB(Md, Fn, ErrBB);
+
+      if(CoarseGrainedDuplicationEnabled) {
+        repairBasicBlock(BB);
+      }
+    }
+  }
+  
 
   LLVM_DEBUG(dbgs() << "Fixing global ctors\n");
   fixGlobalCtors(Md);
@@ -2048,17 +2042,159 @@ PreservedAnalyses EDDI::run(Module &Md, ModuleAnalysisManager &AM) {
   return PreservedAnalyses::none();
 }
 
-bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B) {
-  const llvm::DataLayout &DL = Md.getDataLayout();
+bool EDDI::isHeapOriginatedThroughAlloca(llvm::AllocaInst *AI, unsigned depth) {
+  static constexpr unsigned MaxHeapOriginSearchDepth = 8;
+  if (depth > MaxHeapOriginSearchDepth)
+    return false;
 
-  auto TTIter = deducedTypes.transparentTypes.find(value);
-  if (TTIter == deducedTypes.transparentTypes.end()) {
-    errs() << "Warning: Cannot TDA value " << *value << "\n";
+  for (User *U : AI->users()) {
+    auto *SI = dyn_cast<StoreInst>(U);
+    if (SI && SI->getPointerOperand() == AI &&
+        isHeapOriginated(SI->getValueOperand(), depth + 1))
+      return true;
+  }
+  return false;
+}
+
+// Walks back through simple pointer-forwarding instructions to determine
+// whether `V` ultimately comes from a heap-allocation call (malloc/new/...).
+bool EDDI::isHeapOriginated(llvm::Value *V, unsigned depth) {
+  static constexpr unsigned MaxHeapOriginSearchDepth = 8; // guard against pathological/cyclic chains
+  errs() << "isHeapOriginated " << depth << ": " << *V << "\n";
+  if (depth > MaxHeapOriginSearchDepth) {
+    errs() << "MaxHeapOriginSearchDepth\n";
     return false;
   }
 
-  tda::TransparentType *VTy = TTIter->second.begin()->get();
+  if (auto *CI = dyn_cast<CallInst>(V)) {
+    if (Function *callee = CI->getCalledFunction()) {
+      if(isHeapFunction(callee->getName())) {
+        errs() << "isHeapFunction!\n";
+        synchronizeHeapValue(V, cast<Instruction>(V), true);
+        return true;
+      }
+    }
+    errs() << "isn't HeapFunction\n";
+    return false;
+  }
+
+  if (auto *AI = dyn_cast<AllocaInst>(V))
+      return isHeapOriginatedThroughAlloca(AI, depth + 1);
+
+  if (auto *GEP = dyn_cast<GetElementPtrInst>(V))
+    return isHeapOriginated(GEP->getPointerOperand(), depth + 1);
+
+  if (auto *LI = dyn_cast<LoadInst>(V))
+    return isHeapOriginated(LI->getPointerOperand(), depth + 1);
+
+  if (auto *PN = dyn_cast<PHINode>(V)) {
+    for (Value *incoming : PN->incoming_values())
+      if (isHeapOriginated(incoming, depth + 1)) {
+        errs() << "isHeapOriginated phi\n";
+        return true;
+      }
+  }
+
+  errs() << "false\n";
+  return false;
+}
+
+// Instead of TAD (alloca + memcpy snapshot), make sure the instruction that
+// produced this heap value has itself been duplicated, and reuse that real
+// duplicate as the synchronized value.
+bool EDDI::synchronizeHeapValue(llvm::Value *value, Instruction *I, bool before) {
+  Instruction *defInst = cast<Instruction>(value);
+  duplicateInstruction(*defInst);
+
+  std::set<Value *> toHardenHeapVariables{value};
+  std::set<Value *> toCheckVariables{toHardenHeapVariables};
+  while(!toCheckVariables.empty()) {
+    std::set<Value *> toAddVariables; // support set to contain new to-be-checked values
+    for(Value *V : toCheckVariables) {
+      // Just protect the return value of the call, not the operands
+      if((isa<Instruction>(V) || isa<GEPOperator>(V)) && !isa<CallBase>(V)) {
+        auto Instr = cast<User>(V);
+
+        // Check parameters of function
+        for(int i = 0; i < Instr->getNumOperands(); i++) {
+          Value *operand = nullptr;
+
+          // Get operand
+          if(isa<PHINode>(Instr)) {
+            auto PhiInst = cast<PHINode>(Instr);
+            operand = PhiInst->getIncomingValue(i);
+          } else if(isa<Instruction>(Instr->getOperand(i)) || isa<GlobalVariable>(Instr->getOperand(i)) || isa<GEPOperator>(Instr->getOperand(i))) {
+            operand = Instr->getOperand(i);
+          }
+          
+          // Check if to add operand to toAddVariables
+          if(operand != NULL && operand != V && isa<Instruction>(operand) &&
+                toHardenHeapVariables.find(operand) == toHardenHeapVariables.end() && 
+                toCheckVariables.find(operand) == toCheckVariables.end() && 
+                (FuncAnnotations.find(operand) == FuncAnnotations.end() || !FuncAnnotations.find(operand)->second.starts_with("exclude")) && 
+                (!operand->hasName() || !isToDuplicateName(operand->getName())) && 
+                (!isa<AllocaInst>(operand) || !isAllocaForExceptionHandling(*cast<AllocaInst>(operand)))) {
+            toAddVariables.insert(operand);
+          }
+        }
+      }
+
+      for(User *U : V->users()) {
+        if(isa<Instruction>(U) || isa<GEPOperator>(U)) {
+          if(U != NULL && U != V && 
+                toHardenHeapVariables.find(U) == toHardenHeapVariables.end() && 
+                toCheckVariables.find(U) == toCheckVariables.end() && 
+                (FuncAnnotations.find(U) == FuncAnnotations.end() || !FuncAnnotations.find(U)->second.starts_with("exclude")) && 
+                (!U->hasName() || !isToDuplicateName(U->getName())) && 
+                (!isa<AllocaInst>(U) || !isAllocaForExceptionHandling(*cast<AllocaInst>(U)))) {
+            // If it is a call, add also the called function in the toHardenFunction set
+            if(isa<CallBase>(U)) {
+              CallBase *CallI = cast<CallBase>(U);     
+              Function *Fn = CallI->getCalledFunction();  
+              if (Fn != NULL && getFunctionDuplicate(Fn) == NULL && 
+                    (FuncAnnotations.find(Fn) == FuncAnnotations.end() || 
+                      (!FuncAnnotations.find(Fn)->second.starts_with("exclude") && !FuncAnnotations.find(Fn)->second.starts_with("to_duplicate"))) && 
+                    !isToDuplicateName(Fn->getName()) && !Fn->getName().starts_with("__clang_call_terminate")) {
+                // If it isn't/hasn't a duplicate version already
+                // toHardenFunctions.insert(Fn);
+                toAddVariables.insert(U);
+              }
+            } else {
+              toAddVariables.insert(U);
+            }
+          }
+        }
+      }
+    }
+    toHardenHeapVariables.merge(toCheckVariables);
+    toCheckVariables = toAddVariables;
+  }
+
+  for(auto &V : toHardenHeapVariables) {
+    if(isa<Instruction>(V)) {
+      duplicateInstruction(*cast<Instruction>(V));
+    }
+  }
+
+  return true;
+}
+
+
+bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I, bool before) {
+  const llvm::DataLayout &DL = Md.getDataLayout();
+
+  if (isHeapOriginated(value)) {
+    errs() << *value << " isHeapOriginated\n";
+    return synchronizeHeapValue(value, I, before);
+  }
+
+  tda::TransparentType *VTy = getBestType(value);
+  if (VTy == nullptr) {
+    return false;
+  }
+
   // Cannot do argument duplication if the type contains opaque pointers since we cannot find the final value to duplicate
+  // Limitation: if the type found is a pointer to a struct containing opaque pointers, it could not appear as opaque pointer
   {
     auto VTyCopy = VTy;
     while(VTyCopy->isPointerTT()) {
@@ -2088,44 +2224,74 @@ bool EDDI::temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilde
     }
   }
 
-  // currentPtr is now the pointer to the final value
-
+  bool hasPerformedTAD = false;
+  Value *valueDup = getDuplicateValue(value, I->getFunction());
   uint64_t SizeInBytes = 0;
-  AllocaInst *allocaPrev = nullptr;
-
   if(isa<GetElementPtrInst>(currentPtr)) {
     auto *gepInst = cast<GetElementPtrInst>(currentPtr);
     SizeInBytes = DL.getTypeAllocSize(gepInst->getSourceElementType());
-    allocaPrev = B.CreateAlloca(VTy->getLLVMType(), ConstantInt::get(VTy->getLLVMType(), SizeInBytes));
   } else {
     SizeInBytes = DL.getTypeAllocSize(VTy->getLLVMType());
-    allocaPrev = B.CreateAlloca(VTy->getLLVMType());
   }
 
-  deducedTypes.transparentTypes[allocaPrev].insert(VTy->clone());
+  if(valueDup == nullptr) {
+    hasPerformedTAD = true;
+    assert(hasPerformedTAD && before && "TAD shall be performed only for syncrhonization before the instruction");
+    // currentPtr is now the pointer to the final value
 
+    AllocaInst *allocaPrev = nullptr;
+
+    if(isa<GetElementPtrInst>(currentPtr)) {
+      allocaPrev = B.CreateAlloca(VTy->getLLVMType(), ConstantInt::get(B.getInt8Ty(), SizeInBytes));
+    } else {
+      allocaPrev = B.CreateAlloca(VTy->getLLVMType());
+    }
+    allocaPrev->moveAfter(allocaPrev->getParent()->getParent()->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
+
+    deducedTypes.transparentTypes[allocaPrev].insert(VTy->clone());
+    valueDup = allocaPrev;
+  } else {
+    hasPerformedTAD = false;
+  }
 
   Value *Size = llvm::ConstantInt::get(B.getInt8Ty(), SizeInBytes);
 
   llvm::CallInst *memcpy_call = B.CreateMemCpy(
-      allocaPrev, allocaPrev->getPointerAlignment(DL),
-      currentPtr, allocaPrev->getPointerAlignment(DL),
+      valueDup, valueDup->getPointerAlignment(DL),
+      currentPtr, valueDup->getPointerAlignment(DL),
       Size);
-
+  if(!before) {
+    if(!I->isTerminator()) {
+      memcpy_call->moveAfter(I);
+    } else {
+      if(isa<InvokeInst>(I)) {
+        memcpy_call->moveBefore(cast<InvokeInst>(I)->getNormalDest()->getFirstNonPHIOrDbgOrAlloca());
+      } else {
+        errs() << "Error: not handled instruction for synchronize function arguments\n";
+        abort();
+      }
+    }
+  }
+  
   auto VTyPtr = VTy->clone();
 
   // Now we need to create as many allocas as the number of pointer indirections
   // in order to duplicate the whole pointer chain
-  for (int i = 0; i < indirections; ++i) {
-    VTyPtr = VTyPtr->getPointerToType();
-    auto *allocaCurr = B.CreateAlloca(VTyPtr->getLLVMType());
-    deducedTypes.transparentTypes[allocaCurr].insert(VTyPtr->getPointerToType()->clone());
-    B.CreateStore(allocaPrev, allocaCurr);
-    allocaPrev = allocaCurr;
+  if(hasPerformedTAD) {
+    errs() << "TAD of " << *value << "  -in-  " << I->getFunction()->getName() << "\n";
+    for (int i = 0; i < indirections; ++i) {
+      VTyPtr = VTyPtr->getPointerToType();
+      auto *allocaCurr = B.CreateAlloca(VTyPtr->getLLVMType());
+      allocaCurr->moveAfter(allocaCurr->getParent()->getParent()->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
+      deducedTypes.transparentTypes[allocaCurr].insert(VTyPtr->getPointerToType()->clone());
+      B.CreateStore(valueDup, allocaCurr);
+      valueDup = allocaCurr;
+    }
+
+    DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(valueDup, value));
+    DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(value, valueDup));
   }
 
-  DuplicatedInstructionMap.emplace(allocaPrev, value);
-  DuplicatedInstructionMap.emplace(value, allocaPrev);
   DuplicatedInstructionMap.insert(std::pair<Value *, Value *>(memcpy_call, memcpy_call));
 
   return true;
