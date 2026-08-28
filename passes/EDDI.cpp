@@ -1546,9 +1546,22 @@ int EDDI::duplicateInstruction(Instruction &I) {
     }
   }
 
-  if(clonedInst && deducedTypes.transparentTypes.find(&I) != deducedTypes.transparentTypes.end()) {
-    auto V1Ty = deducedTypes.transparentTypes.find(&I)->second.begin()->get();
-    deducedTypes.transparentTypes[clonedInst].insert(V1Ty->clone());
+
+  if (clonedInst) {
+    auto SrcIt = deducedTypes.transparentTypes.find(&I);
+    if (SrcIt != deducedTypes.transparentTypes.end()) {
+      
+      std::vector<std::unique_ptr<tda::TransparentType>> ClonedTypes;
+      ClonedTypes.reserve(SrcIt->second.size());
+      for (auto &TyPtr : SrcIt->second) {
+        ClonedTypes.push_back(TyPtr->clone());
+      }
+
+      auto &DestSet = deducedTypes.transparentTypes[clonedInst];
+      for (auto &ClonedTy : ClonedTypes) {
+        DestSet.insert(std::move(ClonedTy));
+      }
+    }
   }
 
   return res;
