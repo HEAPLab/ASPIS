@@ -185,6 +185,24 @@ void EDDI::fixDuplicatedConstructors(Module &Md) {
       continue;
     }
 
+    // Handle the case where the class has no attribute: zero the padding byte
+    auto zeroThisPointee = [&](Function *F) {
+      if (F->arg_empty())
+        return;
+
+      Argument *ThisArg = F->getArg(0);
+      if (!ThisArg->getType()->isPointerTy())
+        return;
+
+      BasicBlock &Entry = F->getEntryBlock();
+      IRBuilder<> B(&Entry, Entry.getFirstNonPHIOrDbgOrAlloca());
+
+      B.CreateStore(B.getInt8(0), ThisArg);
+    };
+
+    zeroThisPointee(Fn);
+    zeroThisPointee(FnDup);
+
     // Find vtable
     LLVM_DEBUG(dbgs() << "[REDDI] Finding vtable for " << Fn->getName() << "\n");
     for(auto &BB : *Fn) {
