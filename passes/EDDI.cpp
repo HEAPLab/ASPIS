@@ -724,32 +724,27 @@ void EDDI::duplicateOperands(Instruction &I) {
   }
 }
 
-// recursively follow store instructions to find the pointer final value,
-// if the value cannot be found (e.g. when the pointer is passed as function
-// argument) we return NULL.
-Value *EDDI::getPtrFinalValue(Value &V) {
-  Value *res = nullptr;
+tda::TransparentType *EDDI::getBestType(Value *V) {
+  TransparentTypeFactory ttf;
+  tda::TransparentType *VTy = nullptr;
 
-  if (V.getType()->isPointerTy() && V.hasUseList()) {
-    // find the store using V as ptr
-    for (User *U : V.users()) {
-      if (isa<StoreInst>(U)) {
-        StoreInst *SI = cast<StoreInst>(U);
-        if (SI->getPointerOperand() == &V) { // we found the store
+  auto TTIter = deducedTypes.transparentTypes.find(V);
 
-          // if the store saves a pointer we work recursively to find the
-          // original value
-          if (SI->getValueOperand()->getType()->isPointerTy()) {
-            return getPtrFinalValue(*(SI->getValueOperand()));
-          } else {
-            return &V;
-          }
-        }
-      }
-    }
+  if (TTIter != deducedTypes.transparentTypes.end() && TTIter->second.size() == 1) {
+    VTy = TTIter->second.begin()->get();
+    return VTy;
   }
 
-  return res;
+  if (isa<AllocaInst>(V) &&
+      cast<AllocaInst>(V)->getAllocatedType() &&
+      !cast<AllocaInst>(V)->getAllocatedType()->isPointerTy()) {
+
+    auto newTy = ttf.createFromType(cast<AllocaInst>(V)->getAllocatedType(), 1);
+    VTy = newTy.get();                                  // grab the raw pointer while we still own it
+    deducedTypes.transparentTypes[V].insert(std::move(newTy)); // then transfer ownership into the map
+  }
+
+  return VTy;
 }
 
 bool EDDI::ptrNotDereferenceable(Value &V) {
@@ -765,7 +760,7 @@ bool EDDI::ptrNotDereferenceable(Value &V) {
   return false;
 }
 
-// Follows the pointers V1 and V2 using getPtrFinalValue() and adds a compare
+// Follows the pointers V1 and V2 and adds a compare
 // instruction using the IRBuilder B.
 void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B) {
   /**
@@ -787,25 +782,15 @@ void EDDI::comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &
     return;
   }
 
-  if(deducedTypes.transparentTypes.find(&V1)->second.size() != 1) {
-    errs() << "\tMultiple types 1!\n";
-    return;
-  }
+  tda::TransparentType *V1Ty = getBestType(F1);
+  tda::TransparentType *V2Ty = getBestType(F2);
 
-  if(deducedTypes.transparentTypes.find(&V2)->second.size() != 1) {
-    errs() << "\tMultiple types 2!\n";
-    return;
-  }
-
-  auto V1Ty = deducedTypes.transparentTypes.find(&V1)->second.begin()->get();
-  auto V2Ty = deducedTypes.transparentTypes.find(&V2)->second.begin()->get();
-
-  if(!V1Ty || V1Ty->isOpaquePtr()) {
+  if(V1Ty == nullptr || V1Ty->isOpaquePtr()) {
     errs() << "Warning 1: Can't find final value for pointer " << V1 << "\n";
     return;
   }
 
-  if(!V2Ty || V2Ty->isOpaquePtr()) {
+  if(V2Ty == nullptr || V2Ty->isOpaquePtr()) {
     errs() << "Warning 2: Can't find final value for pointer " << V1 << "\n";
     return;
   }
@@ -1021,25 +1006,16 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
   Value *Original = V;
   Value *Copy = Duplicate;
 
-  // we compare the operands only if they are found in the TDA transparent types
-  if(deducedTypes.transparentTypes.find(V) == deducedTypes.transparentTypes.end()) {
-    return;
-  }
-
   compareValues(CmpInstructions, *Original, *Copy, B);
 }
 
 void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, bool checkCompositeTypes) {
-  if(deducedTypes.transparentTypes.find(&V1) == deducedTypes.transparentTypes.end()) {
+  TransparentType *V1Ty = getBestType(&V1);
+  TransparentType *V2Ty = getBestType(&V2);
+
+  if(V1Ty == nullptr || V1Ty->containsOpaquePtr() || V2Ty == nullptr || V2Ty->containsOpaquePtr() ) {
     return;
   }
-
-  if(deducedTypes.transparentTypes.find(&V2) == deducedTypes.transparentTypes.end()) {
-    return;
-  }
-
-  TransparentType *V1Ty = deducedTypes.transparentTypes.find(&V1)->second.begin()->get();
-  TransparentType *V2Ty = deducedTypes.transparentTypes.find(&V2)->second.begin()->get();
 
   if(V1Ty->isPointerTT() || V2Ty->isPointerTT()) {
     comparePtrs(CmpInstructions, V1, V2, B);
@@ -2212,42 +2188,13 @@ bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilde
     return synchronizeHeapValue(value, I, before);
   }
 
-  auto TTIter = deducedTypes.transparentTypes.find(value);
-  if (TTIter == deducedTypes.transparentTypes.end()) {
-    errs() << "Warning: Cannot TDA value " << *value << "\n";
+  tda::TransparentType *VTy = getBestType(value);
+  if (VTy == nullptr) {
     return false;
   }
 
-  tda::TransparentType *VTy = nullptr;
-  TransparentTypeFactory ttf;
-
-  // TODO: fix this in TDA!
-  if (value->getType()->isPointerTy()) {
-    if (isa<AllocaInst>(value) &&
-        cast<AllocaInst>(value)->getAllocatedType() &&
-        !cast<AllocaInst>(value)->getAllocatedType()->isPointerTy()) {
-
-      auto newTy = ttf.createFromType(cast<AllocaInst>(value)->getAllocatedType(), 1);
-      VTy = newTy.get();                                  // grab the raw pointer while we still own it
-      deducedTypes.transparentTypes[value].insert(std::move(newTy)); // then transfer ownership into the map
-
-    } else {
-      auto TTIter = deducedTypes.transparentTypes.find(value);
-      if (TTIter == deducedTypes.transparentTypes.end() || TTIter->second.empty()) {
-        errs() << "Warning: Cannot TDA value " << *value << "\n";
-        return false;
-      }
-      // WARNING: THIS IS JUST BEST EFFORT, COULD MESS THINGS UP!
-      VTy = TTIter->second.begin()->get();
-      errs() << "ERROR: Best effort inference of type. could be wrong! value: " << *value << " type " << VTy->toString() << "\n";
-    }
-  } else {
-    auto newTy = ttf.createFromType(value->getType());
-    VTy = newTy.get();
-    deducedTypes.transparentTypes[value].insert(std::move(newTy));
-  }
-
   // Cannot do argument duplication if the type contains opaque pointers since we cannot find the final value to duplicate
+  // Limitation: if the type found is a pointer to a struct containing opaque pointers, it could not appear as opaque pointer
   {
     auto VTyCopy = VTy;
     while(VTyCopy->isPointerTT()) {
@@ -2331,6 +2278,7 @@ bool EDDI::synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilde
   // Now we need to create as many allocas as the number of pointer indirections
   // in order to duplicate the whole pointer chain
   if(hasPerformedTAD) {
+    errs() << "TAD of " << *value << "  -in-  " << I->getFunction()->getName() << "\n";
     for (int i = 0; i < indirections; ++i) {
       VTyPtr = VTyPtr->getPointerToType();
       auto *allocaCurr = B.CreateAlloca(VTyPtr->getLLVMType());

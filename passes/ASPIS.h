@@ -62,7 +62,6 @@ class EDDI : public PassInfoMixin<EDDI> {
         int isUsedByStore(Instruction &I, Instruction &Use);
         Instruction* cloneInstr(Instruction &I);
         void duplicateOperands (Instruction &I);
-        Value* getPtrFinalValue(Value &V);
         bool ptrNotDereferenceable(Value &V);
         void comparePtrs(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B);
         void addConsistencyChecks(Instruction &I, BasicBlock &ErrBB);
@@ -77,7 +76,8 @@ class EDDI : public PassInfoMixin<EDDI> {
         Function *duplicateFnArgs(Function &Fn, Module &Md);
         void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
         bool synchronizeFunctionArguments(Module &Md, llvm::Value *value, IRBuilder<> &B, Instruction *I, bool before);
-        Value *getDuplicateValue(Value *V, Function *I);
+        Value *getDuplicateValue(Value *V, Function *Fn);
+        tda::TransparentType *getBestType(Value *V);
         void createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, IRBuilder<> &B);
         void compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B, bool checkCompositeTypes = true);
         void fixGlobalCtors(Module &M);
