@@ -242,3 +242,11 @@ source_file = "c/floating_point/fp_conversions.c"
 [[tests]]
 test_name = "c_fp_special_values"
 source_file = "c/floating_point/fp_special_values.c"
+
+[[tests]]
+test_name = "c_bitfields"
+source_file = "c/data_representation/bitfields.c"
+
+[[tests]]
+test_name = "c_type_punning"
+source_file = "c/data_representation/type_punning.c"
