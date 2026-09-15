@@ -202,3 +202,23 @@ test_name = "cpp_complex"
 source_file = "cpp/complex/*.cpp"
 add_compiler_flags = "-lm"
 black_list = ["--inter-rasm", "--racfed"]
+
+[[tests]]
+test_name = "c_recursion_linear"
+source_file = "c/recursion/recursion_linear.c"
+
+[[tests]]
+test_name = "c_recursion_tree"
+source_file = "c/recursion/recursion_tree.c"
+
+[[tests]]
+test_name = "c_recursion_mutual"
+source_file = "c/recursion/recursion_mutual.c"
+
+[[tests]]
+test_name = "c_recursion_nested"
+source_file = "c/recursion/recursion_nested.c"
+
+[[tests]]
+test_name = "c_recursion_ptr_arg"
+source_file = "c/recursion/recursion_ptr_arg.c"
