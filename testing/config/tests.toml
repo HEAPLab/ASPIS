@@ -222,3 +222,23 @@ source_file = "c/recursion/recursion_nested.c"
 [[tests]]
 test_name = "c_recursion_ptr_arg"
 source_file = "c/recursion/recursion_ptr_arg.c"
+
+[[tests]]
+test_name = "c_fp_accumulation"
+source_file = "c/floating_point/fp_accumulation.c"
+
+[[tests]]
+test_name = "c_fp_array_reduction"
+source_file = "c/floating_point/fp_array_reduction.c"
+
+[[tests]]
+test_name = "c_fp_comparisons"
+source_file = "c/floating_point/fp_comparisons.c"
+
+[[tests]]
+test_name = "c_fp_conversions"
+source_file = "c/floating_point/fp_conversions.c"
+
+[[tests]]
+test_name = "c_fp_special_values"
+source_file = "c/floating_point/fp_special_values.c"
