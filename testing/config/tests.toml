@@ -258,3 +258,7 @@ source_file = "c/taclebench/ndes.c"
 [[tests]]
 test_name = "c_statemate"
 source_file = "c/taclebench/statemate.c"
+
+[[tests]]
+test_name = "c_telemetry"
+source_file = "c/autonomous_bench/telemetry.c"
