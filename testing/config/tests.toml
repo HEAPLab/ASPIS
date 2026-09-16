@@ -262,3 +262,7 @@ source_file = "c/taclebench/statemate.c"
 [[tests]]
 test_name = "c_telemetry"
 source_file = "c/autonomous_bench/telemetry.c"
+
+[[tests]]
+test_name = "c_game_of_life"
+source_file = "c/autonomous_bench/game_of_life.c"
