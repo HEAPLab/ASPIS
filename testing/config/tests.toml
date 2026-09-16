@@ -250,3 +250,11 @@ source_file = "c/data_representation/bitfields.c"
 [[tests]]
 test_name = "c_type_punning"
 source_file = "c/data_representation/type_punning.c"
+
+[[tests]]
+test_name = "c_ndes"
+source_file = "c/taclebench/ndes.c"
+
+[[tests]]
+test_name = "c_statemate"
+source_file = "c/taclebench/statemate.c"
