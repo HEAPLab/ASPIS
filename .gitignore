@@ -69,3 +69,6 @@ examples/cuda/add
 
 # IDE
 .idea/
+
+# Rust
+**/target/
