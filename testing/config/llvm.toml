@@ -1,2 +1,5 @@
 #llvm_bin = "<path/to/your/llvm/bin>"
 llvm_bin = "/opt/llvm-21/bin"
+
+#rust_bin = "<path/to/your/rustc-cargo/bin>"
+rust_bin = "/opt/rust-llvm21/bin"

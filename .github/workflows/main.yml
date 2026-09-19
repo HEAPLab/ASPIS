@@ -11,7 +11,7 @@ jobs:
   compile-ASPIS:
     runs-on: ubuntu-latest
     container:
-      image: docker.io/ledmington/aspis-deps:llvm21
+      image: docker.io/ledmington/aspis-deps:llvm-rust1.93
 
     steps:
       - name: Checking out ASPIS

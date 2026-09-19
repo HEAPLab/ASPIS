@@ -202,3 +202,7 @@ test_name = "cpp_complex"
 source_file = "cpp/complex/*.cpp"
 add_compiler_flags = "-lm"
 black_list = ["--inter-rasm", "--racfed"]
+
+[[tests]]
+test_name = "rust_loop_exit"
+source_file = "loop_exit.rs"
