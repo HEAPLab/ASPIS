@@ -373,9 +373,9 @@ void EDDI::preprocess(Module &Md) {
       }
     }
     
-    // All the Global Variables are to be hardened except the ones explicitly marked as `exclude` or `to_duplicate`
+    // All the Global Variables are to be hardened except the ones explicitly marked as `exclude` or `to_duplicate`. Also, do not include the constant global variables
     for(auto &GV : Md.globals()) {
-      if(GV.hasName() && !isToDuplicateName(GV.getName())) {
+      if(GV.hasName() && !isToDuplicateName(GV.getName()) && (!isa<GlobalVariable>(GV) || !cast<GlobalVariable>(GV).isConstant())) {
         if(FuncAnnotations.find(&GV) == FuncAnnotations.end() || 
           (!FuncAnnotations.find(&GV)->second.starts_with("exclude") && !FuncAnnotations.find(&GV)->second.starts_with("to_duplicate"))) {
           toHardenVariables.insert(&GV);
