@@ -999,6 +999,35 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
     if(!isLocalValueInitializedBefore(cast<Instruction>(V), &I)) {
       return;
     }
+    
+    // Check if retrieving a pointer to an array element, and if so, check that the index is within bounds
+    // Avoids the checking of the out-by-one element which is not dereferenceable but commonly used for iteration
+    auto GEP = cast<GetElementPtrInst>(&I);
+    auto GEPOp = GEP->getOperand(0);
+    while(isa<GetElementPtrInst>(GEPOp)) {
+      GEPOp = cast<GetElementPtrInst>(GEPOp)->getOperand(0);
+    }
+
+    auto GEPTy = getBestType(GEPOp);
+
+    if(GEPTy->isArrayTTOrPtrTo()) {
+
+      if(GEPTy->isPointerTT()) {
+        GEPTy = GEPTy->getPointedType();
+      }
+
+      unsigned NumElems = GEPTy->getLLVMType()->getArrayNumElements();
+      if (GEP->getNumIndices() > 0) {
+        Value *LastIndex = GEP->getOperand(GEP->getNumOperands() - 1);
+        if (auto *CIdx = dyn_cast<ConstantInt>(LastIndex)) {
+          APInt IdxVal = CIdx->getValue();
+          
+          if (!(IdxVal.sge(APInt(IdxVal.getBitWidth(), 0)) && IdxVal.sle(APInt(IdxVal.getBitWidth(), NumElems-1)))) {
+            return;
+          }
+        }
+      }
+    }
   } else {
     // TODO: are there other cases to support?
   }
