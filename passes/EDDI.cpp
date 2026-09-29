@@ -1082,7 +1082,13 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
         compareValues(CmpInstructions, *OriginalElem, *CopyElem, B, false);
       }
     } else if(V1Ty->isArrayTT()) {
-      int arraysize = V1Ty->getLLVMType()->getArrayNumElements();
+      int arraysize = 0;
+      if(isa<ArrayType>(V1Ty->getLLVMType())) {
+        arraysize = cast<ArrayType>(V1Ty->getLLVMType())->getArrayNumElements();
+      } else {
+        errs() << "Error: V1Ty is ArrayTT but V1Ty->getLLVMType() is not ArrayType\n";
+        // abort();
+      }
 
       // TODO: understand if is possible to remove the extracted values when no check is performed
       TransparentTypeFactory ttf;
