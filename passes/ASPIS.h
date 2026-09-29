@@ -60,6 +60,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         void fixDuplicatedConstructors(Module &Md);
         std::set<Function *> getVirtualMethodsFromConstructor(Function *Fn);
         int isUsedByStore(Instruction &I, Instruction &Use);
+        bool isReadAcrossCalls(Value *V, CallBase *CallI);
         Instruction* cloneInstr(Instruction &I);
         void duplicateOperands (Instruction &I);
         bool ptrNotDereferenceable(Value &V);

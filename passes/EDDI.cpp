@@ -912,6 +912,70 @@ bool isLocalValueInitializedBefore(Instruction *AI, Instruction *At) {
   return true;
 }
 
+
+bool EDDI::isReadAcrossCalls(Value *V, CallBase *CallI) {
+  if(CallI->isInlineAsm()) {
+    // Assume the variable is read if it is an inline asm call
+    return true;
+  } else if(CallI->isIndirectCall()) {
+    // For indirect calls check only the called operand
+    return CallI->getCalledOperand() != V;
+  } else if(isToDuplicate(CallI) || isToExclude(CallI)) {
+    return true;
+  } else {
+
+
+    // If V is a pointer, we have to check if it should point to a valid memory location
+    if(V->getType()->isPointerTy()) {
+      // If it is not a pointer, we can check if it is used in a read operation in the function
+      return true;
+    } else {
+      // Effectively check if it the current content will be read
+      int ArgNo = -1;
+      for (unsigned i = 0; i < CallI->arg_size(); ++i) {
+        if (CallI->getArgOperand(i) == V){
+          ArgNo = i;
+          break;
+        }
+      }
+
+      if(ArgNo == -1) {
+        errs() << "Error: Value " << *V << " not found in the arguments of the call instruction " << *CallI << "\n";
+        abort();
+        return false;
+      } 
+      
+      if(ArgNo >= CallI->getCalledFunction()->getFunctionType()->getNumParams()) {
+        // If the argument is a vararg, consider it as read by the function
+        return true;
+      }
+
+      assert(CallI->getArgOperand(ArgNo) == V && "Value not found in the arguments of the call instruction");
+
+      auto arg = CallI->getCalledFunction()->getArg(ArgNo);
+      auto Fn = CallI->getCalledFunction();
+
+      for(auto &BB : *Fn) {
+        for(auto &I : BB) {
+          if(isa<LoadInst>(I) && cast<LoadInst>(I).getPointerOperand() == arg) {
+            return true;
+          } else if(isa<StoreInst>(I) && cast<StoreInst>(I).getPointerOperand() == arg) {
+            return false;
+          } else if(isa<StoreInst>(I) && cast<StoreInst>(I).getValueOperand() == arg) {
+            return true; // ?
+          } else if(isa<CallBase>(I)) {
+            if(isReadAcrossCalls(arg, cast<CallBase>(&I))) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 /**
  * Adds a consistency check on the instruction I
  */
@@ -1028,8 +1092,14 @@ void EDDI::createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *
         }
       }
     }
-  } else {
-    // TODO: are there other cases to support?
+  }
+    
+  // Check if the operand will be read in the future or enters in an excluded/to be duplicated function. If so, we will check it.
+  // Notice that we have to exclude the branches where a store is being performed before the read
+  if(isa<CallBase>(I)) {
+    if(!isReadAcrossCalls(V, cast<CallBase>(&I))) {
+      return;
+    }
   }
 
   Value *Original = V;
