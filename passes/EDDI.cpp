@@ -1523,6 +1523,20 @@ int EDDI::duplicateInstruction(Instruction &I) {
       // duplicate the operands
       duplicateOperands(I);
 
+      // Special case: __cxa_atexit must register the original destructor since it will be called twice
+      if (auto *clonedCInstr = dyn_cast<CallInst>(clonedInst)) {
+        if (auto *CalledFn = clonedCInstr->getCalledFunction()) {
+          if (CalledFn->getName() == "__cxa_atexit") {
+            if (auto *FD = dyn_cast<Function>(clonedCInstr->getArgOperand(0))) {
+              Function *OrigF = getFunctionFromDuplicate(FD);
+
+              clonedCInstr->setArgOperand(0, OrigF);
+              CInstr->setArgOperand(0, OrigF);
+            }
+          }
+        }
+      }
+
       if(isa<InvokeInst>(I)) {
         // In case of an invoke instruction, we have to fix the first invoke since 
         // it would jump to the next BB and not to the duplicated invoke instruction
