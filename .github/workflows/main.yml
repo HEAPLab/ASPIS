@@ -78,7 +78,7 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}/ASPIS/testing
         run: |
-           pytest test.py --no-header -v
+           pytest test.py --no-header -v -n $(nproc) --dist loadgroup
 
       - name: Upload comparison counter artifact
         if: always()
