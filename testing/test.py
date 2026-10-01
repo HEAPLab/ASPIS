@@ -89,12 +89,13 @@ def pytest_generate_tests(metafunc):
     if "test_data" in metafunc.fixturenames:
         os.makedirs("./build", exist_ok=True)
 
-        if os.path.exists(COMPARISON_COUNTER_PATH):
-          os.remove(COMPARISON_COUNTER_PATH)
+        if os.environ.get("PYTEST_XDIST_WORKER") is None:
+          if os.path.exists(COMPARISON_COUNTER_PATH):
+            os.remove(COMPARISON_COUNTER_PATH)
 
-        comparison_file = open(COMPARISON_COUNTER_PATH, "a+")
-        comparison_file.write("test_name,comparison_counter\n")
-        comparison_file.close()
+          comparison_file = open(COMPARISON_COUNTER_PATH, "a+")
+          comparison_file.write("test_name,comparison_counter\n")
+          comparison_file.close()
 
         tests_file_paths = metafunc.config.getoption("--tests-file")
         test_list = []
@@ -105,10 +106,15 @@ def pytest_generate_tests(metafunc):
             # Access the 'tests' list inside the TOML dictionary
             test_list.extend(config_data.get("tests", []))
 
-            # Use 'test_name' for better output in the terminal
-            ids = [t.get("test_name", str(i)) for i, t in enumerate(test_list)]
+        # Use 'test_name' for better output in the terminal
+        ids = [t.get("test_name", str(i)) for i, t in enumerate(test_list)]
 
-        metafunc.parametrize("test_data", test_list, ids=ids)
+        params = [
+          pytest.param(t, marks=pytest.mark.xdist_group(name=ids[i]))
+          for i, t in enumerate(test_list)
+        ]
+
+        metafunc.parametrize("test_data", params, ids=ids)
     
 # Tests
 @pytest.mark.timeout(60) # Set a timeout of 60 seconds for each test
