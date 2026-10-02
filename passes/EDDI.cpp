@@ -941,7 +941,6 @@ bool EDDI::isReadAcrossCalls(Value *V, CallBase *CallI) {
 
       if(ArgNo == -1) {
         errs() << "Error: Value " << *V << " not found in the arguments of the call instruction " << *CallI << "\n";
-        abort();
         return false;
       } 
       
@@ -1157,7 +1156,7 @@ void EDDI::compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value
         arraysize = cast<ArrayType>(V1Ty->getLLVMType())->getArrayNumElements();
       } else {
         errs() << "Error: V1Ty is ArrayTT but V1Ty->getLLVMType() is not ArrayType\n";
-        // abort();
+        abort();
       }
 
       // TODO: understand if is possible to remove the extracted values when no check is performed
