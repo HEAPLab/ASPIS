@@ -25,8 +25,8 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}/ASPIS
         run: |
-          cmake -B build -DLLVM_DIR=${{ env.LLVM_INSTALL_DIR }}/lib/cmake/llvm
-          cmake --build build
+          cmake -S . -B build -DLLVM_DIR=${{ env.LLVM_INSTALL_DIR }}/lib/cmake/llvm
+          cmake --build build -j $(nproc) -- all
 
       - name: Install Python requirements
         shell: bash
