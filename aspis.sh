@@ -27,7 +27,7 @@ cfc=0 # 0 = cfcss,  1 = rasm,   2 = inter-rasm
 debug_enabled=false
 verbose=false
 cleanup=true
-libstdcpp_added=false
+cpp_input=false
 enable_profiling=false
 
 # Check if the shell supports colors
@@ -255,17 +255,11 @@ EOF
                     --no-cleanup)
                         cleanup=false;
                         ;;
-                    -lstdc++)
-                        libstdcpp_added=true
-                        ;;
                     *.c | *.cpp)
                         input_files="$input_files $opt";
-                        # Check if it's a .cpp file and if -lstdc++ hasn't been added yet
-                        if [[ "$opt" == *.cpp ]] && [[ "$libstdcpp_added" == false ]]; then
-                            clang_options="$clang_options -lstdc++"
-                            libstdcpp_added=true 
+                        if [[ "$opt" == *.cpp ]]; then
+                            cpp_input=true
                         fi
-                        
                         ;;
                     *)
                         clang_options="$clang_options $opt";
@@ -324,13 +318,21 @@ EOF
         }
     fi
 
-    CLANG="${llvm_bin}/clang${suffix}" 
+    CLANG="${llvm_bin}/clang${suffix}"
+    CLANGXX="${llvm_bin}/clang++${suffix}"
     OPT="${llvm_bin}/opt${suffix}"
     LLVM_LINK="${llvm_bin}/llvm-link${suffix}"
 
     if [[ -n "$config_file" ]]; then
         CLANG="${CLANG} --config ${config_file}"
+        CLANGXX="${CLANGXX} --config ${config_file}"
     fi;
+
+    if [[ "$cpp_input" == true ]]; then
+        LINKER=$CLANGXX
+    else
+        LINKER=$CLANG
+    fi
 }
 
 run_aspis() {
@@ -452,7 +454,7 @@ run_aspis() {
         exe $OPT -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-insert-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
         success_msg "Code instrumented."
 
-        exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
+        exe $LINKER $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file
         success_msg "Instrumented binary emitted."
 
         exe $build_dir/$output_file
@@ -468,7 +470,7 @@ run_aspis() {
             exe cp $build_dir/out.ll $build_dir/$output_file.bak
             ;;
         *)
-            exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
+            exe $LINKER $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file
             ;;
     esac
     success_msg "Binary emitted."
