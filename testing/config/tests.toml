@@ -202,3 +202,69 @@ test_name = "cpp_complex"
 source_file = "cpp/complex/*.cpp"
 add_compiler_flags = "-lm"
 black_list = ["--inter-rasm", "--racfed"]
+
+[[tests]]
+test_name = "c_recursion_linear"
+source_file = "c/recursion/recursion_linear.c"
+black_list = ["--seddi"]
+
+[[tests]]
+test_name = "c_recursion_tree"
+source_file = "c/recursion/recursion_tree.c"
+
+[[tests]]
+test_name = "c_recursion_mutual"
+source_file = "c/recursion/recursion_mutual.c"
+black_list = ["--eddi", "--eddi --multiple-errbb", "--eddi --coarse-grained", "--eddi --multiple-errbb --coarse-grained", "--seddi"]
+
+[[tests]]
+test_name = "c_recursion_nested"
+source_file = "c/recursion/recursion_nested.c"
+
+[[tests]]
+test_name = "c_recursion_ptr_arg"
+source_file = "c/recursion/recursion_ptr_arg.c"
+
+[[tests]]
+test_name = "c_fp_accumulation"
+source_file = "c/floating_point/fp_accumulation.c"
+
+[[tests]]
+test_name = "c_fp_array_reduction"
+source_file = "c/floating_point/fp_array_reduction.c"
+
+[[tests]]
+test_name = "c_fp_comparisons"
+source_file = "c/floating_point/fp_comparisons.c"
+
+[[tests]]
+test_name = "c_fp_conversions"
+source_file = "c/floating_point/fp_conversions.c"
+
+[[tests]]
+test_name = "c_fp_special_values"
+source_file = "c/floating_point/fp_special_values.c"
+
+[[tests]]
+test_name = "c_bitfields"
+source_file = "c/data_representation/bitfields.c"
+
+[[tests]]
+test_name = "c_type_punning"
+source_file = "c/data_representation/type_punning.c"
+
+[[tests]]
+test_name = "c_ndes"
+source_file = "c/taclebench/ndes.c"
+
+[[tests]]
+test_name = "c_statemate"
+source_file = "c/taclebench/statemate.c"
+
+[[tests]]
+test_name = "c_telemetry"
+source_file = "c/autonomous_bench/telemetry.c"
+
+[[tests]]
+test_name = "c_game_of_life"
+source_file = "c/autonomous_bench/game_of_life.c"
