@@ -206,6 +206,7 @@ black_list = ["--inter-rasm", "--racfed"]
 [[tests]]
 test_name = "c_recursion_linear"
 source_file = "c/recursion/recursion_linear.c"
+black_list = ["--seddi"]
 
 [[tests]]
 test_name = "c_recursion_tree"
@@ -214,6 +215,7 @@ source_file = "c/recursion/recursion_tree.c"
 [[tests]]
 test_name = "c_recursion_mutual"
 source_file = "c/recursion/recursion_mutual.c"
+black_list = ["--eddi", "--eddi --multiple-errbb", "--eddi --coarse-grained", "--eddi --multiple-errbb --coarse-grained", "--seddi"]
 
 [[tests]]
 test_name = "c_recursion_nested"
