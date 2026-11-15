@@ -17,6 +17,7 @@ asm_file=""
 asm_files=""
 input_files=""
 clang_options=
+rustc_options=()
 eddi_options="-S"
 cfc_options="-S"
 llvm_bin=$(dirname "$(which clang)")
@@ -83,7 +84,21 @@ perform_platform_checks() {
 
 parse_commands() {
 
-    raw_opts="$@"
+    ## Everything after `--` is passed verbatim to rustc. It is kept as an array, unlike the other
+    ## options, so that arguments containing spaces (e.g. `--check-cfg 'cfg(feature, values(...))'`)
+    ## survive.
+    local aspis_opts=()
+    while (($# > 0)); do
+        if [[ "$1" == "--" ]]; then
+            shift
+            rustc_options=("$@")
+            break
+        fi
+        aspis_opts+=("$1")
+        shift
+    done
+
+    raw_opts="${aspis_opts[*]}"
 
     for opt in $raw_opts; do
         case $parse_state in
@@ -103,7 +118,7 @@ parse_commands() {
     |                                                                  |
     '--.. .- -. . .-.. .-.. .- -.-. ..- .-.. ---=-=-=-=-=-=-=-=-=-=-=-='
 
-    Usage: aspis.sh [options] file(s)...
+    Usage: aspis.sh [options] file(s)... [-- rustc-options...]
 
     The specified files can be any C, C++, or Rust source code files, or LLVM IR
     files (.ll/.bc) that are linked in as they are, skipping the front-end.
@@ -377,9 +392,18 @@ run_aspis() {
         filename=$(basename "$input_file" | sed 's/\.[^.]*$//')
         # Compile the file to LLVM IR (.ll) and save it in the build directory
         if [[ "$input_file" == *.rs ]]; then
+            ## Defaults, unless the user passed their own after `--`
+            rustc_defaults=()
+            if [[ " ${rustc_options[*]} " != *" --crate-type"* ]]; then
+                rustc_defaults+=(--crate-type=bin)
+            fi
+            if [[ " ${rustc_options[*]} " != *" --edition"* ]]; then
+                rustc_defaults+=(--edition 2024)
+            fi
+
             exe $RUSTC \
-                --crate-type=bin \
-                --edition 2024 \
+                "${rustc_defaults[@]}" \
+                "${rustc_options[@]}" \
                 --cfg aspis \
                 --check-cfg 'cfg(aspis)' \
                 --extern aspis_rust_annotations="$rust_annotations_lib" \
