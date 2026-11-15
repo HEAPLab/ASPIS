@@ -15,6 +15,7 @@ exclude_file=""
 excluded_files=""
 asm_file=""
 asm_files=""
+lib_files=""
 input_files=""
 clang_options=
 rustc_options=()
@@ -285,6 +286,9 @@ EOF
                     *.ll | *.bc)
                         input_files="$input_files $opt";
                         ;;
+                    *.a | *.rlib)
+                        lib_files="$lib_files $opt";
+                        ;;
                     *)
                         clang_options="$clang_options $opt";
                         ;;
@@ -527,6 +531,13 @@ run_aspis() {
         done < "$asm_file";
     fi;
 
+    ## Libraries go after out.ll
+    ## The --start-group/--end-group lets them depend on each other in any order.
+    lib_link_flags=""
+    if [[ -n "$lib_files" ]]; then
+        lib_link_flags="-Wl,--start-group $lib_files -Wl,--end-group"
+    fi
+
     ## Backend
     exe $OPT $build_dir/out.ll -o $build_dir/out.ll -S $opt_flags
     if [[ "$enable_profiling" == "true" ]]; then
@@ -534,7 +545,7 @@ run_aspis() {
         exe $OPT -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-insert-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
         success_msg "Code instrumented."
 
-        exe $LINKER $clang_options $build_dir/out.ll $asm_files $rust_link_flags -o $build_dir/$output_file
+        exe $LINKER $clang_options $build_dir/out.ll $asm_files $lib_link_flags $rust_link_flags -o $build_dir/$output_file
         success_msg "Instrumented binary emitted."
 
         exe $build_dir/$output_file
@@ -550,7 +561,7 @@ run_aspis() {
             exe cp $build_dir/out.ll $build_dir/$output_file.bak
             ;;
         *)
-            exe $LINKER $clang_options $build_dir/out.ll $asm_files $rust_link_flags -o $build_dir/$output_file
+            exe $LINKER $clang_options $build_dir/out.ll $asm_files $lib_link_flags $rust_link_flags -o $build_dir/$output_file
             ;;
     esac
     success_msg "Binary emitted."
