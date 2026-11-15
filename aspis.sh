@@ -382,7 +382,10 @@ run_aspis() {
     ## Rust sources may use the #[aspis(...)] macro from the rust-annotations crate. It only emits
     ## the annotations when compiled with `--cfg aspis`, so a plain rustc build ignores them.
     rust_annotations_lib="$DIR/rust-annotations/target/release/libaspis_rust_annotations.so"
-    if [[ "$rust_input" == true && ! -f "$rust_annotations_lib" ]]; then
+    rust_annotations_extern=(--extern aspis_rust_annotations="$rust_annotations_lib")
+    if [[ " ${rustc_options[*]} " == *" aspis_rust_annotations="* ]]; then
+        rust_annotations_extern=()
+    elif [[ "$rust_input" == true && ! -f "$rust_annotations_lib" ]]; then
         error_msg "Rust annotations crate not found at $rust_annotations_lib. Build it with 'cargo build --release' in $DIR/rust-annotations."
     fi
 
@@ -410,7 +413,7 @@ run_aspis() {
                 "${rustc_options[@]}" \
                 --cfg aspis \
                 --check-cfg 'cfg(aspis)' \
-                --extern aspis_rust_annotations="$rust_annotations_lib" \
+                "${rust_annotations_extern[@]}" \
                 -C opt-level=0 \
                 -C panic=abort \
                 --emit=llvm-ir \
