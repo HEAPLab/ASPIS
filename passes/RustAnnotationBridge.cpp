@@ -39,8 +39,6 @@ using namespace llvm;
 class RustAnnotationBridge : public PassInfoMixin<RustAnnotationBridge> {
 public:
   PreservedAnalyses run(Module &Md, ModuleAnalysisManager &) {
-    outs() << "run()\n";
-
     std::vector<std::pair<GlobalObject *, std::string>> ToAnnotate;
 
     for (GlobalVariable &GV : Md.globals()) {
@@ -66,7 +64,8 @@ public:
     }
 
     for (GlobalObject *GO : findRustStartupGlue(Md)) {
-      outs() << "Found Rust startup glue: " << GO->getName() << "\n";
+      LLVM_DEBUG(dbgs() << "Found Rust startup glue: " << GO->getName()
+                        << "\n");
       if (auto *Fn = dyn_cast<Function>(GO); Fn && Annotated.insert(Fn)) {
         ToAnnotate.emplace_back(Fn, "exclude");
       }
@@ -78,15 +77,14 @@ public:
     for (Function &Fn : Md) {
       if (!Fn.isDeclaration() && isRustStdLibFunction(Fn) &&
           Annotated.insert(&Fn)) {
-        outs() << "Found Rust standard library function: " << Fn.getName()
-               << "\n";
+        LLVM_DEBUG(dbgs() << "Found Rust standard library function: "
+                          << Fn.getName() << "\n");
         ToAnnotate.emplace_back(&Fn, "exclude");
       }
     }
 
     addAnnotations(Md, ToAnnotate);
 
-    outs() << "run() finished\n";
     return PreservedAnalyses::none();
   }
 
