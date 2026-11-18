@@ -1,0 +1,8 @@
+[[faults]]
+name = "rust_add_corrupt_A"
+source_file = "rust/simple/add.rs"
+break_at = "add::main"
+variable = "add::A"
+type = "int"
+value = 99
+detection_method = ["data"]

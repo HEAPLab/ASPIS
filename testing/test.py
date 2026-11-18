@@ -16,6 +16,7 @@ DOCKER_SHARED_VOLUME = "/workspace/ASPIS/tmp"
 LOCAL_SHARED_VOLUME = "./tests/"
 DOCKER_COMPOSE_FILE = "../docker/docker-compose.yml"
 COMPARISON_COUNTER_PATH = "./build/comparison_counter.csv"
+RUST_ANNOTATIONS_LIB = "../rust-annotations/target/release/libaspis_rust_annotations.so"
 
 data_techniques = ["--no-dup", "--eddi", "--eddi --multiple-errbb", "--eddi --coarse-grained", "--eddi --multiple-errbb --coarse-grained",  "--reddi", "--reddi --multiple-errbb", "--reddi --coarse-grained", "--reddi --multiple-errbb --coarse-grained", "--seddi", "--fdsc"]
 cfc_techniques =   ["--no-cfc", "--cfcss", "--rasm", "--racfed", "--inter-rasm"]
@@ -69,7 +70,11 @@ def cleanup_out_ll(build_dir):
 # Compile without ASPIS to get expected output
 def compile_without_aspis(source_file, output_file, llvm_bin, build_dir):
   """Compile a file without ASPIS."""
-  command = f"{llvm_bin}/clang++ {source_file} -o {build_dir}/{output_file}.out --verbose"
+  if source_file.endswith(".rs"):
+    # No `--cfg aspis`: the ASPIS annotations must leave a plain build unchanged.
+    command = f"rustc --edition 2024 --check-cfg 'cfg(aspis)' --extern aspis_rust_annotations={RUST_ANNOTATIONS_LIB} -C panic=abort {source_file} -o {build_dir}/{output_file}.out"
+  else:
+    command = f"{llvm_bin}/clang++ {source_file} -o {build_dir}/{output_file}.out --verbose"
   print(command)
   stdout, stderr, exit_code = run_command(command)
   if exit_code != 0:
@@ -89,12 +94,17 @@ def pytest_generate_tests(metafunc):
     if "test_data" in metafunc.fixturenames:
         os.makedirs("./build", exist_ok=True)
 
-        if os.path.exists(COMPARISON_COUNTER_PATH):
-          os.remove(COMPARISON_COUNTER_PATH)
+        # Under pytest-xdist, every worker re-runs collection (hence this
+        # hook), but only the controller process should reset the shared
+        # counter file - otherwise workers race to truncate/recreate it
+        # mid-run and stomp on each other's results.
+        if os.environ.get("PYTEST_XDIST_WORKER") is None:
+          if os.path.exists(COMPARISON_COUNTER_PATH):
+            os.remove(COMPARISON_COUNTER_PATH)
 
-        comparison_file = open(COMPARISON_COUNTER_PATH, "a+")
-        comparison_file.write("test_name,comparison_counter\n")
-        comparison_file.close()
+          comparison_file = open(COMPARISON_COUNTER_PATH, "a+")
+          comparison_file.write("test_name,comparison_counter\n")
+          comparison_file.close()
 
         tests_file_paths = metafunc.config.getoption("--tests-file")
         test_list = []
@@ -105,10 +115,20 @@ def pytest_generate_tests(metafunc):
             # Access the 'tests' list inside the TOML dictionary
             test_list.extend(config_data.get("tests", []))
 
-            # Use 'test_name' for better output in the terminal
-            ids = [t.get("test_name", str(i)) for i, t in enumerate(test_list)]
+        # Use 'test_name' for better output in the terminal
+        ids = [t.get("test_name", str(i)) for i, t in enumerate(test_list)]
 
-        metafunc.parametrize("test_data", test_list, ids=ids)
+        # All technique combinations of the same test_name share one
+        # un-hardened reference binary (see test_aspis below), compiled by
+        # whichever combination runs first. Pin every combination of a given
+        # test_name to the same xdist worker (via --dist loadgroup) so that
+        # shared compile can never race across workers.
+        params = [
+          pytest.param(t, marks=pytest.mark.xdist_group(name=ids[i]))
+          for i, t in enumerate(test_list)
+        ]
+
+        metafunc.parametrize("test_data", params, ids=ids)
     
 # Tests
 @pytest.mark.timeout(60) # Set a timeout of 60 seconds for each test

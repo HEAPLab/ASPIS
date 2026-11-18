@@ -107,8 +107,48 @@ CallBase *RASM::isCallBB (BasicBlock &BB) {
 
 void RASM::initializeEntryBlocksMap(Module &Md) {
   for (Function &Fn : Md) {
-    if (shouldCompile(Fn, FuncAnnotations)) 
+    if (shouldCompile(Fn, FuncAnnotations))
       FuncEntryBlocks.insert(std::pair<Function*, BasicBlock*>(&Fn, &Fn.front()));
+  }
+}
+
+// Non-hardened callees may call back into hardened functions (e.g. through a vtable):
+// reset the signatures before such calls so the callback's prequel re-initializes them.
+void RASM::resetSignaturesAtExternalCalls(Module &Md, GlobalVariable &RuntimeSig, GlobalVariable &RetSig) {
+  auto *IntType = llvm::Type::getInt32Ty(Md.getContext());
+  std::vector<CallInst*> ExternalCalls;
+
+  for (Function &Fn : Md) {
+    if (shouldCompile(Fn, FuncAnnotations)) {
+      for (BasicBlock &BB : Fn) {
+        for (Instruction &I : BB) {
+          CallInst *Call = dyn_cast<CallInst>(&I);
+          if (Call == nullptr || Call->isInlineAsm() || Call->isMustTailCall()) {
+            continue;
+          }
+          Function *Callee = Call->getCalledFunction();
+          if (Callee != nullptr &&
+              (Callee->isIntrinsic() || shouldCompile(*Callee, FuncAnnotations) ||
+               Callee->getName().contains("DataCorruption_Handler") ||
+               Callee->getName().contains("SigMismatch_Handler"))) {
+            continue;
+          }
+          ExternalCalls.push_back(Call);
+        }
+      }
+    }
+  }
+
+  for (CallInst *Call : ExternalCalls) {
+    IRBuilder<> B(Call);
+    Value *RuntimeSigBackup = B.CreateLoad(IntType, &RuntimeSig, true);
+    Value *RetSigBackup = B.CreateLoad(IntType, &RetSig, true);
+    B.CreateStore(llvm::ConstantInt::get(IntType, INIT_SIGNATURE), &RuntimeSig, true);
+    B.CreateStore(llvm::ConstantInt::get(IntType, INIT_SIGNATURE), &RetSig, true);
+
+    B.SetInsertPoint(Call->getNextNode());
+    B.CreateStore(RuntimeSigBackup, &RuntimeSig, true);
+    B.CreateStore(RetSigBackup, &RetSig, true);
   }
 }
 
@@ -386,6 +426,7 @@ PreservedAnalyses RASM::run(Module &Md, ModuleAnalysisManager &AM) {
 
     #if (INTER_FUNCTION_CFC == 1)
     initializeEntryBlocksMap(Md);
+    resetSignaturesAtExternalCalls(Md, *RuntimeSig, *RetSig);
     #endif
 
     for (Function &Fn : Md) {

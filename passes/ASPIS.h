@@ -76,7 +76,7 @@ class EDDI : public PassInfoMixin<EDDI> {
         bool isValueDuplicated(Instruction &V);
         Function *duplicateFnArgs(Function &Fn, Module &Md);
         void CreateErrBB(Module &Md, Function &Fn, BasicBlock *ErrBB);
-        bool temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B);
+        Value *temporaryArgumentDuplication(Module &Md, llvm::Value *value, IRBuilder<> &B);
         Value *getDuplicateValue(Value *V, Instruction *I);
         void createCompareOnOperand(std::vector<Value *> *CmpInstructions, Value *V, Instruction &I, IRBuilder<> &B);
         void compareValues(std::vector<Value *> *CmpInstructions, Value &V1, Value &V2, IRBuilder<> &B);
@@ -170,6 +170,7 @@ class RASM : public PassInfoMixin<RASM> {
         void splitBBsAtCalls(Module &Md);
         CallBase *isCallBB (BasicBlock &BB);
         void initializeEntryBlocksMap(Module &Md);
+        void resetSignaturesAtExternalCalls(Module &Md, GlobalVariable &RuntimeSig, GlobalVariable &RetSig);
         Value *getCondition(Instruction &I);
         void createCFGVerificationBB (  BasicBlock &BB, 
                                     std::map<BasicBlock*, int> &RandomNumberBBs, 

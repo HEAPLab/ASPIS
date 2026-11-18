@@ -1,0 +1,13 @@
+[package]
+name = "aspis-rust-annotations"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "aspis_rust_annotations"
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+syn = { version = "3.0.6", features = ["full"] }

@@ -78,3 +78,8 @@ add_library(PROFILER SHARED
 				Utils/Utils.cpp
 )
 target_link_libraries(PROFILER PUBLIC TypeDeductionAnalysis)
+
+# RustAnnotationBridge
+add_library(RUSTBRIDGE SHARED
+				RustAnnotationBridge.cpp
+)

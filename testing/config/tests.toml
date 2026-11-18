@@ -48,6 +48,18 @@ test_name = "c_volatile_io"
 source_file = "c/data_duplication_integrity/volatile_io.c"
 
 [[tests]]
+test_name = "c_vector_store"
+source_file = "c/data_duplication_integrity/vector_store.c"
+
+[[tests]]
+test_name = "c_call_branches"
+source_file = "c/data_duplication_integrity/call_branches.c"
+
+[[tests]]
+test_name = "c_const_global_branches"
+source_file = "c/data_duplication_integrity/const_global_branches.c"
+
+[[tests]]
 test_name = "c_arit_pipeline"
 source_file = "c/misc_math/arit_pipeline.c"
 
@@ -86,7 +98,6 @@ source_file = "c/multi_instruction/multi_if_then_else.c"
 [[tests]]
 test_name = "c_multi_if_then_else_var-decl-sign"
 source_file = "c/declared_signatures/multi_if_then_else.c"
-
 
 [[tests]]
 test_name = "c_phi"
@@ -202,3 +213,108 @@ test_name = "cpp_complex"
 source_file = "cpp/complex/*.cpp"
 add_compiler_flags = "-lm"
 black_list = ["--inter-rasm", "--racfed"]
+
+[[tests]]
+test_name = "rust_function_pointer"
+source_file = "rust/control_flow/function_pointer.rs"
+
+[[tests]]
+test_name = "rust_loop_exit"
+source_file = "rust/control_flow/loop_exit.rs"
+
+[[tests]]
+test_name = "rust_nested_branch"
+source_file = "rust/control_flow/nested_branch.rs"
+
+[[tests]]
+test_name = "rust_simple_branch"
+source_file = "rust/control_flow/simple_branch.rs"
+
+[[tests]]
+test_name = "rust_switch_case"
+source_file = "rust/control_flow/switch_case.rs"
+
+[[tests]]
+test_name = "rust_add"
+source_file = "rust/simple/add.rs"
+
+[[tests]]
+test_name = "rust_class"
+source_file = "rust/simple/class.rs"
+black_list = ["--inter-rasm"]
+
+[[tests]]
+test_name = "rust_fact"
+source_file = "rust/simple/fact.rs"
+
+[[tests]]
+test_name = "rust_file_handler"
+source_file = "rust/simple/file_handler.rs"
+black_list = ["--racfed"]
+
+[[tests]]
+test_name = "rust_func"
+source_file = "rust/simple/func.rs"
+
+[[tests]]
+test_name = "rust_heap"
+source_file = "rust/simple/heap.rs"
+black_list = ["--inter-rasm"]
+
+[[tests]]
+test_name = "rust_inline_constexpr"
+source_file = "rust/simple/inline_constexpr.rs"
+
+[[tests]]
+test_name = "rust_lambda_captures"
+source_file = "rust/simple/lambda_captures.rs"
+
+[[tests]]
+test_name = "rust_mul"
+source_file = "rust/simple/mul.rs"
+
+[[tests]]
+test_name = "rust_ptr"
+source_file = "rust/simple/ptr.rs"
+
+[[tests]]
+test_name = "rust_stl_containers_advanced"
+source_file = "rust/simple/stl_containers_advanced.rs"
+
+[[tests]]
+test_name = "rust_template"
+source_file = "rust/simple/template.rs"
+
+[[tests]]
+test_name = "rust_volatile_memory_order"
+source_file = "rust/simple/volatile_memory_order.rs"
+
+[[tests]]
+test_name = "rust_vector_store"
+source_file = "rust/data_duplication_integrity/vector_store.rs"
+
+[[tests]]
+test_name = "rust_call_branches"
+source_file = "rust/data_duplication_integrity/call_branches.rs"
+
+[[tests]]
+test_name = "rust_const_global_branches"
+source_file = "rust/data_duplication_integrity/const_global_branches.rs"
+
+[[tests]]
+test_name = "rust_complex"
+source_file = "rust/complex/main_full_test.rs"
+add_compiler_flags = "-lm"
+
+[[tests]]
+test_name = "rust_basicmath"
+source_file = "rust/mibench/basicmath.rs"
+add_compiler_flags = "-lm"
+
+[[tests]]
+test_name = "rust_crc32_mibench"
+source_file = "rust/mibench/crc32_mibench.rs"
+
+[[tests]]
+test_name = "rust_dijkstra_small_mibench"
+source_file = "rust/mibench/dijkstra_small_mibench.rs"

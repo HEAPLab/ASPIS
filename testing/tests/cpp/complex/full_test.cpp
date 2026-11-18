@@ -17,7 +17,7 @@ void SigMismatch_Handler()
 
 float relAltitude(float pressure, float pressureRef, float temperatureRef)
 {
-    return temperatureRef / 0.0065f * (1 - std::powf(pressure / pressureRef, 0.19026119f));
+    return temperatureRef / 0.0065f * (1 - std::pow(pressure / pressureRef, 0.19026119f));
 }
 
 // testing unexpected special variable

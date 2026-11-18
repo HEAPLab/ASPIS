@@ -50,7 +50,7 @@ include/divisible/*
 .cache/*
 .idea/*.xml
 .vscode/*
-.venv/*
+**/.venv/
 
 build/**/*
 test_build/**/*
@@ -69,3 +69,6 @@ examples/cuda/add
 
 # IDE
 .idea/
+
+# Rust
+**/target/

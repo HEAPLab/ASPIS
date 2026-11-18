@@ -1,0 +1,49 @@
+{
+  "name": "ASPIS (LLVM 21 + Rust 1.93)",
+  "image": "docker.io/ledmington/aspis-deps:llvm-rust1.93",
+  "remoteUser": "ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "ubuntu",
+      "upgradePackages": true
+    }
+  },
+  "containerEnv": {
+    "LLVM_DIR": "/opt/llvm-21/lib/cmake/llvm"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "cmake.configureArgs": [
+          "-DLLVM_DIR=/opt/llvm-21/lib/cmake/llvm",
+          "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+        ],
+        "cmake.generator": "Ninja",
+        "clangd.arguments": [
+          "--compile-commands-dir=${workspaceFolder}/build"
+        ],
+        "python.defaultInterpreterPath": "${workspaceFolder}/testing/.venv/bin/python"
+      },
+      "extensions": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-vscode.cmake-tools",
+        "ms-python.python",
+        "rust-lang.rust-analyzer",
+        "ms-python.black-formatter",
+        "ms-vscode.cpptools-extension-pack",
+        "KylinIdeTeam.cmake-intellisence",
+        "vadimcn.vscode-lldb",
+        "janisdd.vscode-edit-csv",
+        "mechatroner.rainbow-csv",
+        "timonwong.shellcheck",
+        "RReverser.llvm",
+        "tamasfe.even-better-toml",
+        "xaver.clang-format"
+      ]
+    }
+  },
+  "postCreateCommand": {
+    "submodules": "git submodule update --init --recursive",
+    "python-venv": "python3 -m venv testing/.venv && testing/.venv/bin/pip install -r testing/requirements.txt"
+  }
+}

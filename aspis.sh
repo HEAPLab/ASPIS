@@ -15,8 +15,10 @@ exclude_file=""
 excluded_files=""
 asm_file=""
 asm_files=""
+lib_files=""
 input_files=""
 clang_options=
+rustc_options=()
 eddi_options="-S"
 cfc_options="-S"
 llvm_bin=$(dirname "$(which clang)")
@@ -27,7 +29,8 @@ cfc=0 # 0 = cfcss,  1 = rasm,   2 = inter-rasm
 debug_enabled=false
 verbose=false
 cleanup=true
-libstdcpp_added=false
+cpp_input=false
+rust_input=false
 enable_profiling=false
 
 # Check if the shell supports colors
@@ -82,7 +85,21 @@ perform_platform_checks() {
 
 parse_commands() {
 
-    raw_opts="$@"
+    ## Everything after `--` is passed verbatim to rustc. It is kept as an array, unlike the other
+    ## options, so that arguments containing spaces (e.g. `--check-cfg 'cfg(feature, values(...))'`)
+    ## survive.
+    local aspis_opts=()
+    while (($# > 0)); do
+        if [[ "$1" == "--" ]]; then
+            shift
+            rustc_options=("$@")
+            break
+        fi
+        aspis_opts+=("$1")
+        shift
+    done
+
+    raw_opts="${aspis_opts[*]}"
 
     for opt in $raw_opts; do
         case $parse_state in
@@ -102,9 +119,10 @@ parse_commands() {
     |                                                                  |
     '--.. .- -. . .-.. .-.. .- -.-. ..- .-.. ---=-=-=-=-=-=-=-=-=-=-=-='
 
-    Usage: aspis.sh [options] file(s)...
+    Usage: aspis.sh [options] file(s)... [-- rustc-options...]
 
-    The specified files can be any C source code files. 
+    The specified files can be any C, C++, or Rust source code files, or LLVM IR
+    files (.ll/.bc) that are linked in as they are, skipping the front-end.
     By default, the compiler performs EDDI+CFCSS hardening.
 
     Options:
@@ -186,21 +204,21 @@ EOF
                         if [[ ${#opt} -eq 9 ]]; then
                             parse_state=4;
                         else
-                            exclude_file=`echo "$opt" | cut -b 9`;
+                            exclude_file=$(echo "$opt" | cut -b 9);
                         fi;
                         ;;
                     --asmfiles*)
                         if [[ ${#opt} -eq 10 ]]; then
                             parse_state=5;
                         else
-                            asm_file=`echo "$opt" | cut -b 10`;
+                            asm_file=$(echo "$opt" | cut -b 10);
                         fi;
                         ;;
                     --build-dir*)
                         if [[ ${#opt} -eq 11 ]]; then
                             parse_state=6;
                         else
-                            build_dir=`echo "$opt" | cut -b 10`;
+                            build_dir=$(echo "$opt" | cut -b 10);
                         fi;
                         ;;
                     --eddi)
@@ -255,17 +273,21 @@ EOF
                     --no-cleanup)
                         cleanup=false;
                         ;;
-                    -lstdc++)
-                        libstdcpp_added=true
-                        ;;
                     *.c | *.cpp)
                         input_files="$input_files $opt";
-                        # Check if it's a .cpp file and if -lstdc++ hasn't been added yet
-                        if [[ "$opt" == *.cpp ]] && [[ "$libstdcpp_added" == false ]]; then
-                            clang_options="$clang_options -lstdc++"
-                            libstdcpp_added=true 
+                        if [[ "$opt" == *.cpp ]]; then
+                            cpp_input=true
                         fi
-                        
+                        ;;
+                    *.rs)
+                        input_files="$input_files $opt";
+                        rust_input=true;
+                        ;;
+                    *.ll | *.bc)
+                        input_files="$input_files $opt";
+                        ;;
+                    *.a | *.rlib)
+                        lib_files="$lib_files $opt";
                         ;;
                     *)
                         clang_options="$clang_options $opt";
@@ -324,13 +346,22 @@ EOF
         }
     fi
 
-    CLANG="${llvm_bin}/clang${suffix}" 
+    CLANG="${llvm_bin}/clang${suffix}"
+    CLANGXX="${llvm_bin}/clang++${suffix}"
     OPT="${llvm_bin}/opt${suffix}"
     LLVM_LINK="${llvm_bin}/llvm-link${suffix}"
+    RUSTC="rustc"
 
     if [[ -n "$config_file" ]]; then
         CLANG="${CLANG} --config ${config_file}"
+        CLANGXX="${CLANGXX} --config ${config_file}"
     fi;
+
+    if [[ "$cpp_input" == true ]]; then
+        LINKER=$CLANGXX
+    else
+        LINKER=$CLANG
+    fi
 }
 
 run_aspis() {
@@ -339,22 +370,77 @@ run_aspis() {
     fi
 
     exe mkdir -p $build_dir
-    exe rm -f $build_dir/*.ll
+
+    ## Intermediate .ll files emitted by the frontend, linked into out.ll
+    ll_files=()
+    excluded_ll_files=()
+    ## IR files given as input, linked as they are (and never removed by the cleanup)
+    ir_input_files=()
 
     title_msg "Front-end and pre-processing"
 
+    ## Rust sources may use the #[aspis(...)] macro from the rust-annotations crate. It only emits
+    ## the annotations when compiled with `--cfg aspis`, so a plain rustc build ignores them.
+    rust_annotations_lib="$DIR/rust-annotations/target/release/libaspis_rust_annotations.so"
+    rust_annotations_extern=(--extern aspis_rust_annotations="$rust_annotations_lib")
+    if [[ " ${rustc_options[*]} " == *" aspis_rust_annotations="* ]]; then
+        rust_annotations_extern=()
+    elif [[ "$rust_input" == true && ! -f "$rust_annotations_lib" ]]; then
+        error_msg "Rust annotations crate not found at $rust_annotations_lib. Build it with 'cargo build --release' in $DIR/rust-annotations."
+    fi
+
     ## FRONTEND
     for input_file in $input_files; do
+        if [[ "$input_file" == *.ll || "$input_file" == *.bc ]]; then
+            ir_input_files+=("$input_file")
+            continue
+        fi
         # Extract the filename without extension
         filename=$(basename "$input_file" | sed 's/\.[^.]*$//')
         # Compile the file to LLVM IR (.ll) and save it in the build directory
-        exe $CLANG "$input_file" $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
+        if [[ "$input_file" == *.rs ]]; then
+            ## Defaults, unless the user passed their own after `--`
+            rustc_defaults=()
+            if [[ " ${rustc_options[*]} " != *" --crate-type"* ]]; then
+                rustc_defaults+=(--crate-type=bin)
+            fi
+            if [[ " ${rustc_options[*]} " != *" --edition"* ]]; then
+                rustc_defaults+=(--edition 2024)
+            fi
+
+            exe $RUSTC \
+                "${rustc_defaults[@]}" \
+                "${rustc_options[@]}" \
+                --cfg aspis \
+                --check-cfg 'cfg(aspis)' \
+                "${rust_annotations_extern[@]}" \
+                -C opt-level=0 \
+                -C panic=abort \
+                --emit=llvm-ir \
+                "$input_file" -o "$build_dir/$filename.ll"
+        else
+            exe $CLANG "$input_file" $clang_options -S -emit-llvm -O0 -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
+        fi
+        ll_files+=("$build_dir/$filename.ll")
     done
 
+    ## Rust programs reference symbols from Rust's standard library, so the final link must pull in
+    ## the toolchain's libstd.
+    rust_link_flags=""
+    if [[ "$rust_input" == true ]]; then
+        rust_lib_dir="$($RUSTC --print target-libdir)"
+        rust_std_lib="$(basename "$(ls "$rust_lib_dir"/libstd-*.so | head -n 1)" .so)"
+        rust_link_flags="-L$rust_lib_dir -Wl,-rpath,$rust_lib_dir -l${rust_std_lib#lib}"
+    fi
+
     ## LINK & PREPROCESS
-    exe $LLVM_LINK $build_dir/*.ll -o $build_dir/out.ll
+    exe $LLVM_LINK "${ll_files[@]}" "${ir_input_files[@]}" -o $build_dir/out.ll
 
     success_msg "Emitted and linked IR."
+
+    ## Explicitly use the Rust annotation bridge before anything else.
+    exe $OPT -load-pass-plugin=$DIR/build/passes/libRUSTBRIDGE.so --passes="aspis-rust-annotation-bridge" $build_dir/out.ll -o $build_dir/out.ll
+    success_msg "Translated Rust annotations."
 
     if [[ $debug_enabled == false ]]; then
         exe $OPT --passes="strip" $build_dir/out.ll -o $build_dir/out.ll
@@ -388,7 +474,9 @@ run_aspis() {
     esac
     success_msg "Applied data protection passes."
 
-    exe $OPT --passes="simplifycfg" $build_dir/out.ll -o $build_dir/out.ll
+    ## simplifycfg can fold chains of comparisons back into switches, which the CFC passes
+    ## do not support, so lower them again.
+    exe $OPT --passes="simplifycfg,lower-switch" $build_dir/out.ll -o $build_dir/out.ll
 
     ## CONTROL-FLOW CHECKING
     case $cfc in
@@ -418,15 +506,16 @@ run_aspis() {
 
         ## Frontend & linking
         exe mv $build_dir/out.ll $build_dir/out.ll.bak
-        exe rm $build_dir/*.ll
+        exe rm -f "${ll_files[@]}"
         exe mv $build_dir/out.ll.bak $build_dir/out.ll
         for input_file in $excluded_files; do
             # Extract the filename without extension
             filename=$(basename "$input_file" | sed 's/\.[^.]*$//')
             # Compile the file to LLVM IR (.ll) and save it in the build directory
             exe $CLANG "$input_file" $clang_options -S -emit-llvm -Xclang -disable-O0-optnone -o "$build_dir/$filename.ll"
+            excluded_ll_files+=("$build_dir/$filename.ll")
         done
-        exe $LLVM_LINK $build_dir/*.ll -o $build_dir/out.ll
+        exe $LLVM_LINK $build_dir/out.ll "${excluded_ll_files[@]}" -o $build_dir/out.ll
     fi;
     success_msg "Linked excluded files to the compilation."
 
@@ -445,6 +534,13 @@ run_aspis() {
         done < "$asm_file";
     fi;
 
+    ## Libraries go after out.ll
+    ## The --start-group/--end-group lets them depend on each other in any order.
+    lib_link_flags=""
+    if [[ -n "$lib_files" ]]; then
+        lib_link_flags="-Wl,--start-group $lib_files -Wl,--end-group"
+    fi
+
     ## Backend
     exe $OPT $build_dir/out.ll -o $build_dir/out.ll -S $opt_flags
     if [[ "$enable_profiling" == "true" ]]; then
@@ -452,7 +548,7 @@ run_aspis() {
         exe $OPT -load-pass-plugin=$DIR/build/passes/libPROFILER.so --passes="aspis-insert-check-profile" $build_dir/out.ll -o $build_dir/out.ll -S
         success_msg "Code instrumented."
 
-        exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
+        exe $LINKER $clang_options $build_dir/out.ll $asm_files $lib_link_flags $rust_link_flags -o $build_dir/$output_file
         success_msg "Instrumented binary emitted."
 
         exe $build_dir/$output_file
@@ -468,14 +564,14 @@ run_aspis() {
             exe cp $build_dir/out.ll $build_dir/$output_file.bak
             ;;
         *)
-            exe $CLANG $clang_options $build_dir/out.ll $asm_files -o $build_dir/$output_file 
+            exe $LINKER $clang_options $build_dir/out.ll $asm_files $lib_link_flags $rust_link_flags -o $build_dir/$output_file
             ;;
     esac
     success_msg "Binary emitted."
 
     #Cleanup
     if [[ $cleanup == true ]]; then
-        rm -f $build_dir/*.ll
+        rm -f "${ll_files[@]}" "${excluded_ll_files[@]}" $build_dir/out.ll
         success_msg "Cleaned cached files."
     fi
 
@@ -490,4 +586,7 @@ run_aspis() {
 
 parse_commands "$@"
 perform_platform_checks $CLANG $OPT $LLVM_LINK
+if [[ "$rust_input" == true ]] && ! command -v "$RUSTC" >/dev/null 2>&1; then
+    error_msg "\nCommand rustc not found on PATH. Rust source files require rustc."
+fi
 run_aspis

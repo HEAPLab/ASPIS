@@ -21,6 +21,17 @@ RUN apt-get update && apt-get install -y \
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 \
     && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
 
+# ==== Rust toolchain
+ARG RUST_VERSION=1.93.0
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:$PATH
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --no-modify-path --profile minimal --default-toolchain ${RUST_VERSION} \
+    && chmod -R a+w ${RUSTUP_HOME} ${CARGO_HOME} \
+    && rustc --version --verbose
+
 # ==== Download LLVM 21.1.8
 WORKDIR /workspace/
 
@@ -39,7 +50,7 @@ ENV CXX=/usr/local/bin/clang++-16
 ENV CC=/usr/local/bin/clang-16
 
 RUN wget https://apt.llvm.org/llvm.sh  \
-    &&  chmod +x llvm.sh \
+    && chmod +x llvm.sh \
     && ./llvm.sh
 
 # LLVM CMAKE CONFIG 
@@ -48,7 +59,22 @@ WORKDIR /workspace/llvm-project-21.1.8.src
 
 RUN mkdir build \
     && cd build \
-    && cmake -S ../llvm -B . -G "Ninja" -DCMAKE_BUILD_TYPE=Debug -DLLVM_ENABLE_PROJECTS='clang' -DLLVM_INSTALL_UTILS=ON -DLLVM_BUILD_LLVM_DYLIB=ON -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_OPTIMIZED_TABLEGEN=ON -DLLVM_INCLUDE_EwebXAMPLES=OFF -DLLVM_USE_LINKER=NO  -DCMAKE_C_COMPILER=clang-16 -DCMAKE_CXX_COMPILER=clang++-16 -DLLVM_ENABLE_RTTI=OFF -DLLVM_ENABLE_EH=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_CROSSCOMPILING=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+    && cmake -S ../llvm -B . -G "Ninja" \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DLLVM_ENABLE_PROJECTS='clang' \
+        -DLLVM_INSTALL_UTILS=ON \
+        -DLLVM_BUILD_LLVM_DYLIB=ON \
+        -DLLVM_LINK_LLVM_DYLIB=ON \
+        -DLLVM_OPTIMIZED_TABLEGEN=ON \
+        -DLLVM_INCLUDE_EwebXAMPLES=OFF \
+        -DLLVM_USE_LINKER=NO \
+        -DCMAKE_C_COMPILER=clang-16 \
+        -DCMAKE_CXX_COMPILER=clang++-16 \
+        -DLLVM_ENABLE_RTTI=OFF \
+        -DLLVM_ENABLE_EH=OFF \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
+        -DCMAKE_CROSSCOMPILING=ON \
+        -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
     && ninja -j10
 
 RUN export PATH=/home/ubuntu/llvm-project-21.1.8.src/build/bin:$PATH
@@ -63,7 +89,8 @@ RUN git clone https://github.com/HEAPLab/ASPIS.git \
     && cd ASPIS \
     && mkdir build \
     && cmake -B build -DLLVM_DIR=/workspace/llvm-project-21.1.8.src/build/lib/cmake/llvm \
-    && cmake --build build
+    && cmake --build build \
+    && cargo build --release --manifest-path rust-annotations/Cargo.toml
 
 # Set the working directory to where ASPIS is located
 WORKDIR /workspace/ASPIS

@@ -4,6 +4,16 @@
 
 #include <stdio.h>
 
+void DataCorruption_Handler() {
+    printf("ASPIS_FAULT_INJECTION_CAUGHT: DataCorruption_Handler\n");
+    fflush(stdout);
+}
+
+void SigMismatch_Handler() {
+    printf("ASPIS_FAULT_INJECTION_CAUGHT: SigMismatch_Handler\n");
+    fflush(stdout);
+}
+
 __attribute__((annotate("to_harden")))
 int sum = 0;
 
