@@ -1323,6 +1323,10 @@ void EDDI::duplicateGlobals(Module &Md) {
         GVCopy->setSection(DuplicateSecName);
       }
 
+      if (GV->hasSection()) {
+        GVCopy->setSection(GV->getSection());
+      }
+
       GVCopy->setAlignment(GV->getAlign());
       GVCopy->setDSOLocal(GV->isDSOLocal());
       // Save the duplicated global so that the duplicate can be used as operand

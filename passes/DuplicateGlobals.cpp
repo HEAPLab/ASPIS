@@ -209,6 +209,9 @@ PreservedAnalyses DuplicateGlobals::run(Module &Md, ModuleAnalysisManager &AM) {
                                       GV->isExternallyInitialized()
                                       );
         GVCopy->setAlignment(GV->getAlign());
+        if (GV->hasSection())
+          GVCopy->setSection(GV->getSection());
+        GVCopy->setDSOLocal(GV->isDSOLocal());
         DuplicatedGlobals.insert(std::pair<GlobalVariable*, GlobalVariable*>(GV, GVCopy));
       }
     }
